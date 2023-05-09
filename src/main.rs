@@ -12,7 +12,7 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
 };
 //use async_log::span;
-use log::info;
+use log::{error, info};
 mod channels;
 use channels::IPCMessage;
 
@@ -32,6 +32,7 @@ lazy_static! {
         HashMap::new();
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
+    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "chat".to_string()];
 }
 
 #[tokio::main]
@@ -98,7 +99,7 @@ async fn main() -> Result<(), Error> {
                         .unwrap();
                 }
                 goval::command::Body::OpenChan(open_chan) => {
-                    if open_chan.service == "gcsfiles".to_owned() {
+                    if IMPLEMENTED_SERVICES.contains(&open_chan.service) {
                         info!("executing openchan main block");
                         let service = open_chan.service.clone();
                         let mut max_channel = MAX_CHANNEL.lock().await;
@@ -106,6 +107,8 @@ async fn main() -> Result<(), Error> {
                         let channel_id = max_channel.clone();
                         let channel_id_held = channel_id.clone();
                         drop(max_channel);
+
+                        info!("Awating queue write");
 
                         CHANNEL_MESSAGES
                             .write(channel_id_held)
@@ -120,8 +123,11 @@ async fn main() -> Result<(), Error> {
                                 local
                                     .run_until(async {
                                         // local.spawn_local(async move {
-                                        let main_module =
-                                            deno_core::resolve_path("service.js").unwrap();
+                                        let main_module = deno_core::resolve_path(&format!(
+                                            "service/{}.js",
+                                            open_chan.service
+                                        ))
+                                        .unwrap();
                                         let mut js_runtime =
                                             deno_core::JsRuntime::new(deno_core::RuntimeOptions {
                                                 module_loader: Some(std::rc::Rc::new(
@@ -277,9 +283,14 @@ async fn accept_connection(
     });
 
     while let Some(i) = sent.recv().await {
-        write
-            .send(tungstenite::Message::Binary(i.bytes))
-            .await
-            .unwrap();
+        match write.send(tungstenite::Message::Binary(i.bytes)).await {
+            Ok(_) => {}
+            Err(err) => {
+                error!(
+                    "The following error occured while sending a message: {}",
+                    err
+                )
+            }
+        }
     }
 }

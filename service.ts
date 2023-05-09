@@ -10,6 +10,7 @@ class Chat extends ServiceBase {
 				this.clients.filter((arr_session) => arr_session !== session),
 			);
 		} else if (cmd.readdir) {
+			cmd.read?.content
 			api.Command.create({
 				files: { files: [{ path: "test.txt", type: api.File.Type.DIRECTORY }, { path: "fake file" }] },
 			});

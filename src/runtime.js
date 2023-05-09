@@ -5,7 +5,7 @@ Deno.core.initializeAsyncOps();
 	const core = Deno.core;
 
 	function argsToMessage(...args) {
-		return args.map((arg) => JSON.stringify(arg ? arg : null)).join(" ");
+		return args.map((arg) => JSON.stringify(arg != undefined ? arg : null)).join(" ");
 	}
 
 	function makeLog(level) {
@@ -29,8 +29,20 @@ Deno.core.initializeAsyncOps();
 })(globalThis);
 
 globalThis.fs = {
-	readDir: (path) => {
-		
+	readDir: async (path) => {
+		return await Deno.core.ops.op_list_dir(path)
+	},
+	writeFile: async (path, contents = "") => {
+		return await Deno.core.ops.op_write_file(path, contents)
+	},
+	readFile: async (path) => {
+		return await Deno.core.ops.op_read_file(path)
+	},
+	remove: async (path) => {
+		return await Deno.core.ops.op_remove_file(path)
+	},
+	rename: async (oldPath, newPath) => {
+		return await Deno.core.ops.op_move_file(oldPath, newPath)
 	}
 }
 
@@ -45,7 +57,15 @@ class ServiceBase {
 	async _recv() {
 		const message = await Deno.core.ops.op_recv_info(this.id);
 		const cmd = api.Command.decode(message.bytes);
-		const res = await this.recv(cmd, message.session);
+		let res;
+
+		try {
+			res = await this.recv(cmd, message.session);
+		} catch(err) {
+			res = api.Command.create({ error: err.toString() });
+			console.error(err.toString())
+		}
+
 		if (res) {
 			res.ref = cmd.ref;
 			await this.send(res, message.session);
