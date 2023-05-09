@@ -3,5 +3,9 @@
         "./Cargo.toml",
         "./Cargo.toml",
         "./Cargo.toml"
-    ]
+    ],
+    "[javascript]": {
+        "editor.formatOnSave": false
+    },
+    "editor.formatOnSave": true,
 }

@@ -11,7 +11,7 @@ class Chat extends ServiceBase {
 			);
 		} else if (cmd.readdir) {
 			api.Command.create({
-				files: { files: [{ path: "test.txt" }, { path: "fake file" }] },
+				files: { files: [{ path: "test.txt", type: api.File.Type.DIRECTORY }, { path: "fake file" }] },
 			});
 		}
 	}

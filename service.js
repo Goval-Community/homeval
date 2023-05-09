@@ -8,8 +8,16 @@ class Service extends ServiceBase {
 			);
 		}
 		if (cmd.readdir) {
+			let files = []
+			
+			try {
+				files = await Deno.core.ops.op_list_dir(cmd.readdir.path)
+			} catch(err) {
+				return api.Command.create({error: err.toString()})
+			}
+
 			return api.Command.create({
-				files: { files: [{ path: "test.txt" }, { path: "fake file" }] },
+				files: { files: files.map(item => {return {path: item.path, type: !item.directory ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },
 			});
 		}
 	}

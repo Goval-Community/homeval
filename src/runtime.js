@@ -5,7 +5,7 @@ Deno.core.initializeAsyncOps();
 	const core = Deno.core;
 
 	function argsToMessage(...args) {
-		return args.map((arg) => JSON.stringify(arg)).join(" ");
+		return args.map((arg) => JSON.stringify(arg ? arg : null)).join(" ");
 	}
 
 	function makeLog(level) {
@@ -28,6 +28,12 @@ Deno.core.initializeAsyncOps();
 	};
 })(globalThis);
 
+globalThis.fs = {
+	readDir: (path) => {
+		
+	}
+}
+
 class ServiceBase {
 	constructor(id, service, name) {
 		this.id = id;
@@ -38,7 +44,7 @@ class ServiceBase {
 
 	async _recv() {
 		const message = await Deno.core.ops.op_recv_info(this.id);
-		const cmd = api.Command.decode(Buffer.from(message.contents, "base64"));
+		const cmd = api.Command.decode(message.bytes);
 		const res = await this.recv(cmd, message.session);
 		if (res) {
 			res.ref = cmd.ref;
@@ -55,10 +61,9 @@ class ServiceBase {
 	async send(cmd, session) {
 		cmd.channel = this.id;
 		cmd.session = session;
+		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
 		await Deno.core.ops.op_send_msg({
-			contents: Buffer.from(api.Command.encode(cmd).finish()).toString(
-				"base64",
-			),
+			bytes: buf,
 			session: session,
 		});
 	}

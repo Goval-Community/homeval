@@ -2,7 +2,6 @@
 use goval_impl::goval;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
-
 //use std::fmt::Binary;
 use std::{env, io::Error, sync::Arc};
 
@@ -12,99 +11,19 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
 };
-
 //use async_log::span;
-use log::{info, log};
+use log::info;
 mod channels;
-use channels::{IPCMessage, JsMessage};
+use channels::IPCMessage;
 
-use deno_core::error::AnyError;
-use deno_core::{op, Extension};
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Service {
-    pub service: String,
-    pub name: Option<String>,
-    pub id: i32,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ConsoleLogLevels {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-}
-
-impl ConsoleLogLevels {
-    pub fn to_log(&self) -> log::Level {
-        match self {
-            ConsoleLogLevels::Trace => log::Level::Trace,
-            ConsoleLogLevels::Debug => log::Level::Debug,
-            ConsoleLogLevels::Info => log::Level::Info,
-            ConsoleLogLevels::Warn => log::Level::Warn,
-            ConsoleLogLevels::Error => log::Level::Error,
-        }
-    }
-}
-
-#[op]
-fn op_console_log(
-    level: ConsoleLogLevels,
-    service: Service,
-    message: String,
-) -> Result<(), AnyError> {
-    let mut name = "".to_string();
-    match service.name {
-        None => {}
-        Some(_name) => {
-            name = format!(":{}", _name);
-        }
-    }
-    let target = &format!("goval_impl/v8: {}{}", service.service, name);
-
-    log!(target: target, level.to_log(), "{}", message);
-    Ok(())
-}
-
-#[op]
-async fn op_send_msg(msg: JsMessage) -> Result<(), AnyError> {
-    SESSION_MAP
-        .read(&msg.session)
-        .get()
-        .unwrap()
-        .send(msg.to_ipc())
-        .unwrap();
-    Ok(())
-}
-
-#[op]
-async fn op_recv_info(channel: i32) -> Result<JsMessage, AnyError> {
-    // let queues_clone = CHANNEL_MESSAGES.clone();
-    // let internal = 0 as i32;
-    // info!("Checking for channel: {} in queue list", internal);
-    let _read = CHANNEL_MESSAGES.read(&channel);
-    if !_read.contains_key() {
-        return Err(AnyError::new(Error::new(
-            std::io::ErrorKind::NotFound,
-            "not found",
-        )));
-    }
-    let queue = _read.get().unwrap();
-
-    let res = queue.pop().await;
-    Ok(res.to_js())
-}
+mod deno_extension;
+use deno_extension::{make_extension, Service};
 
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(1));
-    static ref MAX_CHANNEL: Arc<Mutex<i32>> = Arc::new(Mutex::new(1));
+    static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
+    static ref MAX_CHANNEL: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
 }
 
 use c_map::HashMap;
@@ -160,7 +79,7 @@ async fn main() -> Result<(), Error> {
     let session_map_clone = SESSION_MAP.clone();
     let _channel_map: RwLock<HashMap<i32, deno_core::JsRuntime>> = RwLock::new(HashMap::new());
     while let Some(i) = rx.recv().await {
-        let cmd = goval::Command::decode(&*i.bytes).unwrap();
+        let cmd = i.to_cmd().unwrap();
         //println!("{}: {:#?}", i.session, cmd);
 
         if cmd.channel == 0 {
@@ -208,13 +127,7 @@ async fn main() -> Result<(), Error> {
                                                 module_loader: Some(std::rc::Rc::new(
                                                     deno_core::FsModuleLoader,
                                                 )),
-                                                extensions: vec![Extension::builder()
-                                                    .ops(vec![
-                                                        op_recv_info::decl(),
-                                                        op_send_msg::decl(),
-                                                        op_console_log::decl(),
-                                                    ])
-                                                    .build()],
+                                                extensions: vec![make_extension()],
                                                 ..Default::default()
                                             });
 
