@@ -69,7 +69,7 @@ class ServiceBase {
 					await this.send(res, message.ipc.session);
 				}
 			}).catch(async (err) => {
-				res = api.Command.create({ error: err.toString(), ref: cmd.ref });
+				const res = api.Command.create({ error: err.toString(), ref: cmd.ref });
 				console.error(err.toString());
 				await this.send(res, message.ipc.session);
 			});

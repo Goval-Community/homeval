@@ -16,14 +16,14 @@ class Service extends ServiceBase {
 		if (cmd.write) {
 			let contents = cmd.write.content
 			if (contents.length === 0) {
-				contents = {}
+				contents = []
 			}
 			await fs.writeFile(cmd.write.path, contents)
 			return api.Command.create({ok:{}})
 		}
 		if (cmd.read) {
-			const contents = await fs.readFile(cmd.write.path)
-			return api.Command.create({file:{path:cmd.write.path, content: contents}})
+			const contents = await fs.readFile(cmd.read.path)
+			return api.Command.create({file:{path:cmd.read.path, content: contents}})
 		}
 		if (cmd.remove) {
 			await fs.remove(cmd.remove.path)
