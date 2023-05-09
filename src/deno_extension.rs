@@ -7,22 +7,30 @@ use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use deno_core::error::AnyError;
 
 use crate::channels::IPCMessage;
-use log::{info, log, warn};
+use log::{error, info, log};
 use std::io::Error;
 
 #[op]
 async fn op_send_msg(msg: IPCMessage) -> Result<(), AnyError> {
-    crate::SESSION_MAP
-        .read(&msg.session.clone())
-        .get()
-        .unwrap()
-        .send(msg)
-        .unwrap();
+    if let Some(sender) = crate::SESSION_MAP.read(&msg.session.clone()).get() {
+        sender.send(msg)?;
+    } else {
+        error!("Missing session outbound message queue in op_send_msg")
+    }
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum JsMessage {
+    #[serde(rename = "ipc")]
+    IPC(IPCMessage),
+    Attach(i32),
+    Detach(i32),
+}
+
 #[op]
-async fn op_recv_info(channel: i32) -> Result<IPCMessage, AnyError> {
+async fn op_recv_info(channel: i32) -> Result<JsMessage, AnyError> {
     // let queues_clone = CHANNEL_MESSAGES.clone();
     // let internal = 0 as i32;
     // info!("Checking for channel: {} in queue list", internal);
@@ -61,7 +69,7 @@ impl ConsoleLogLevels {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     pub service: String,
@@ -131,18 +139,16 @@ async fn op_list_dir(path: String) -> Result<Vec<File>, AnyError> {
     let parent = std::path::Path::new(&path);
     while let Some(fs_path) = dir.next().await {
         let file = fs_path?;
-        let path = file
-            .path()
-            .strip_prefix(parent)?
-            .to_str()
-            .unwrap()
-            .to_string();
-        let file_type = FileType::from_file_type(file.file_type().await?)?;
+        if let Some(str_path) = file.path().strip_prefix(parent)?.to_str() {
+            let file_type = FileType::from_file_type(file.file_type().await?)?;
 
-        ret.push(File {
-            path,
-            r#type: file_type,
-        });
+            ret.push(File {
+                path: str_path.to_string(),
+                r#type: file_type,
+            });
+        } else {
+            error!("Got none from Path#to_str in op_list_dir")
+        }
     }
     Ok(ret)
 }

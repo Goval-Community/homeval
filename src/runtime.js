@@ -5,7 +5,8 @@ Deno.core.initializeAsyncOps();
 	const core = Deno.core;
 
 	function argsToMessage(...args) {
-		return args.map((arg) => JSON.stringify(arg != undefined ? arg : null)).join(" ");
+		return args.map((arg) => JSON.stringify(arg !== undefined ? arg : null))
+			.join(" ");
 	}
 
 	function makeLog(level) {
@@ -30,21 +31,21 @@ Deno.core.initializeAsyncOps();
 
 globalThis.fs = {
 	readDir: async (path) => {
-		return await Deno.core.ops.op_list_dir(path)
+		return await Deno.core.ops.op_list_dir(path);
 	},
 	writeFile: async (path, contents = "") => {
-		return await Deno.core.ops.op_write_file(path, contents)
+		return await Deno.core.ops.op_write_file(path, contents);
 	},
 	readFile: async (path) => {
-		return await Deno.core.ops.op_read_file(path)
+		return await Deno.core.ops.op_read_file(path);
 	},
 	remove: async (path) => {
-		return await Deno.core.ops.op_remove_file(path)
+		return await Deno.core.ops.op_remove_file(path);
 	},
 	rename: async (oldPath, newPath) => {
-		return await Deno.core.ops.op_move_file(oldPath, newPath)
-	}
-}
+		return await Deno.core.ops.op_move_file(oldPath, newPath);
+	},
+};
 
 class ServiceBase {
 	constructor(id, service, name) {
@@ -56,19 +57,24 @@ class ServiceBase {
 
 	async _recv() {
 		const message = await Deno.core.ops.op_recv_info(this.id);
-		const cmd = api.Command.decode(message.bytes);
-		let res;
 
-		try {
-			res = await this.recv(cmd, message.session);
-		} catch(err) {
-			res = api.Command.create({ error: err.toString() });
-			console.error(err.toString())
-		}
+		if (message.attach) {
+			this.attach(message.attach);
+		} else if (message.ipc) {
+			const cmd = api.Command.decode(message.ipc.bytes);
 
-		if (res) {
-			res.ref = cmd.ref;
-			await this.send(res, message.session);
+			this.recv(cmd, message.session).then(async (res) => {
+				if (res) {
+					res.ref = cmd.ref;
+					await this.send(res, message.ipc.session);
+				}
+			}).catch(async (err) => {
+				res = api.Command.create({ error: err.toString(), ref: cmd.ref });
+				console.error(err.toString());
+				await this.send(res, message.ipc.session);
+			});
+		} else {
+			console.error("Unknown IPC message", message)
 		}
 
 		await this._recv();

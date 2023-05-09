@@ -17,7 +17,7 @@ class Service extends ServiceBase {
 			}
 
 			return api.Command.create({
-				files: { files: files.map(item => {return {path: item.path, type: !item.directory ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },
+				files: { files: files.map(item => {return {path: item.path, type: item.type !== "directory" ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },
 			});
 		}
 	}

@@ -22,4 +22,8 @@ impl IPCMessage {
     pub fn to_cmd(&self) -> Result<goval::Command, prost::DecodeError> {
         Ok(goval::Command::decode(&*self.bytes)?)
     }
+
+    pub fn replace_cmd(&self, cmd: goval::Command) -> IPCMessage {
+        IPCMessage::from_cmd(cmd, self.session)
+    }
 }

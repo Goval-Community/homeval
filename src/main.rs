@@ -1,5 +1,7 @@
+use deno_core::error::AnyError;
 #[allow(unused_imports)]
 use goval_impl::goval;
+use goval_impl::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
 //use std::fmt::Binary;
@@ -12,12 +14,12 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
 };
 //use async_log::span;
-use log::{error, info};
+use log::{error, info, debug};
 mod channels;
 use channels::IPCMessage;
 
 mod deno_extension;
-use deno_extension::{make_extension, Service};
+use deno_extension::{make_extension, JsMessage, Service};
 
 use lazy_static::lazy_static;
 
@@ -28,8 +30,9 @@ lazy_static! {
 
 use c_map::HashMap;
 lazy_static! {
-    static ref CHANNEL_MESSAGES: HashMap<i32, deadqueue::unlimited::Queue<IPCMessage>> =
+    static ref CHANNEL_MESSAGES: HashMap<i32, deadqueue::unlimited::Queue<JsMessage>> =
         HashMap::new();
+    static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
     static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "chat".to_string()];
@@ -79,104 +82,179 @@ async fn main() -> Result<(), Error> {
 
     let session_map_clone = SESSION_MAP.clone();
     let _channel_map: RwLock<HashMap<i32, deno_core::JsRuntime>> = RwLock::new(HashMap::new());
-    while let Some(i) = rx.recv().await {
-        let cmd = i.to_cmd().unwrap();
-        //println!("{}: {:#?}", i.session, cmd);
+    while let Some(message) = rx.recv().await {
+        let cmd: Command;
+        let command_res = message.to_cmd();
+        if let Err(err) = command_res {
+            error!("Following error occured when decoding message in main loop: {}", err);
+            continue;
+        } else {
+            cmd = command_res.expect("Impossible condition, decoded message was already verified as not None")
+        }
+
+        if cmd.body.is_none() {
+            continue;
+        }
 
         if cmd.channel == 0 {
-            match cmd.body.unwrap() {
+            match cmd.body.expect("This case is impossible, Command#body is none while having been checked to not be none earlier") {
                 goval::command::Body::Ping(_) => {
                     let mut pong = goval::Command::default();
                     pong.body = Some(goval::command::Body::Pong(goval::Pong::default()));
                     pong.r#ref = cmd.r#ref;
                     pong.channel = 0;
 
-                    session_map_clone
-                        .read(&i.session)
-                        .get()
-                        .unwrap()
-                        .send(IPCMessage::from_cmd(pong, i.session))
-                        .unwrap();
+                    if let Some(sender) = session_map_clone.read(&message.session).get() {
+                        match sender.send(message.replace_cmd(pong)) {
+                            Ok(_) => {}
+                            Err(err) => {
+                                error!("Error occured while sending Pong {}", err);
+                            }
+                        }
+                    } else {
+                        error!("Missing session queue when sending Pong")
+                    }
                 }
                 goval::command::Body::OpenChan(open_chan) => {
                     if IMPLEMENTED_SERVICES.contains(&open_chan.service) {
-                        info!("executing openchan main block");
-                        let service = open_chan.service.clone();
-                        let mut max_channel = MAX_CHANNEL.lock().await;
-                        *max_channel += 1;
-                        let channel_id = max_channel.clone();
-                        let channel_id_held = channel_id.clone();
-                        drop(max_channel);
+                        let mut found = false;
+                        let mut channel_id_held = 0;
 
-                        info!("Awating queue write");
+                        let attach = open_chan.action()
+                            == goval::open_channel::Action::AttachOrCreate
+                            || open_chan.action() == goval::open_channel::Action::Attach;
+                        let create = open_chan.action()
+                            == goval::open_channel::Action::AttachOrCreate
+                            || open_chan.action() == goval::open_channel::Action::Create;
+                        if attach {
+                            let metadata = CHANNEL_METADATA.read().await;
+                            for channel in metadata.iter() {
+                                if channel.name.clone().unwrap_or("".to_string()) == open_chan.name
+                                    && channel.service.clone() == open_chan.service
+                                {
+                                    found = true;
+                                    channel_id_held = channel.id.clone();
+                                    continue;
+                                }
+                            }
+                        }
 
-                        CHANNEL_MESSAGES
-                            .write(channel_id_held)
-                            .insert(deadqueue::unlimited::Queue::new());
-                        info!("Added channel: {} to queue list", channel_id_held);
+                        if !found && create {
+                            info!("executing openchan main block");
+                            let service = open_chan.service.clone();
+                            let mut max_channel = MAX_CHANNEL.lock().await;
+                            *max_channel += 1;
+                            let channel_id = max_channel.clone();
+                            channel_id_held = channel_id.clone();
+                            drop(max_channel);
 
-                        tokio::task::spawn_blocking(move || {
-                            let local = tokio::task::LocalSet::new();
+                            let service_data = Service {
+                                service: service.clone(),
+                                id: channel_id,
+                                name: None,
+                            };
 
-                            let rt = tokio::runtime::Handle::current();
-                            rt.block_on(async {
-                                local
-                                    .run_until(async {
-                                        // local.spawn_local(async move {
-                                        let main_module = deno_core::resolve_path(&format!(
-                                            "service/{}.js",
-                                            open_chan.service
-                                        ))
-                                        .unwrap();
-                                        let mut js_runtime =
-                                            deno_core::JsRuntime::new(deno_core::RuntimeOptions {
-                                                module_loader: Some(std::rc::Rc::new(
-                                                    deno_core::FsModuleLoader,
-                                                )),
-                                                extensions: vec![make_extension()],
-                                                ..Default::default()
-                                            });
+                            info!("Awating queue write");
 
-                                        js_runtime
-                                            .execute_script(
-                                                "[goval::generated::globals]",
-                                                &format!(
-                                                    "globalThis.serviceInfo = {};",
-                                                    serde_json::to_string(&Service {
-                                                        service: service,
-                                                        id: channel_id,
-                                                        name: None
-                                                    })
-                                                    .unwrap()
-                                                ),
-                                            )
-                                            .unwrap();
-                                        js_runtime
-                                            .execute_script(
-                                                "[goval::runtime.js]",
-                                                include_str!("./runtime.js"),
-                                            )
-                                            .unwrap();
-                                        js_runtime
-                                            .execute_script(
-                                                "[goval::api.js]",
-                                                include_str!("./api.js"),
-                                            )
-                                            .unwrap();
+                            CHANNEL_MESSAGES
+                                .write(channel_id_held)
+                                .insert(deadqueue::unlimited::Queue::new());
+                            let mut metadata = CHANNEL_METADATA.write().await;
+                            metadata.push(service_data.clone());
+                            drop(metadata);
+                            info!("Added channel: {} to queue list", channel_id_held);
 
-                                        let mod_id = js_runtime
-                                            .load_main_module(&main_module, None)
-                                            .await
-                                            .unwrap();
-                                        let result = js_runtime.mod_evaluate(mod_id);
+                            tokio::task::spawn_blocking(move || {
+                                let local = tokio::task::LocalSet::new();
 
-                                        js_runtime.run_event_loop(false).await.unwrap();
-                                        result.await.unwrap().unwrap();
-                                        // })
-                                    })
-                                    .await;
+                                let rt = tokio::runtime::Handle::current();
+                                rt.block_on(async {
+                                    local
+                                        .run_until(async {
+                                            // local.spawn_local(async move {
+                                            let mod_path = &format!("services/{}.js", open_chan.service);
+                                            debug!("Module path: {}", mod_path);
+                                            let main_module: deno_core::url::Url;
+                                            let main_module_res = deno_core::resolve_path(
+                                                mod_path
+                                            );
+                                            match main_module_res {
+                                                Err(err) => {
+                                                    error!("Error resolving js module {}", err);
+                                                    return;
+                                                } 
+                                                Ok(result) => {
+                                                    main_module = result;
+                                                }
+                                            }
+
+                                            let mut js_runtime = deno_core::JsRuntime::new(
+                                                deno_core::RuntimeOptions {
+                                                    module_loader: Some(std::rc::Rc::new(
+                                                        deno_core::FsModuleLoader,
+                                                    )),
+                                                    extensions: vec![make_extension()],
+                                                    ..Default::default()
+                                                },
+                                            );
+
+                                            js_runtime
+                                                .execute_script(
+                                                    "[goval::generated::globals]",
+                                                    &format!(
+                                                        "globalThis.serviceInfo = {};",
+                                                        serde_json::to_string(&service_data)
+                                                            .unwrap()
+                                                    ),
+                                                )
+                                                .unwrap();
+                                            js_runtime
+                                                .execute_script(
+                                                    "[goval::runtime.js]",
+                                                    include_str!("./runtime.js"),
+                                                )
+                                                .unwrap();
+                                            js_runtime
+                                                .execute_script(
+                                                    "[goval::api.js]",
+                                                    include_str!("./api.js"),
+                                                )
+                                                .unwrap();
+
+                                            let mod_id = js_runtime
+                                                .load_main_module(&main_module, None)
+                                                .await
+                                                .unwrap();
+                                            let result = js_runtime.mod_evaluate(mod_id);
+
+                                            js_runtime.run_event_loop(false).await.unwrap();
+                                            result.await.unwrap().unwrap();
+                                            // })
+                                        })
+                                        .await;
+                                });
                             });
-                        });
+                            found = true;
+                        }
+
+                        if !found {
+                            error!("Couldnt make channel");
+                            let mut protocol_error = goval::Command::default();
+                            let mut _inner = goval::ProtocolError::default();
+                            _inner.text = "Could not create / attach channel".to_string();
+
+                            protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
+                            protocol_error.r#ref = cmd.r#ref;
+                            protocol_error.channel = 0;
+
+                            session_map_clone
+                                .read(&message.session)
+                                .get()
+                                .unwrap()
+                                .send(message.replace_cmd(protocol_error))
+                                .unwrap();
+                            continue;
+                        }
 
                         let mut open_chan_res = goval::Command::default();
                         let mut _open_res = goval::OpenChannelRes::default();
@@ -187,17 +265,28 @@ async fn main() -> Result<(), Error> {
                         open_chan_res.channel = 0;
 
                         session_map_clone
-                            .read(&i.session)
+                            .read(&message.session)
                             .get()
                             .unwrap()
-                            .send(IPCMessage::from_cmd(open_chan_res, i.session))
+                            .send(message.replace_cmd(open_chan_res))
                             .unwrap();
+
+                        CHANNEL_MESSAGES
+                            .read(&channel_id_held)
+                            .get()
+                            .unwrap()
+                            .push(JsMessage::Attach(message.session));
+                        // }
                     }
                 }
                 _ => {}
             }
         } else {
-            CHANNEL_MESSAGES.read(&cmd.channel).get().unwrap().push(i);
+            CHANNEL_MESSAGES
+                .read(&cmd.channel)
+                .get()
+                .unwrap()
+                .push(JsMessage::IPC(message));
         }
     }
 
@@ -210,12 +299,12 @@ async fn send_message(
         tokio_tungstenite::WebSocketStream<TcpStream>,
         tungstenite::Message,
     >,
-) -> Result<(), tungstenite::Error> {
+) -> Result<(), AnyError> {
     let mut buf = Vec::new();
     buf.reserve(message.encoded_len());
-    message.encode(&mut buf).unwrap();
+    message.encode(&mut buf)?;
 
-    stream.send(tungstenite::Message::Binary(buf)).await
+    Ok(stream.send(tungstenite::Message::Binary(buf)).await?)
 }
 
 async fn accept_connection(
@@ -244,7 +333,9 @@ async fn accept_connection(
         goval::BootStatus::default(),
     ));
 
-    send_message(boot_status, &mut write).await.unwrap();
+    send_message(boot_status, &mut write)
+        .await
+        .expect("Error sending spoofed boot status");
 
     // Sending container state
     let mut container_state = goval::Command::default();
@@ -252,7 +343,9 @@ async fn accept_connection(
     inner_state.state = goval::container_state::State::Ready.into();
     container_state.body = Some(goval::command::Body::ContainerState(inner_state));
 
-    send_message(container_state, &mut write).await.unwrap();
+    send_message(container_state, &mut write)
+        .await
+        .expect("Error sending spoofed container state");
 
     // Sending server info message
     let mut toast = goval::Command::default();
@@ -260,26 +353,35 @@ async fn accept_connection(
     inner_state.text = "Hello from an unnamed goval impl".to_owned();
     toast.body = Some(goval::command::Body::Toast(inner_state));
 
-    send_message(toast, &mut write).await.unwrap();
+    send_message(toast, &mut write)
+        .await
+        .expect("Error sending server info toast");
 
     tokio::spawn(async move {
-        read.try_for_each(|msg| {
-            match msg {
-                tungstenite::Message::Binary(buf) => {
-                    // let decode = buf.clone();
-                    propogate
-                        .send(IPCMessage {
-                            bytes: buf,
-                            session,
-                        })
-                        .unwrap();
-                }
-                _ => {}
-            };
-            future::ok(())
-        })
-        .await
-        .unwrap();
+        if let Err(err) = read
+            .try_for_each(|msg| {
+                match msg {
+                    tungstenite::Message::Binary(buf) => {
+                        // let decode = buf.clone();
+                        if let Err(err) = propogate
+                            .send(IPCMessage {
+                                bytes: buf,
+                                session,
+                            }) {
+                                error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
+                            }
+                    }
+                    _ => {}
+                };
+                future::ok(())
+            })
+            .await
+        {
+            error!(
+                "The following error occured while reading messages (session {}): {}",
+                session, err
+            );
+        }
     });
 
     while let Some(i) = sent.recv().await {
