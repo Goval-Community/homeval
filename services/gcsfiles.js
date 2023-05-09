@@ -1,12 +1,5 @@
 class Service extends ServiceBase {
 	async recv(cmd, session) {
-		console.log(cmd);
-		if (cmd.chatMessage) {
-			this.send(
-				cmd,
-				this.clients.filter((arr_session) => arr_session !== session),
-			);
-		}
 		if (cmd.readdir) {
 			let files = []
 			
@@ -19,6 +12,26 @@ class Service extends ServiceBase {
 			return api.Command.create({
 				files: { files: files.map(item => {return {path: item.path, type: item.type !== "directory" ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },
 			});
+		} 
+		if (cmd.write) {
+			let contents = cmd.write.content
+			if (contents.length === 0) {
+				contents = {}
+			}
+			await fs.writeFile(cmd.write.path, contents)
+			return api.Command.create({ok:{}})
+		}
+		if (cmd.read) {
+			const contents = await fs.readFile(cmd.write.path)
+			return api.Command.create({file:{path:cmd.write.path, content: contents}})
+		}
+		if (cmd.remove) {
+			await fs.remove(cmd.remove.path)
+			return api.Command.create({ok:{}})
+		}
+		if (cmd.move) {
+			await fs.rename(cmd.move.oldPath, cmd.move.newPath)
+			return api.Command.create({ok:{}})
 		}
 	}
 }
