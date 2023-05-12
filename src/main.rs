@@ -23,7 +23,7 @@ mod deno_extension;
 use deno_extension::{make_extension, JsMessage, Service};
 
 mod parse_paseto;
-use parse_paseto::parse;
+// use parse_paseto::parse;
 
 use lazy_static::lazy_static;
 
@@ -41,7 +41,7 @@ lazy_static! {
         Arc::new(HashMap::new());
     static ref SESSION_CHANNELS: HashMap<i32, Vec<i32>> = HashMap::new();
 
-    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string(), "presence".to_string()];
+    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string(), "presence".to_string(), "shell".to_string()];
 }
 
 #[tokio::main]
@@ -103,6 +103,7 @@ async fn main() -> Result<(), Error> {
         }
 
         if cmd.channel == 0 {
+            // info!("{:#?}", cmd);
             match cmd.body.expect("This case is impossible, Command#body is none while having been checked to not be none earlier") {
                 goval::command::Body::Ping(_) => {
                     let mut pong = goval::Command::default();
@@ -110,7 +111,9 @@ async fn main() -> Result<(), Error> {
                     pong.r#ref = cmd.r#ref;
                     pong.channel = 0;
 
+                    // info!("Aquiring pong lock...");
                     if let Some(sender) = session_map_clone.read(&message.session).get() {
+                        // info!("got pong lock...");
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
