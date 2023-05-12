@@ -35,7 +35,7 @@ lazy_static! {
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
-    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "chat".to_string()];
+    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string()];
 }
 
 #[tokio::main]
@@ -151,7 +151,7 @@ async fn main() -> Result<(), Error> {
                             let service_data = Service {
                                 service: service.clone(),
                                 id: channel_id,
-                                name: None,
+                                name: Some(open_chan.name),
                             };
 
                             info!("Awating queue write");

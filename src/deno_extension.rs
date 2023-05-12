@@ -185,6 +185,23 @@ async fn op_move_file(old_path: String, new_path: String) -> Result<(), AnyError
     Ok(fs::rename(old_path, new_path).await?)
 }
 
+#[op]
+async fn op_read_file_string(path: String) -> Result<String, AnyError> {
+    Ok(String::from_utf8(fs::read(path).await?)?)
+}
+
+#[op]
+async fn op_write_file_string(path: String, contents: String) -> Result<(), AnyError> {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(path)
+        .await?;
+    file.set_len(0).await?;
+    file.write(&contents.as_bytes()).await?;
+    Ok(())
+}
+
 pub fn make_extension() -> Extension {
     Extension::builder()
         .ops(vec![
@@ -199,6 +216,8 @@ pub fn make_extension() -> Extension {
             op_read_file::decl(),
             op_remove_file::decl(),
             op_move_file::decl(),
+            op_read_file_string::decl(),
+            op_write_file_string::decl(),
         ])
         .build()
 }

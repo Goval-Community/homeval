@@ -59,7 +59,7 @@ class ServiceBase {
 		const message = await Deno.core.ops.op_recv_info(this.id);
 
 		if (message.attach) {
-			this.attach(message.attach);
+			this._attach(message.attach);
 		} else if (message.ipc) {
 			const cmd = api.Command.decode(message.ipc.bytes);
 
@@ -94,7 +94,11 @@ class ServiceBase {
 		});
 	}
 
-	attach(session) {
+	async _attach(session) {
 		this.clients.push(session);
+		await this.attach(session)
+	}
+
+	async attach(_) {
 	}
 }
