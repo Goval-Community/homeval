@@ -4,6 +4,19 @@ class Service extends ServiceBase {
 		this.version = 1
 		this.contents = ""
 		this.path = null
+		this.cursors = {}
+		/*
+		{
+			"position": 22,
+			"selectionStart": 22,
+			"selectionEnd": 22,
+			"user": {
+			"id": 2618577,
+			"name": "Codemonkey51"
+			},
+			"id": "8no5nincdts"
+		}
+		*/
 	}
 
 	async _recv() {
@@ -46,9 +59,7 @@ class Service extends ServiceBase {
 			this.path = path
 			this.contents = await Deno.core.ops.op_read_file_string(path);
 			return api.Command.create({otLinkFileResponse:{version:this.version, linkedFile:{path, content}}})
-		}
-
-		if (cmd.ot) {
+		} else if (cmd.ot) {
 			let cursor = 0
 			let contents = this.contents.toString()
 
@@ -84,8 +95,8 @@ class Service extends ServiceBase {
 					op: cmd.ot.op,
 					crc32: CRC32.str(contents),
 					committed: {
-						seconds: "1683677449",
-						nanos: 286090369
+						seconds: (Date.now()/ 1000n).toString(),
+						nanos: 0
 					},
 					version: this.version,
 					userId: 1
@@ -93,18 +104,51 @@ class Service extends ServiceBase {
 				ref: cmd.ref
 			})
 
-			for (const session of this.clients) {
-				await this.send(msg, session)
+			await this.send(msg,session)
+
+			for (const arr_session of this.clients) {
+				if (arr_session === session) {continue}
+				await this.send(msg, arr_session)
 			}
 
 			await Deno.core.ops.op_write_file_string(this.path, contents)
+		} else if (cmd.otNewCursor) {
+			const cursor = cmd.otNewCursor
+			this.cursors[cursor.id] = cursor
+
+			const msg = api.Command.create({otNewCursor: cursor, session:-session})
+
+			for (const arr_session of this.clients) {
+				if (arr_session === session) {continue}
+				await this._send(msg, arr_session)
+			}
+		} else if (cmd.otDeleteCursor) {
+			delete this.cursors[cmd.otDeleteCursor]
+
+			const msg = api.Command.create({otDeleteCursor: cmd.otDeleteCursor, session: -session})
+
+			for (const arr_session of this.clients) {
+				if (arr_session === session) {continue}
+				await this._send(msg, arr_session)
+			}
+		} else {
+			console.warn("Unknown ot command", cmd)
 		}
 
 		// console.log(cmd)
 	}
 
+	async _send(cmd, session) {
+		cmd.channel = this.id;
+		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
+		await Deno.core.ops.op_send_msg({
+			bytes: buf,
+			session: session,
+		});
+	}
+
 	async attach(session) {
-		console.log(this, this.path)
+		// console.log(this, this.path)
 		if (!this.path) {
 			await this.send(api.Command.create({otstatus: {}}), session)
 			return
@@ -114,7 +158,8 @@ class Service extends ServiceBase {
 			otstatus:{
 				contents:this.contents, 
 				version: this.version, 
-				linkedFile: {path:this.path}
+				linkedFile: {path:this.path},
+				cursors: Object.values(this.cursors)
 			}
 		}), session)
 		

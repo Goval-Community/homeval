@@ -4,8 +4,12 @@
 extern crate prost_build;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/goval.proto");
-    prost_build::compile_protos(&["src/goval.proto"], &["src/"]).unwrap();
+    println!("cargo:rerun-if-changed=src/protobufs");
+    prost_build::compile_protos(
+        &["src/protobufs/goval.proto", "src/protobufs/client.proto"],
+        &["src/"],
+    )
+    .unwrap();
 
     // let runjs_extension = Extension::builder("runjs")
     //     .esm(include_js_files!("src/runtime.js",))

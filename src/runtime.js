@@ -47,6 +47,12 @@ globalThis.fs = {
 	},
 };
 
+globalThis.Date = {
+	now: () => {
+		return BigInt(Deno.core.ops.op_time_milliseconds())
+	}
+}
+
 class ServiceBase {
 	constructor(id, service, name) {
 		this.id = id;
@@ -73,6 +79,10 @@ class ServiceBase {
 				console.error(err.toString());
 				await this.send(res, message.ipc.session);
 			});
+		} else if (message.close) {
+			await this._detach(message.close, true)
+		} else if (message.detach) {
+			await this._detach(message.close, false)
 		} else {
 			console.error("Unknown IPC message", message)
 		}
@@ -101,4 +111,11 @@ class ServiceBase {
 
 	async attach(_) {
 	}
+
+	async _detach(session, forced) {
+		this.clients = this.clients.filter(item => item !== session)
+		await this.detach(session, forced)
+	}
+
+	async detach(_session, _forced) {}
 }

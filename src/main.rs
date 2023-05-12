@@ -4,6 +4,7 @@ use goval_impl::goval;
 use goval_impl::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
+use tokio_tungstenite::tungstenite::handshake::server::{Request, Response, ErrorResponse};
 //use std::fmt::Binary;
 use std::{env, io::Error, sync::Arc};
 
@@ -14,12 +15,15 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
 };
 //use async_log::span;
-use log::{error, info, debug};
+use log::{error, info, debug, warn};
 mod channels;
 use channels::IPCMessage;
 
 mod deno_extension;
 use deno_extension::{make_extension, JsMessage, Service};
+
+mod parse_paseto;
+use parse_paseto::parse;
 
 use lazy_static::lazy_static;
 
@@ -35,7 +39,9 @@ lazy_static! {
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
-    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string()];
+    static ref SESSION_CHANNELS: HashMap<i32, Vec<i32>> = HashMap::new();
+
+    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string(), "presence".to_string()];
 }
 
 #[tokio::main]
@@ -276,6 +282,10 @@ async fn main() -> Result<(), Error> {
                             .get()
                             .unwrap()
                             .push(JsMessage::Attach(message.session));
+                        
+                        SESSION_CHANNELS.write(message.session).entry().and_modify(
+                            |channels| { channels.push(channel_id_held) }
+                        );
                         // }
                     }
                 }
@@ -318,7 +328,15 @@ async fn accept_connection(
         .expect("connected streams should have a peer address");
     info!("Peer address: {}", addr);
 
-    let ws_stream = tokio_tungstenite::accept_async(stream)
+    let copy_headers_callback = |req: &Request, res: Response| -> Result<Response, ErrorResponse> {
+        info!("The request's path is: {}", req.uri().path());
+
+        Ok(res)
+    };
+
+    // let mut websocket = accept_hdr(stream.unwrap(), copy_headers_callback).unwrap();
+
+    let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback)
         .await
         .expect("Error during the websocket handshake occurred");
 
@@ -357,6 +375,7 @@ async fn accept_connection(
         .await
         .expect("Error sending server info toast");
 
+    SESSION_CHANNELS.write(session).insert(vec![]);
     tokio::spawn(async move {
         if let Err(err) = read
             .try_for_each(|msg| {
@@ -370,6 +389,17 @@ async fn accept_connection(
                             }) {
                                 error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
                             }
+                    }
+                    tungstenite::Message::Close(_) => {
+                        warn!("CLOSING SESSION {}", session);
+                        for channel in SESSION_CHANNELS.read(&session).get().unwrap().iter() {
+                            CHANNEL_MESSAGES
+                                .read(&channel)
+                                .get()
+                                .unwrap()
+                                .push(JsMessage::Close(session));
+                        }
+                        warn!("CLOSED SESSION {}", session);
                     }
                     _ => {}
                 };
