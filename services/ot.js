@@ -5,47 +5,8 @@ class Service extends ServiceBase {
 		this.contents = ""
 		this.path = null
 		this.cursors = {}
-		/*
-		{
-			"position": 22,
-			"selectionStart": 22,
-			"selectionEnd": 22,
-			"user": {
-			"id": 2618577,
-			"name": "Codemonkey51"
-			},
-			"id": "8no5nincdts"
-		}
-		*/
-	}
-
-	async _recv() {
-		const message = await Deno.core.ops.op_recv_info(this.id);
-
-		console.log(message)
-		if (message.attach) {
-			this._attach(message.attach);
-		} else if (message.ipc) {
-			const cmd = api.Command.decode(message.ipc.bytes);
-
-			let res;
-			try {
-				res = await this.recv(cmd, message.ipc.session)
-			} catch(err) {
-				res = api.Command.create({ error: err.toString(), ref: cmd.ref });
-				console.error(err.toString());
-			}
-
-			if (res) {
-				res.ref = cmd.ref;
-				await this.send(res, message.ipc.session);
-			}
-				
-		} else {
-			console.error("Unknown IPC message", message)
-		}
-
-		await this._recv();
+		this.history = []
+		this.session_info = {}
 	}
 
 	async recv(cmd, session) {
@@ -60,6 +21,21 @@ class Service extends ServiceBase {
 			const content = await fs.readFile(path);
 			this.path = path
 			this.contents = await Deno.core.ops.op_read_file_string(path);
+
+			this.history.push({
+				spookyVersion: this.version,
+				op: [{insert: this.contents}],
+				crc32: CRC32.str(this.contents),
+				committed: {
+					seconds: (Date.now()/ 1000n).toString(),
+					nanos: 0
+				},
+				version: this.version,
+				author: api.OTPacket.Author.USER,
+				// use https://replit.com/@homeval for initial insert
+				userId: 20567961
+			})
+
 			return api.Command.create({otLinkFileResponse:{version:this.version, linkedFile:{path, content}}})
 		} else if (cmd.ot) {
 			let cursor = 0
@@ -91,18 +67,26 @@ class Service extends ServiceBase {
 			this.version += 1
 			this.contents = contents
 
-			const msg = api.Command.create({
-				ot: {
-					spookyVersion: this.version,
-					op: cmd.ot.op,
-					crc32: CRC32.str(contents),
-					committed: {
-						seconds: (Date.now()/ 1000n).toString(),
-						nanos: 0
-					},
-					version: this.version,
-					userId: 1
+			console.log(this.session_info, session)
+
+			const inner_packet = {
+				spookyVersion: this.version,
+				op: cmd.ot.op,
+				crc32: CRC32.str(contents),
+				committed: {
+					seconds: (Date.now()/ 1000n).toString(),
+					nanos: 0
 				},
+				version: this.version,
+				author: cmd.ot.author,
+				// use https://replit.com/@ghostwriterai if ghostwriter wrote it (for history)
+				userId: cmd.ot.author !== api.OTPacket.Author.GHOSTWRITER ? this.session_info[session].id : 22261053
+			}
+
+			this.history.push(inner_packet)
+
+			const msg = api.Command.create({
+				ot: inner_packet,
 				ref: cmd.ref
 			})
 
@@ -133,6 +117,16 @@ class Service extends ServiceBase {
 				if (arr_session === session) {continue}
 				await this._send(msg, arr_session)
 			}
+		} else if (cmd.otFetchRequest) {
+			console.log(cmd, this.history)
+			return api.Command.create({
+				otFetchResponse: {
+					packets: this.history.slice(
+						cmd.otFetchRequest.versionFrom - 1,
+						cmd.otFetchRequest.versionTo + 1
+					)
+				}
+			})
 		} else {
 			console.warn("Unknown ot command", cmd)
 		}
@@ -140,21 +134,24 @@ class Service extends ServiceBase {
 		// console.log(cmd)
 	}
 
-	async _send(cmd, ssession) {
+	async _send(cmd, session) {
 		cmd.channel = this.id;
 		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
 		await Deno.core.ops.op_send_msg({
 			bytes: buf,
-			session: ssession,
+			session: session,
 		});
 	}
 
 	async attach(session) {
-		// console.log(this, this.path)
+		this.session_info[session] = Deno.core.ops.op_user_info(session)
+		
 		if (!this.path) {
 			await this.send(api.Command.create({otstatus: {}}), session)
 			return
 		}
+
+		
 
 		await this.send(api.Command.create({
 			otstatus:{
@@ -174,4 +171,4 @@ const service = new Service(
 	serviceInfo.service,
 	serviceInfo.name,
 );
-await service._recv();
+await service.start()

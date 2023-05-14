@@ -61,24 +61,37 @@ class ServiceBase {
 		this.clients = [];
 	}
 
-	async _recv() {
+	async start() {
+		while (true) {
+			await this.ipc_recv()
+		}
+	}
+
+	async _recv(message) {
+		const cmd = api.Command.decode(message.ipc.bytes);
+		
+		let res = null;
+
+		try {
+			await this.recv(cmd, message.ipc.session)
+		} catch(err) {
+			res = api.Command.create({ error: err.toString(), ref: cmd.ref });
+			console.error(err.toString());
+		}
+		
+		if (res) {
+			res.ref = cmd.ref;
+			await this.send(res, message.ipc.session);
+		}
+	}
+
+	async ipc_recv() {
 		const message = await Deno.core.ops.op_recv_info(this.id);
 
 		if (message.attach) {
-			this._attach(message.attach);
+			await this._attach(message.attach);
 		} else if (message.ipc) {
-			const cmd = api.Command.decode(message.ipc.bytes);
-
-			this.recv(cmd, message.ipc.session).then(async (res) => {
-				if (res) {
-					res.ref = cmd.ref;
-					await this.send(res, message.ipc.session);
-				}
-			}).catch(async (err) => {
-				const res = api.Command.create({ error: err.toString(), ref: cmd.ref });
-				console.error(err.toString());
-				await this.send(res, message.ipc.session);
-			});
+			await this._recv(message)
 		} else if (message.close) {
 			await this._detach(message.close, true)
 		} else if (message.detach) {
@@ -86,8 +99,6 @@ class ServiceBase {
 		} else {
 			console.error("Unknown IPC message", message)
 		}
-
-		await this._recv();
 	}
 
 	async recv(_c, _s) {

@@ -56,4 +56,4 @@ const service = new Service(
 	serviceInfo.service,
 	serviceInfo.name,
 );
-await service._recv();
+await service.start()
