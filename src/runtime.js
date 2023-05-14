@@ -127,7 +127,7 @@ class ServiceBase {
 			await this._send(cmd, session);
 		} else if (session === 0) {
 			for (let client of this.clients) {
-				await this._send(cmd, session);
+				await this._send(cmd, client);
 			}
 		} else if (session < 0) {
 			const ignore = Math.abs(session);
@@ -135,7 +135,7 @@ class ServiceBase {
 				if (client === ignore) {
 					continue;
 				}
-				await this._send(cmd, session);
+				await this._send(cmd, client);
 			}
 		}
 	}
