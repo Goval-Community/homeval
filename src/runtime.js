@@ -73,7 +73,7 @@ class ServiceBase {
 		let res = null;
 
 		try {
-			await this.recv(cmd, message.ipc.session)
+			res = await this.recv(cmd, message.ipc.session)
 		} catch(err) {
 			res = api.Command.create({ error: err.toString(), ref: cmd.ref });
 			console.error(err.toString());
