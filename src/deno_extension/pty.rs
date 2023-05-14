@@ -1,7 +1,8 @@
 use futures_util::{future::abortable, stream::AbortHandle};
-use log::{error, info};
+use log::error;
 use portable_pty::PtySize;
 use std::{
+    collections::VecDeque,
     io::{Error, ErrorKind, Write},
     sync::Arc,
 };
@@ -22,8 +23,6 @@ use c_map::HashMap;
 lazy_static! {
     static ref PTY_CANCELATION_MAP: HashMap<u32, AbortHandle> = HashMap::new();
     static ref PTY_SESSION_MAP: HashMap<u32, Vec<i32>> = HashMap::new();
-    static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
-        HashMap::new();
 }
 
 struct PtyWriter {
@@ -103,8 +102,8 @@ async fn op_register_pty(_args: Vec<String>, channel: i32) -> Result<u32, AnyErr
 
     // Spawn a shell into the pty
     let mut cmd = portable_pty::CommandBuilder::new(_args[0].clone());
-    let mut args = _args.to_vec();
-    args.swap_remove(0);
+    let args = &mut VecDeque::from(_args.to_vec());
+    VecDeque::pop_front(args);
     for arg in args {
         cmd.arg(arg);
     }
@@ -128,7 +127,19 @@ async fn op_register_pty(_args: Vec<String>, channel: i32) -> Result<u32, AnyErr
     let queue = Arc::new(deadqueue::unlimited::Queue::new());
 
     PTY_SESSION_MAP.write(pty_id).insert(vec![]);
-    PTY_WRITE_MESSAGES.write(pty_id).insert(queue.clone());
+    let mut pty_channel_map_writer = crate::PTY_CHANNEL_TO_ID.write(channel);
+    if pty_channel_map_writer.contains_key() {
+        pty_channel_map_writer
+            .entry()
+            .and_modify(|pty_channel_map| {
+                pty_channel_map.push(pty_id);
+            });
+    } else {
+        pty_channel_map_writer.insert(vec![pty_id]);
+    }
+    crate::PTY_WRITE_MESSAGES
+        .write(pty_id)
+        .insert(queue.clone());
 
     let (task, handle) = abortable(async move {
         loop {
@@ -171,7 +182,7 @@ async fn op_pty_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
 
 #[op]
 async fn op_pty_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
-    match PTY_WRITE_MESSAGES.read(&id).get() {
+    match crate::PTY_WRITE_MESSAGES.read(&id).get() {
         Some(queue) => {
             queue.push(msg);
 

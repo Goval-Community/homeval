@@ -69,7 +69,7 @@ class ServiceBase {
 		} else if (message.ipc) {
 			const cmd = api.Command.decode(message.ipc.bytes);
 
-			this.recv(cmd, message.session).then(async (res) => {
+			this.recv(cmd, message.ipc.session).then(async (res) => {
 				if (res) {
 					res.ref = cmd.ref;
 					await this.send(res, message.ipc.session);

@@ -22,6 +22,7 @@ class Service extends ServiceBase {
 	async _recv() {
 		const message = await Deno.core.ops.op_recv_info(this.id);
 
+		console.log(message)
 		if (message.attach) {
 			this._attach(message.attach);
 		} else if (message.ipc) {
@@ -29,7 +30,7 @@ class Service extends ServiceBase {
 
 			let res;
 			try {
-				res = await this.recv(cmd, message.session)
+				res = await this.recv(cmd, message.ipc.session)
 			} catch(err) {
 				res = api.Command.create({ error: err.toString(), ref: cmd.ref });
 				console.error(err.toString());
@@ -48,6 +49,7 @@ class Service extends ServiceBase {
 	}
 
 	async recv(cmd, session) {
+		console.log(session)
 		if (!this.path && !cmd.otLinkFile) {
 			console.error("Command sent before otLinkFile", cmd)
 			return
@@ -138,12 +140,12 @@ class Service extends ServiceBase {
 		// console.log(cmd)
 	}
 
-	async _send(cmd, session) {
+	async _send(cmd, ssession) {
 		cmd.channel = this.id;
 		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
 		await Deno.core.ops.op_send_msg({
 			bytes: buf,
-			session: session,
+			session: ssession,
 		});
 	}
 

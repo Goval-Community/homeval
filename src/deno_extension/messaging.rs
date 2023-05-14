@@ -3,7 +3,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 
-use crate::channels::IPCMessage;
+use crate::{channels::IPCMessage, parse_paseto::ClientInfo};
 
 #[op]
 async fn op_send_msg(msg: IPCMessage) -> Result<(), AnyError> {
@@ -30,19 +30,37 @@ async fn op_recv_info(channel: i32) -> Result<JsMessage, AnyError> {
     // let queues_clone = CHANNEL_MESSAGES.clone();
     // let internal = 0 as i32;
     // info!("Checking for channel: {} in queue list", internal);
-    let _read = crate::CHANNEL_MESSAGES.read(&channel);
-    if !_read.contains_key() {
+    let _read = crate::CHANNEL_MESSAGES.read().await;
+    if !_read.contains_key(&channel) {
         return Err(AnyError::new(Error::new(
             std::io::ErrorKind::NotFound,
             "not found",
         )));
     }
-    let queue = _read.get().unwrap();
+    let queue = _read.get(&channel).unwrap().clone();
+    drop(_read);
 
     let res = queue.pop().await;
     Ok(res)
 }
 
+#[op]
+fn op_user_info(session: i32) -> Result<ClientInfo, AnyError> {
+    let _read = crate::SESSION_CLIENT_INFO.read(&session);
+    if !_read.contains_key() {
+        return Ok(ClientInfo::default());
+    }
+
+    match _read.get() {
+        Some(info) => Ok(info.clone()),
+        None => Ok(ClientInfo::default()),
+    }
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
-    vec![op_recv_info::decl(), op_send_msg::decl()]
+    vec![
+        op_recv_info::decl(),
+        op_send_msg::decl(),
+        op_user_info::decl(),
+    ]
 }

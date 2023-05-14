@@ -1,15 +1,36 @@
 class Service extends ServiceBase {
+    constructor(...args) {
+        super(...args)
+        this.users = []
+        this.files = []
+    }
+
 	async recv(cmd, session) {
 		console.log(cmd)
 	}
 
     async attach(session) {
+        const roster = api.Command.create({
+            roster: {
+                user: this.users,
+                files: this.files
+            }
+        })
+
+        await this._send(roster, session)
+        
+        const _user = Deno.core.ops.op_user_info(session);
+        
+        const user = {
+            id: _user.id,
+            name: _user.username,
+            session: session
+        }
+
+        this.users.push(user)
+
         const msg = api.Command.create({
-            join: {
-              id: 14536118,
-              name: "PotentialStyx",
-              session: session
-            },
+            join: user,
             session: -session
         })
 

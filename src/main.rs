@@ -4,7 +4,7 @@ use goval_impl::goval;
 use goval_impl::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
-use tokio_tungstenite::tungstenite::handshake::server::{Request, Response, ErrorResponse};
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 //use std::fmt::Binary;
 use std::{env, io::Error, sync::Arc};
 
@@ -15,7 +15,7 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
 };
 //use async_log::span;
-use log::{error, info, debug, warn};
+use log::{debug, error, info, warn};
 mod channels;
 use channels::IPCMessage;
 
@@ -23,7 +23,7 @@ mod deno_extension;
 use deno_extension::{make_extension, JsMessage, Service};
 
 mod parse_paseto;
-// use parse_paseto::parse;
+use parse_paseto::{parse, ClientInfo};
 
 use lazy_static::lazy_static;
 
@@ -34,14 +34,22 @@ lazy_static! {
 
 use c_map::HashMap;
 lazy_static! {
-    static ref CHANNEL_MESSAGES: HashMap<i32, deadqueue::unlimited::Queue<JsMessage>> =
-        HashMap::new();
+    static ref SESSION_CHANNELS: HashMap<i32, Vec<i32>> = HashMap::new();
+    static ref SESSION_CLIENT_INFO: HashMap<i32, ClientInfo> = HashMap::new();
+    static ref CHANNEL_MESSAGES: Arc<RwLock<std::collections::HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
+        Arc::new(RwLock::new(std::collections::HashMap::new()));
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
-    static ref SESSION_CHANNELS: HashMap<i32, Vec<i32>> = HashMap::new();
-
-    static ref IMPLEMENTED_SERVICES: Vec<String> = vec!["gcsfiles".to_string(), "ot".to_string(), "presence".to_string(), "shell".to_string()];
+    static ref IMPLEMENTED_SERVICES: Vec<String> = vec![
+        "gcsfiles".to_string(),
+        "ot".to_string(),
+        "presence".to_string(),
+        "shell".to_string()
+    ];
+    static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
+        HashMap::new();
+    static ref PTY_CHANNEL_TO_ID: HashMap<i32, Vec<u32>> = HashMap::new();
 }
 
 #[tokio::main]
@@ -92,19 +100,29 @@ async fn main() -> Result<(), Error> {
         let cmd: Command;
         let command_res = message.to_cmd();
         if let Err(err) = command_res {
-            error!("Following error occured when decoding message in main loop: {}", err);
+            error!(
+                "Following error occured when decoding message in main loop: {}",
+                err
+            );
             continue;
         } else {
-            cmd = command_res.expect("Impossible condition, decoded message was already verified as not None")
+            cmd = command_res
+                .expect("Impossible condition, decoded message was already verified as not None")
         }
 
-        if cmd.body.is_none() {
-            continue;
+        let cmd_body: goval::command::Body;
+
+        match cmd.body {
+            None => {
+                error!("MISSING COMMAND BODY: {:#?}", cmd);
+                continue;
+            }
+            Some(body) => cmd_body = body,
         }
 
         if cmd.channel == 0 {
             // info!("{:#?}", cmd);
-            match cmd.body.expect("This case is impossible, Command#body is none while having been checked to not be none earlier") {
+            match cmd_body {
                 goval::command::Body::Ping(_) => {
                     let mut pong = goval::Command::default();
                     pong.body = Some(goval::command::Body::Pong(goval::Pong::default()));
@@ -138,7 +156,9 @@ async fn main() -> Result<(), Error> {
                         if attach {
                             let metadata = CHANNEL_METADATA.read().await;
                             for channel in metadata.iter() {
-                                if channel.name.clone().unwrap_or("".to_string()) == open_chan.name
+                                if channel.name.is_some()
+                                    && channel.name.clone().unwrap_or("".to_string())
+                                        == open_chan.name
                                     && channel.service.clone() == open_chan.service
                                 {
                                     found = true;
@@ -157,17 +177,26 @@ async fn main() -> Result<(), Error> {
                             channel_id_held = channel_id.clone();
                             drop(max_channel);
 
+                            let _channel_name: Option<String>;
+
+                            if open_chan.name.len() > 0 {
+                                _channel_name = Some(open_chan.name);
+                            } else {
+                                _channel_name = None;
+                            }
+
                             let service_data = Service {
                                 service: service.clone(),
                                 id: channel_id,
-                                name: Some(open_chan.name),
+                                name: _channel_name,
                             };
 
-                            info!("Awating queue write");
+                            info!("Awaiting queue write for channel {}", channel_id);
 
-                            CHANNEL_MESSAGES
-                                .write(channel_id_held)
-                                .insert(deadqueue::unlimited::Queue::new());
+                            CHANNEL_MESSAGES.write().await.insert(
+                                channel_id_held,
+                                Arc::new(deadqueue::unlimited::Queue::new()),
+                            );
                             let mut metadata = CHANNEL_METADATA.write().await;
                             metadata.push(service_data.clone());
                             drop(metadata);
@@ -181,17 +210,16 @@ async fn main() -> Result<(), Error> {
                                     local
                                         .run_until(async {
                                             // local.spawn_local(async move {
-                                            let mod_path = &format!("services/{}.js", open_chan.service);
+                                            let mod_path =
+                                                &format!("services/{}.js", open_chan.service);
                                             debug!("Module path: {}", mod_path);
                                             let main_module: deno_core::url::Url;
-                                            let main_module_res = deno_core::resolve_path(
-                                                mod_path
-                                            );
+                                            let main_module_res = deno_core::resolve_path(mod_path);
                                             match main_module_res {
                                                 Err(err) => {
                                                     error!("Error resolving js module {}", err);
                                                     return;
-                                                } 
+                                                }
                                                 Ok(result) => {
                                                     main_module = result;
                                                 }
@@ -280,26 +308,51 @@ async fn main() -> Result<(), Error> {
                             .send(message.replace_cmd(open_chan_res))
                             .unwrap();
 
-                        CHANNEL_MESSAGES
-                            .read(&channel_id_held)
-                            .get()
-                            .unwrap()
-                            .push(JsMessage::Attach(message.session));
-                        
-                        SESSION_CHANNELS.write(message.session).entry().and_modify(
-                            |channels| { channels.push(channel_id_held) }
-                        );
+                        let msg_read = CHANNEL_MESSAGES.read().await;
+
+                        let queue = msg_read.get(&channel_id_held).unwrap().clone();
+
+                        drop(msg_read);
+
+                        queue.push(JsMessage::Attach(message.session));
+
+                        SESSION_CHANNELS
+                            .write(message.session)
+                            .entry()
+                            .and_modify(|channels| channels.push(channel_id_held));
                         // }
                     }
                 }
                 _ => {}
             }
         } else {
-            CHANNEL_MESSAGES
-                .read(&cmd.channel)
-                .get()
-                .unwrap()
-                .push(JsMessage::IPC(message));
+            // Directly deal with Command::Input, should be faster
+            if let goval::command::Body::Input(input) = cmd_body {
+                if let Some(ptys) = PTY_CHANNEL_TO_ID.read(&cmd.channel).get() {
+                    if ptys.len() == 1 {
+                        let pty_id = ptys[0];
+                        let mut to_continue = false;
+                        if let Some(queue) = crate::PTY_WRITE_MESSAGES.read(&pty_id).get() {
+                            queue.push(input);
+                            to_continue = true;
+                        } else {
+                            error!("Couldn't find pty {} to write to", pty_id);
+                        }
+
+                        if to_continue {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            let msg_lock = CHANNEL_MESSAGES.read().await;
+
+            let queue = msg_lock.get(&cmd.channel).unwrap().clone();
+
+            drop(msg_lock);
+
+            queue.push(JsMessage::IPC(message));
         }
     }
 
@@ -331,8 +384,12 @@ async fn accept_connection(
         .expect("connected streams should have a peer address");
     info!("Peer address: {}", addr);
 
+    let _uri: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
+
     let copy_headers_callback = |req: &Request, res: Response| -> Result<Response, ErrorResponse> {
-        info!("The request's path is: {}", req.uri().path());
+        let mut ptr = _uri.lock().unwrap();
+        *ptr = Some(req.uri().path().to_string());
+        drop(ptr);
 
         Ok(res)
     };
@@ -342,6 +399,52 @@ async fn accept_connection(
     let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback)
         .await
         .expect("Error during the websocket handshake occurred");
+
+    // needed due to futures stuff :/
+    let client: ClientInfo;
+    match tokio::task::spawn_blocking(move || -> Result<ClientInfo, AnyError> {
+        let __uri = _uri
+            .lock()
+            .expect("Header callback paniced when setting uri");
+
+        let uri = __uri.clone().unwrap_or("".to_string());
+
+        let split = uri.split("/").collect::<Vec<&str>>();
+        if split.len() >= 3 {
+            return Ok(parse(split[2])?);
+        } else {
+            warn!("Request path wasnt long enough, using default user")
+        }
+
+        Ok(ClientInfo::default())
+    })
+    .await
+    .expect("Error converting uri to client info")
+    {
+        Ok(_client) => client = _client,
+        Err(err) => {
+            warn!(
+                "Error while decoding request path: {}, using default user",
+                err
+            );
+            client = ClientInfo::default();
+        }
+    }
+
+    info!("New connection from: {:#?}", client);
+
+    SESSION_CLIENT_INFO.write(session).insert(client);
+
+    // let uri = _uri
+    //     .lock()
+    //     .expect("Header callback paniced when setting uri");
+
+    // match *uri {
+    //     Some(_) => {}
+    //     None => {}
+    // }
+
+    // drop(uri);
 
     info!("New WebSocket connection: {}", addr);
 
@@ -395,12 +498,21 @@ async fn accept_connection(
                     }
                     tungstenite::Message::Close(_) => {
                         warn!("CLOSING SESSION {}", session);
-                        for channel in SESSION_CHANNELS.read(&session).get().unwrap().iter() {
-                            CHANNEL_MESSAGES
-                                .read(&channel)
-                                .get()
-                                .unwrap()
-                                .push(JsMessage::Close(session));
+                        for _channel in SESSION_CHANNELS.read(&session).get().unwrap().iter() {
+                            let channel = _channel.clone();
+                            tokio::spawn(async move {
+                                let msg_lock = CHANNEL_MESSAGES
+                                .read().await;
+
+                                let queue = msg_lock.get(&channel)
+                                    .unwrap()
+                                    .clone();
+                                
+                                drop(msg_lock);
+                                
+                                queue.push(JsMessage::Close(session));
+                            });
+                            
                         }
                         warn!("CLOSED SESSION {}", session);
                     }

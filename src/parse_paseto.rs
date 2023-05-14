@@ -2,9 +2,27 @@ use std::io::Error;
 
 use base64::{engine::general_purpose, Engine as _};
 use deno_core::error::AnyError;
+use goval_impl::paseto_token;
+use prost::Message;
+use serde::{Deserialize, Serialize};
 
-pub fn _parse(token: &str) -> Result<(), AnyError> {
-    // let token = "v2.public.Q2dZSXY0bnhvZ1lTQmdqZXBmR2lCaUlMWkdWMlpXeHZjRzFsYm5Rd0FEcXVBUW9rTW1RNVpEWTVOR010WTJJeU1DMDBZalZtTFdFM01URXRaak5tTlRsalltTXpaVFEwRWdOdWFYZ2FESEpsY0d4cGRDMXlaWEJzY3lJTloyOTJZV3d0ZEdWemRHbHVaeW9OVUc5MFpXNTBhV0ZzVTNSNWVFb0hDTGFiOXdZUUFWQUFXZ2x0YjJSbGNtRjBiM0phQ0dWNGNHeHZjbVZ5V2dsa1pYUmxZM1JwZG1WYUVuUmxZV05vWlhKZmRXNTJaWEpwWm1sbFpGb1dkbVZ5YVdacFpXUmZZbTkxYm5SNVgyaDFiblJsY2xJbUNBRVFnSUNBZ0FJWkFBQUFBQUFBNEQ4aEFBQUFBQUFBNEQ4b2dJQ0FnQVF3QVRnQVFBQmdBR29UQ05IcG53RVNERU52WkdWdGIyNXJaWGsxTVhJV1oyaHZjM1IzY21sMFpYSXRaR0YwWVd4dloyZGxjbklSYUhSMGNDMWxaM0psYzNNdGNISnZlSGx5RlhCcFpERXRaMmwwTFdsdUxYUm9aUzF6YUdWc2JISVRjR2xrTVMxdGRXeDBhWEJzWlMxd2IzSjBjM0liY0dsa01TMXpaV05qYjIxd0xYQnZjblF0WkdWMFpXTjBhVzl1Y2hwd2NtVjJaVzUwTFhkaGEyVjFjSE10ZFc1MlpYSnBabWxsWkhJUWNISnZkRzlqYjJ3dGRISmhZMmx1WjNJSGRYTmxMVzVpWkE9PfpuV9LxH0_OPJVSCdSb36QziC0YN_P7jHDXUs8k7cryfQrcASc1CNhHHf3-7kkdESqZVJuPxFG6Bp8zznk4iA0.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ";
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientInfo {
+    username: String,
+    id: u32,
+}
+
+impl ClientInfo {
+    pub fn default() -> ClientInfo {
+        ClientInfo {
+            username: "homeval-user".to_owned(),
+            id: 23054564,
+        }
+    }
+}
+
+pub fn parse(token: &str) -> Result<ClientInfo, AnyError> {
     let token_parts = token.split(".").collect::<Vec<_>>();
     if token_parts.len() < 3 {
         return Err(AnyError::new(Error::new(
@@ -20,12 +38,21 @@ pub fn _parse(token: &str) -> Result<(), AnyError> {
         )));
     }
 
-    let decoded = general_purpose::URL_SAFE_NO_PAD
-        .decode(token_parts[2].as_bytes())
-        .unwrap();
+    let decoded = general_purpose::URL_SAFE_NO_PAD.decode(token_parts[2].as_bytes())?;
     let decoded_len = decoded.len();
     // currently doesn't verify signature
     let (msg, _sig) = decoded.split_at(decoded_len - 64);
-    println!("{}", std::str::from_utf8(msg).unwrap());
-    Ok(())
+
+    // info!("base64: {:#?}", String::from_utf8(msg.to_vec()));
+
+    let _inner = general_purpose::STANDARD.decode(msg)?;
+    let inner = paseto_token::ReplToken::decode(_inner.as_slice())?;
+
+    match inner.presenced {
+        Some(user) => Ok(ClientInfo {
+            username: user.bearer_name,
+            id: user.bearer_id,
+        }),
+        None => Ok(ClientInfo::default()),
+    }
 }

@@ -7,7 +7,7 @@ edition = "2021"
 # async-log = "2.0.0"
 async-trait = "0.1.66"
 # base64 = "0.21.0"
-c-map = "0.2.1"
+c-map = { version = "0.2.1", features=["parking-lot"]}
 console-subscriber = "0.1.8"
 deadqueue = "0.2.4"
 deno_core = "0.157.0"

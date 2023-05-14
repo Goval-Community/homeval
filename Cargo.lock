@@ -153,6 +153,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14d764ae9f2295757f912b503db8c02663b6750b4994200a1cb00b2fd9bd6df1"
 dependencies = [
  "num_cpus",
+ "parking_lot",
 ]
 
 [[package]]
