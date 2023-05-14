@@ -30,9 +30,6 @@ Deno.core.initializeAsyncOps();
 })(globalThis);
 
 globalThis.fs = {
-	listDir: async (path) => {
-		return await Deno.core.ops.op_list_dir(path)
-	},
 	readDir: async (path) => {
 		return await Deno.core.ops.op_list_dir(path);
 	},
@@ -76,6 +73,22 @@ class ServiceBase {
 		}
 	}
 
+	async ipc_recv() {
+		const message = await Deno.core.ops.op_recv_info(this.id);
+
+		if (message.attach) {
+			await this._attach(message.attach);
+		} else if (message.ipc) {
+			await this._recv(message);
+		} else if (message.close) {
+			await this._detach(message.close, true);
+		} else if (message.detach) {
+			await this._detach(message.close, false);
+		} else {
+			console.error("Unknown IPC message", message);
+		}
+	}
+
 	async _recv(message) {
 		const cmd = api.Command.decode(message.ipc.bytes);
 
@@ -91,22 +104,6 @@ class ServiceBase {
 		if (res) {
 			res.ref = cmd.ref;
 			await this.send(res, message.ipc.session);
-		}
-	}
-
-	async ipc_recv() {
-		const message = await Deno.core.ops.op_recv_info(this.id);
-
-		if (message.attach) {
-			await this._attach(message.attach);
-		} else if (message.ipc) {
-			await this._recv(message);
-		} else if (message.close) {
-			await this._detach(message.close, true);
-		} else if (message.detach) {
-			await this._detach(message.close, false);
-		} else {
-			console.error("Unknown IPC message", message);
 		}
 	}
 

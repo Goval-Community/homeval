@@ -12,3 +12,6 @@ target/
 *.draw
 node_modules
 bun.lockb
+
+service.ts
+services/*.py

@@ -1,0 +1,10 @@
+{
+  "name": "homeval-types",
+  "version": "0.0.1",
+  "description": "Type definitions for homeval's js bridge",
+  "types": "types.d.ts",
+  "files": [
+    "types.d.ts"
+  ],
+  "private": true
+}
