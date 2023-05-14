@@ -30,14 +30,23 @@ Deno.core.initializeAsyncOps();
 })(globalThis);
 
 globalThis.fs = {
+	listDir: async (path) => {
+		return await Deno.core.ops.op_list_dir(path)
+	},
 	readDir: async (path) => {
 		return await Deno.core.ops.op_list_dir(path);
 	},
-	writeFile: async (path, contents = "") => {
+	writeFile: async (path, contents = []) => {
 		return await Deno.core.ops.op_write_file(path, contents);
+	},
+	writeFileString: async (path, contents = "") => {
+		return await Deno.core.ops.op_write_file_string(path, contents);
 	},
 	readFile: async (path) => {
 		return await Deno.core.ops.op_read_file(path);
+	},
+	readFileString: async (path) => {
+		return await Deno.core.ops.op_read_file_string(path);
 	},
 	remove: async (path) => {
 		return await Deno.core.ops.op_remove_file(path);
@@ -49,9 +58,9 @@ globalThis.fs = {
 
 globalThis.Date = {
 	now: () => {
-		return BigInt(Deno.core.ops.op_time_milliseconds())
-	}
-}
+		return BigInt(Deno.core.ops.op_time_milliseconds());
+	},
+};
 
 class ServiceBase {
 	constructor(id, service, name) {
@@ -63,22 +72,22 @@ class ServiceBase {
 
 	async start() {
 		while (true) {
-			await this.ipc_recv()
+			await this.ipc_recv();
 		}
 	}
 
 	async _recv(message) {
 		const cmd = api.Command.decode(message.ipc.bytes);
-		
+
 		let res = null;
 
 		try {
-			res = await this.recv(cmd, message.ipc.session)
-		} catch(err) {
+			res = await this.recv(cmd, message.ipc.session);
+		} catch (err) {
 			res = api.Command.create({ error: err.toString(), ref: cmd.ref });
 			console.error(err.toString());
 		}
-		
+
 		if (res) {
 			res.ref = cmd.ref;
 			await this.send(res, message.ipc.session);
@@ -91,13 +100,13 @@ class ServiceBase {
 		if (message.attach) {
 			await this._attach(message.attach);
 		} else if (message.ipc) {
-			await this._recv(message)
+			await this._recv(message);
 		} else if (message.close) {
-			await this._detach(message.close, true)
+			await this._detach(message.close, true);
 		} else if (message.detach) {
-			await this._detach(message.close, false)
+			await this._detach(message.close, false);
 		} else {
-			console.error("Unknown IPC message", message)
+			console.error("Unknown IPC message", message);
 		}
 	}
 
@@ -105,9 +114,7 @@ class ServiceBase {
 		throw new Error("Not implemented");
 	}
 
-	async send(cmd, session) {
-		cmd.channel = this.id;
-		cmd.session = session;
+	async _send(cmd, session) {
 		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
 		await Deno.core.ops.op_send_msg({
 			bytes: buf,
@@ -115,18 +122,105 @@ class ServiceBase {
 		});
 	}
 
+	async send(cmd, session) {
+		cmd.channel = this.id;
+		cmd.session = session;
+
+		if (session > 0) {
+			await this._send(cmd, session);
+		} else if (session === 0) {
+			for (let client of this.clients) {
+				await this._send(cmd, session);
+			}
+		} else if (session < 0) {
+			const ignore = Math.abs(session);
+			for (let client of this.clients) {
+				if (client === ignore) {
+					continue;
+				}
+				await this._send(cmd, session);
+			}
+		}
+	}
+
 	async _attach(session) {
 		this.clients.push(session);
-		await this.attach(session)
+		await this.attach(session);
 	}
 
 	async attach(_) {
 	}
 
 	async _detach(session, forced) {
-		this.clients = this.clients.filter(item => item !== session)
-		await this.detach(session, forced)
+		this.clients = this.clients.filter((item) => item !== session);
+		await this.detach(session, forced);
 	}
 
 	async detach(_session, _forced) {}
 }
+
+class PtyProcess {
+	constructor(channel, command, args = []) {
+		this.channel = channel;
+		this.command = command;
+		this.args = args;
+		this.id = null;
+	}
+
+	async init() {
+		this.id = await Deno.core.ops.op_register_pty([this.command, ...this.args], this.channel);
+	}
+
+	async add_session(session) {
+		await this._await_pty_exists();
+		await Deno.core.ops.op_pty_add_session(this.id, session);
+	}
+
+	async remove_session(session) {
+		await this._await_pty_exists();
+		await Deno.core.ops.op_pty_remove_session(this.id, session);
+	}
+
+	async write(input) {
+		await this._await_pty_exists();
+		await Deno.core.ops.op_pty_write_msg(this.id, input);
+	}
+
+	// ensure pty exists, if not wait in a non-blocking manner
+	// used by functions that queue inputs instead of erroring
+	// when the pty isnt initialized yet
+	async _await_pty_exists() {
+		// fast path
+		if (this.id != null) return;
+
+		let loops = 0;
+		let warned = false;
+
+		while (true) {
+			if (this.id != null) break;
+
+			await Deno.core.ops.op_sleep(1);
+			loops += 1;
+
+			if (loops > 1000 && !warned) {
+				console.warn(
+					"Pty has waited for more than 1 second to initialize, please check this out",
+				);
+			}
+		}
+	}
+}
+
+globalThis.process = {
+	env: new Proxy({}, {
+		get(_target, prop, _recveiver) {
+			return Deno.core.ops.op_get_env_var(prop)
+		},
+		set() {
+			throw new Error("Setting env vars is currently unimplemented");
+		},
+	}),
+	getUserInfo: (session) => {
+		return Deno.core.ops.op_user_info(session)
+	}
+};

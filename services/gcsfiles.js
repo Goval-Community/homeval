@@ -4,7 +4,7 @@ class Service extends ServiceBase {
 			let files = []
 			
 			try {
-				files = await Deno.core.ops.op_list_dir(cmd.readdir.path)
+				files = await fs.listDir(cmd.readdir.path)
 			} catch(err) {
 				return api.Command.create({error: err.toString()})
 			}

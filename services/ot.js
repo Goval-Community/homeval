@@ -20,7 +20,7 @@ class Service extends ServiceBase {
 			const path = cmd.otLinkFile.file.path;
 			const content = await fs.readFile(path);
 			this.path = path
-			this.contents = await Deno.core.ops.op_read_file_string(path);
+			this.contents = await fs.readFileString(path);
 
 			this.history.push({
 				spookyVersion: this.version,
@@ -97,26 +97,20 @@ class Service extends ServiceBase {
 				await this.send(msg, arr_session)
 			}
 
-			await Deno.core.ops.op_write_file_string(this.path, contents)
+			await fs.writeFileString(this.path, contents)
 		} else if (cmd.otNewCursor) {
 			const cursor = cmd.otNewCursor
 			this.cursors[cursor.id] = cursor
 
-			const msg = api.Command.create({otNewCursor: cursor, session:-session})
+			const msg = api.Command.create({ otNewCursor: cursor })
 
-			for (const arr_session of this.clients) {
-				if (arr_session === session) {continue}
-				await this._send(msg, arr_session)
-			}
+			await this.send(msg, -session)
 		} else if (cmd.otDeleteCursor) {
 			delete this.cursors[cmd.otDeleteCursor]
 
-			const msg = api.Command.create({otDeleteCursor: cmd.otDeleteCursor, session: -session})
+			const msg = api.Command.create({ otDeleteCursor: cmd.otDeleteCursor })
 
-			for (const arr_session of this.clients) {
-				if (arr_session === session) {continue}
-				await this._send(msg, arr_session)
-			}
+			await this.send(msg, -session)
 		} else if (cmd.otFetchRequest) {
 			console.log(cmd, this.history)
 			return api.Command.create({
@@ -130,21 +124,10 @@ class Service extends ServiceBase {
 		} else {
 			console.warn("Unknown ot command", cmd)
 		}
-
-		// console.log(cmd)
-	}
-
-	async _send(cmd, session) {
-		cmd.channel = this.id;
-		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
-		await Deno.core.ops.op_send_msg({
-			bytes: buf,
-			session: session,
-		});
 	}
 
 	async attach(session) {
-		this.session_info[session] = Deno.core.ops.op_user_info(session)
+		this.session_info[session] = process.getUserInfo(session)
 		
 		if (!this.path) {
 			await this.send(api.Command.create({otstatus: {}}), session)

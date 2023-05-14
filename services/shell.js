@@ -1,22 +1,22 @@
 class Service extends ServiceBase {
     constructor(...args) {
         super(...args)
-        Deno.core.ops.op_register_pty(["zsh"], this.id).then(pty_id => {
-            console.log("GOT PTY ID:", pty_id)
-            this.pty = pty_id
+        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
+        this.pty.init().then(_ => {
+            console.debug("shell pty obtained:", this.pty.id)
         })
     }
     
 	async recv(cmd, session) {
 		if (cmd.input) {
-			await Deno.core.ops.op_pty_write_msg(this.pty, cmd.input)
+			await this.pty.write(cmd.input)
 		}
 
         // console.log(cmd, this)
 	}
 
     async attach(session) {
-        await Deno.core.ops.op_pty_add_session(this.pty, session)
+        await this.pty.add_session(session)
     }
 }
 

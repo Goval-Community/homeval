@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use deno_core::error::AnyError;
 
-use log::log;
+use log::{log, warn};
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -13,6 +13,12 @@ fn op_time_milliseconds() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::from_secs(0)); // Timestamp set to 0 if current time is before unix epoch
     timestamp.as_millis().to_string()
+}
+
+#[op(deferred)]
+pub async fn op_sleep(millis: u64) -> Result<(), AnyError> {
+    tokio::time::sleep(Duration::from_millis(millis)).await;
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -64,11 +70,25 @@ fn op_console_log(
     Ok(())
 }
 
+#[op]
+fn op_get_env_var(key: String) -> Result<Option<String>, AnyError> {
+    match std::env::var(key.clone()) {
+        Ok(val) => Ok(Some(val)),
+        Err(e) => {
+            warn!("Error occured while fetching env var: '{}' {}", key, e);
+            Ok(None)
+        }
+    }
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         // Time
         op_time_milliseconds::decl(),
+        op_sleep::decl(),
         // Console
         op_console_log::decl(),
+        // Env
+        op_get_env_var::decl(),
     ]
 }

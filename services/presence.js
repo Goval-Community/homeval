@@ -17,9 +17,9 @@ class Service extends ServiceBase {
             }
         })
 
-        await this._send(roster, session)
+        await this.send(roster, session)
         
-        const _user = Deno.core.ops.op_user_info(session);
+        const _user = process.getUserInfo(session);
         
         const user = {
             id: _user.id,
@@ -29,25 +29,8 @@ class Service extends ServiceBase {
 
         this.users.push(user)
 
-        const msg = api.Command.create({
-            join: user,
-            session: -session
-        })
-
-        for (const arr_session of this.clients) {
-            if (arr_session === session) {continue}
-            await this._send(msg, arr_session)
-        }
+        await this.send(api.Command.create({ join: user }), -session)
     }
-
-    async _send(cmd, session) {
-		cmd.channel = this.id;
-		const buf = [...Buffer.from(api.Command.encode(cmd).finish())];
-		await Deno.core.ops.op_send_msg({
-			bytes: buf,
-			session: session,
-		});
-	}
 }
 
 console.log(serviceInfo);
