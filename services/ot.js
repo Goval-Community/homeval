@@ -10,7 +10,6 @@ class Service extends ServiceBase {
 	}
 
 	async recv(cmd, session) {
-		console.log(session)
 		if (!this.path && !cmd.otLinkFile) {
 			console.error("Command sent before otLinkFile", cmd)
 			return
@@ -39,7 +38,7 @@ class Service extends ServiceBase {
 			return api.Command.create({otLinkFileResponse:{version:this.version, linkedFile:{path, content}}})
 		} else if (cmd.ot) {
 			let cursor = 0
-			let contents = this.contents.toString()
+			let contents = [...this.contents]
 
 			for (const op of cmd.ot.op) {
 				if (op.skip) {
@@ -52,7 +51,7 @@ class Service extends ServiceBase {
 				}
 				if (op.insert) {
 					const insert = op.insert
-					contents = contents.slice(0, cursor) + insert + contents.slice(cursor)
+					contents = [...contents.slice(0, cursor), ...insert, ...contents.slice(cursor)]
 					cursor += insert.length
 				}
 				if (op.delete) {
@@ -61,18 +60,19 @@ class Service extends ServiceBase {
 						throw new Error("Invalid delete past bounds")
 					}
 
-					contents = contents.slice(0,cursor) + contents.slice(cursor + del)
+					contents = [...contents.slice(0,cursor), ...contents.slice(cursor + del)]
 				}
 			}
-			this.version += 1
-			this.contents = contents
 
-			console.log(this.session_info, session)
+			const final_contents = contents.join("")
+
+			this.version += 1
+			this.contents = final_contents
 
 			const inner_packet = {
 				spookyVersion: this.version,
 				op: cmd.ot.op,
-				crc32: CRC32.str(contents),
+				crc32: CRC32.str(final_contents),
 				committed: {
 					seconds: (Date.now()/ 1000n).toString(),
 					nanos: 0
@@ -97,7 +97,7 @@ class Service extends ServiceBase {
 				await this.send(msg, arr_session)
 			}
 
-			await fs.writeFileString(this.path, contents)
+			await fs.writeFileString(this.path, final_contents)
 		} else if (cmd.otNewCursor) {
 			const cursor = cmd.otNewCursor
 			this.cursors[cursor.id] = cursor
@@ -106,13 +106,12 @@ class Service extends ServiceBase {
 
 			await this.send(msg, -session)
 		} else if (cmd.otDeleteCursor) {
-			delete this.cursors[cmd.otDeleteCursor]
+			delete this.cursors[cmd.otDeleteCursor.id]
 
 			const msg = api.Command.create({ otDeleteCursor: cmd.otDeleteCursor })
 
 			await this.send(msg, -session)
 		} else if (cmd.otFetchRequest) {
-			console.log(cmd, this.history)
 			return api.Command.create({
 				otFetchResponse: {
 					packets: this.history.slice(
