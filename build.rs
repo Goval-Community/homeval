@@ -1,15 +1,36 @@
 // use deno_core::{include_js_files, Extension};
 // use std::env;
 // use std::path::PathBuf;
+use std::process::Command;
 extern crate prost_build;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/protobufs");
+    println!("cargo:rerun-if-changed=src/protobufs,api.js");
+
     prost_build::compile_protos(
         &["src/protobufs/goval.proto", "src/protobufs/client.proto"],
         &["src/"],
     )
     .unwrap();
+
+    let output = Command::new("bun")
+        .arg("build")
+        .arg("api.js")
+        .arg("--minify")
+        .arg("--outdir=src")
+        .output()
+        .expect("Failed to bun build");
+
+    // println!("cargo:warning=exit code {}", output.status.code().unwrap());
+    // println!(
+    //     "cargo:warning=output {}",
+    //     base64::engine::general_purpose::STANDARD_NO_PAD.encode(output.stderr)
+    // );
+
+    assert!(
+        output.status.code().expect("exit code needed") == 0,
+        "Bun build failed"
+    );
 
     // let runjs_extension = Extension::builder("runjs")
     //     .esm(include_js_files!("src/runtime.js",))

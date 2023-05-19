@@ -17,3 +17,5 @@ service.ts
 services/*.py
 
 test.*
+
+src/api.js
