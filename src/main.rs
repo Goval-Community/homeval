@@ -25,6 +25,9 @@ use deno_extension::{make_extension, JsMessage, Service};
 mod parse_paseto;
 use parse_paseto::{parse, ClientInfo};
 
+mod database;
+use database::DATABASE_CONNECTION;
+
 use lazy_static::lazy_static;
 
 lazy_static! {
