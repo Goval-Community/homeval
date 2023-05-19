@@ -14,18 +14,22 @@ fn main() {
     .unwrap();
 
     let output = Command::new("bun")
+        .arg("install")
+        .output()
+        .expect("Failed to install js packages");
+
+    assert!(
+        output.status.code().expect("exit code needed") == 0,
+        "Bun install failed"
+    );
+
+    let output = Command::new("bun")
         .arg("build")
         .arg("api.js")
         .arg("--minify")
         .arg("--outdir=src")
         .output()
         .expect("Failed to bun build");
-
-    // println!("cargo:warning=exit code {}", output.status.code().unwrap());
-    // println!(
-    //     "cargo:warning=output {}",
-    //     base64::engine::general_purpose::STANDARD_NO_PAD.encode(output.stderr)
-    // );
 
     assert!(
         output.status.code().expect("exit code needed") == 0,
