@@ -23,17 +23,21 @@ fn main() {
         "Bun install failed"
     );
 
+    // bun x esbuild ./api.js --bundle --minify --platform=browser --outfile=src/api.js
     let output = Command::new("bun")
-        .arg("build")
-        .arg("api.js")
+        .arg("x")
+        .arg("esbuild")
+        .arg("./api.js")
+        .arg("--bundle")
         .arg("--minify")
-        .arg("--outdir=src")
+        .arg("--platform=browser")
+        .arg("--outfile=src/api.js")
         .output()
-        .expect("Failed to bun build");
+        .expect("Esbuild failed");
 
     assert!(
         output.status.code().expect("exit code needed") == 0,
-        "Bun build failed"
+        "Esbuild failed"
     );
 
     // let runjs_extension = Extension::builder("runjs")
