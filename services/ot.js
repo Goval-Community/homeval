@@ -147,7 +147,6 @@ class Service extends ServiceBase {
 	}
 }
 
-console.log(serviceInfo);
 const service = new Service(
 	serviceInfo.id,
 	serviceInfo.service,

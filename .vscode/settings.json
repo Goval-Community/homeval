@@ -9,4 +9,5 @@
         "editor.formatOnSave": false
     },
     "editor.formatOnSave": true,
+    "license.default": "agpl-3.0",
 }

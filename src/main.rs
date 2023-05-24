@@ -1,7 +1,7 @@
 use deno_core::error::AnyError;
 #[allow(unused_imports)]
-use goval_impl::goval;
-use goval_impl::goval::Command;
+use homeval::goval;
+use homeval::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
@@ -9,7 +9,6 @@ use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, 
 use std::{env, io::Error, sync::Arc};
 
 use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
-use tokio;
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
@@ -25,8 +24,8 @@ use deno_extension::{make_extension, JsMessage, Service};
 mod parse_paseto;
 use parse_paseto::{parse, ClientInfo};
 
-mod database;
-use database::DATABASE_CONNECTION;
+// mod database;
+// use database::DATABASE_CONNECTION;
 
 use lazy_static::lazy_static;
 
@@ -44,23 +43,34 @@ lazy_static! {
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
-    static ref IMPLEMENTED_SERVICES: Vec<String> = vec![
-        "gcsfiles".to_string(),
-        "ot".to_string(),
-        "presence".to_string(),
-        "shell".to_string()
-    ];
     static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
         HashMap::new();
     static ref PTY_CHANNEL_TO_ID: HashMap<i32, Vec<u32>> = HashMap::new();
+    
+    static ref IMPLEMENTED_SERVICES: Vec<String> = {
+        let mut services = vec![];
+        for _file in std::fs::read_dir("services").expect("Missing services dir :/") {
+            let file = _file.expect("Error when looping over `services/`");
+            if let Some(extension) = file.path().extension() {
+                if extension  == "js" {
+                    let mut service_path = file.file_name().into_string().expect("failed to convert path OsString to String");
+                    
+                    service_path.pop().expect("Impossible case when removing .js extension from service file");
+                    service_path.pop().expect("Impossible case when removing .js extension from service file");
+                    service_path.pop().expect("Impossible case when removing .js extension from service file");
+                    
+                    services.push(service_path);
+                }
+            }
+        }
+        services
+    };
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // if cfg!(features = "debug") {
     console_subscriber::init();
-    // }
-    //span!("main", {
+
     let _ = env_logger::try_init();
     info!("starting...");
     let addr = env::args()

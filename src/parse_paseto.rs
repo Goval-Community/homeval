@@ -2,7 +2,7 @@ use std::io::Error;
 
 use base64::{engine::general_purpose, Engine as _};
 use deno_core::error::AnyError;
-use goval_impl::paseto_token;
+use homeval::paseto_token;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
