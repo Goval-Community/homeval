@@ -1,4 +1,4 @@
-<center>
+<div align="center">
     <img width="70%" src="./media/full-logo.svg">
     <br>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7.svg">
@@ -10,7 +10,7 @@
     -->
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>
-</center>
+</div>
 
 # License
 Homeval is licensed under GNU AGPL-3.0-only  
