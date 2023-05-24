@@ -1,4 +1,6 @@
 // @ts-nocheck
+// This file is outdated see `src/runtime.js` and `types/homeval-types/types.d.ts`
+
 import { api } from "@replit/protocol";
 // rome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
 ((globalThis) => {

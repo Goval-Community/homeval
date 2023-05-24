@@ -20,15 +20,18 @@ fn main() {
 
     assert!(output.status.success(), "Running bun install failed");
 
-    // Run: bun x esbuild ./api.js --bundle --minify --platform=browser --outfile=src/api.js
+    // Run: bun x esbuild src/api.js --bundle --minify --platform=browser --outfile=$OUT_DIR/api.js
     let output = Command::new("bun")
         .arg("x")
         .arg("esbuild")
-        .arg("./api.js")
+        .arg("src/api.js")
         .arg("--bundle")
         .arg("--minify")
         .arg("--platform=browser")
-        .arg("--outfile=src/api.js")
+        .arg(format!(
+            "--outfile={}/api.js",
+            std::env::var("OUT_DIR").unwrap()
+        ))
         .output()
         .expect("Getting esbuild output failed");
 

@@ -257,7 +257,7 @@ async fn main() -> Result<(), Error> {
                                             js_runtime
                                                 .execute_script(
                                                     "[goval::api.js]",
-                                                    include_str!("./api.js"),
+                                                    include_str!(concat!(env!("OUT_DIR"), "/api.js")),
                                                 )
                                                 .unwrap();
 
