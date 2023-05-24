@@ -32,7 +32,7 @@ class Service extends ServiceBase {
 				version: this.version,
 				author: api.OTPacket.Author.USER,
 				// use https://replit.com/@homeval for initial insert
-				userId: 20567961
+				userId: 23352071
 			})
 
 			return api.Command.create({otLinkFileResponse:{version:this.version, linkedFile:{path, content}}})
