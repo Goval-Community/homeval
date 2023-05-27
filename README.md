@@ -21,7 +21,21 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 
 # Running homeval
 
-Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). To compile and run a debug build use `cargo run`.
+## Installation
+1. Git clone the repository
+2. Run `git submodule update --init --recursive` 
+3. Install required dependencies
+    * `curl -fsSL https://bun.sh/install | bash`
+    * `sudo apt install protobuf-compiler`
+    * `curl --proto '=https' --tlsv1.3 https://sh.rustup.rs/ -sSf | sh`
+    * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
+
+## Building
+
+Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). 
+
+## Running
+To compile and run a debug build use `cargo run`.
 
 # Implementing a service
 
@@ -35,4 +49,4 @@ All linux distros with an up to date enough GLIBC should work. The only distro o
 
 Using musl libc, Windows, or MacOS is not officially supported right now. You might encounter roadblocks attempting to compile targeting any of these targets.
 
-Official windows support is a WIP.
+__Official windows support is a WIP.__
