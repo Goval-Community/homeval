@@ -5,7 +5,6 @@ use homeval::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-//use std::fmt::Binary;
 use std::{env, io::Error, sync::Arc};
 
 use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
@@ -13,8 +12,8 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
 };
-//use async_log::span;
 use log::{debug, error, info, warn};
+
 mod channels;
 use channels::IPCMessage;
 
@@ -24,67 +23,47 @@ use deno_extension::{make_extension, JsMessage, Service};
 mod parse_paseto;
 use parse_paseto::{parse, ClientInfo};
 
-// mod database;
-// use database::DATABASE_CONNECTION;
-
-use std::path::PathBuf;
-
-#[cfg(not(debug_assertions))]
-use include_directory::{include_directory, Dir};
-#[cfg(not(debug_assertions))]
-static SERVICES_DIR: Dir<'_> = include_directory!("$CARGO_MANIFEST_DIR/services");
-
 #[cfg(debug_assertions)]
-#[inline(always)]
-fn get_service_module_code(_: String) -> Result<Option<String>, Error> {
-    Ok(None)
-}
-
+mod services_debug;
 #[cfg(debug_assertions)]
-#[inline(always)]
-fn get_all_services() -> Result<Vec<PathBuf>, Error> {
-    let mut res = vec![];
-    for file in std::fs::read_dir("services/").expect("Error reading services") {
-        res.push(file.unwrap().path())
-    }
-    Ok(res)
-}
+use services_debug as services;
 
 #[cfg(not(debug_assertions))]
-#[inline(always)]
-fn get_service_module_code(service: String) -> Result<Option<String>, Error> {
-    match SERVICES_DIR.get_file(format!("{}.js", service)) {
-        Some(file) => {
-            return match file.contents_utf8() {
-                Some(contents) => Ok(Some(contents.to_string())),
-                None => Err(
-                    Error::new(
-                        std::io::ErrorKind::InvalidData, 
-                        format!("Module: {} has None for .contents_utf8()", service)
-                    )
-                )
-            }
-        }
-        None => Err(
-            Error::new(
-                std::io::ErrorKind::NotFound, 
-                format!("Module: {} has None for .contents_utf8()", service)
-            )
-        )
-    }
-}
-
+mod services_release;
 #[cfg(not(debug_assertions))]
-#[inline(always)]
-fn get_all_services() -> Result<Vec<PathBuf>, Error> {
-    let mut res = vec![];
-    for file in SERVICES_DIR.files() {
-        res.push(file.path().to_path_buf())
-    }
-    Ok(res)
-}
+use services_release as services;
 
 use lazy_static::lazy_static;
+lazy_static! {
+    pub static ref IMPLEMENTED_SERVICES: Vec<String> = {
+        let mut services = vec![];
+        for file in services::get_all().expect("Error when looping over `services/`") {
+            if let Some(extension) = file.extension() {
+                if extension == "js" {
+                    let mut service_path = file
+                        .file_name()
+                        .expect("File name missing while extension exists???")
+                        .to_str()
+                        .expect("failed to convert path OsString to String")
+                        .to_string();
+
+                    service_path
+                        .pop()
+                        .expect("Impossible case when removing .js extension from service file");
+                    service_path
+                        .pop()
+                        .expect("Impossible case when removing .js extension from service file");
+                    service_path
+                        .pop()
+                        .expect("Impossible case when removing .js extension from service file");
+
+                    services.push(service_path);
+                }
+            }
+        }
+        services
+    };
+}
 
 lazy_static! {
     static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
@@ -103,29 +82,6 @@ lazy_static! {
     static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
         HashMap::new();
     static ref PTY_CHANNEL_TO_ID: HashMap<i32, Vec<u32>> = HashMap::new();
-    
-    static ref IMPLEMENTED_SERVICES: Vec<String> = {
-        let mut services = vec![];
-        for file in get_all_services().expect("Error when looping over `services/`") { 
-            if let Some(extension) = file.extension() {
-                if extension == "js" {
-                    let mut service_path = file
-                        .file_name()
-                        .expect("File name missing while extension exists???")
-                        .to_str()
-                        .expect("failed to convert path OsString to String")
-                        .to_string();
-                    
-                    service_path.pop().expect("Impossible case when removing .js extension from service file");
-                    service_path.pop().expect("Impossible case when removing .js extension from service file");
-                    service_path.pop().expect("Impossible case when removing .js extension from service file");
-                    
-                    services.push(service_path);
-                }
-            }
-        }
-        services
-    };
 }
 
 #[tokio::main]
@@ -335,7 +291,7 @@ async fn main() -> Result<(), Error> {
                                             let mod_id = js_runtime
                                                 .load_main_module(
                                                     &main_module,
-                                                    get_service_module_code(open_chan.service)
+                                                    services::get_module_core(open_chan.service)
                                                         .expect("Error fetching module code")
                                                 )
                                                 .await
