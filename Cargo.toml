@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = [".", "migration"] # "entity", 
+members = [".", "migration", "include_directory/include_directory", "include_directory/macros"] # "entity", 
 
 [dependencies]
 async-trait = "0.1.66"
@@ -31,5 +31,8 @@ async_once = "0.2.6"
 
 migration = { path = "migration" }
 
+include_directory = {path = "./include_directory/include_directory"}
+
 [build-dependencies]
 prost-build = "0.11.8"
+

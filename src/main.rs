@@ -27,6 +27,63 @@ use parse_paseto::{parse, ClientInfo};
 // mod database;
 // use database::DATABASE_CONNECTION;
 
+use std::path::PathBuf;
+
+#[cfg(not(debug_assertions))]
+use include_directory::{include_directory, Dir};
+#[cfg(not(debug_assertions))]
+static SERVICES_DIR: Dir<'_> = include_directory!("$CARGO_MANIFEST_DIR/services");
+
+#[cfg(debug_assertions)]
+#[inline(always)]
+fn get_service_module_code(_: String) -> Result<Option<String>, Error> {
+    Ok(None)
+}
+
+#[cfg(debug_assertions)]
+#[inline(always)]
+fn get_all_services() -> Result<Vec<PathBuf>, Error> {
+    let mut res = vec![];
+    for file in std::fs::read_dir("services/").expect("Error reading services") {
+        res.push(file.unwrap().path())
+    }
+    Ok(res)
+}
+
+#[cfg(not(debug_assertions))]
+#[inline(always)]
+fn get_service_module_code(service: String) -> Result<Option<String>, Error> {
+    match SERVICES_DIR.get_file(format!("{}.js", service)) {
+        Some(file) => {
+            return match file.contents_utf8() {
+                Some(contents) => Ok(Some(contents.to_string())),
+                None => Err(
+                    Error::new(
+                        std::io::ErrorKind::InvalidData, 
+                        format!("Module: {} has None for .contents_utf8()", service)
+                    )
+                )
+            }
+        }
+        None => Err(
+            Error::new(
+                std::io::ErrorKind::NotFound, 
+                format!("Module: {} has None for .contents_utf8()", service)
+            )
+        )
+    }
+}
+
+#[cfg(not(debug_assertions))]
+#[inline(always)]
+fn get_all_services() -> Result<Vec<PathBuf>, Error> {
+    let mut res = vec![];
+    for file in SERVICES_DIR.files() {
+        res.push(file.path().to_path_buf())
+    }
+    Ok(res)
+}
+
 use lazy_static::lazy_static;
 
 lazy_static! {
@@ -49,11 +106,15 @@ lazy_static! {
     
     static ref IMPLEMENTED_SERVICES: Vec<String> = {
         let mut services = vec![];
-        for _file in std::fs::read_dir("services").expect("Missing services dir :/") {
-            let file = _file.expect("Error when looping over `services/`");
-            if let Some(extension) = file.path().extension() {
-                if extension  == "js" {
-                    let mut service_path = file.file_name().into_string().expect("failed to convert path OsString to String");
+        for file in get_all_services().expect("Error when looping over `services/`") { 
+            if let Some(extension) = file.extension() {
+                if extension == "js" {
+                    let mut service_path = file
+                        .file_name()
+                        .expect("File name missing while extension exists???")
+                        .to_str()
+                        .expect("failed to convert path OsString to String")
+                        .to_string();
                     
                     service_path.pop().expect("Impossible case when removing .js extension from service file");
                     service_path.pop().expect("Impossible case when removing .js extension from service file");
@@ -272,7 +333,11 @@ async fn main() -> Result<(), Error> {
                                                 .unwrap();
 
                                             let mod_id = js_runtime
-                                                .load_main_module(&main_module, None)
+                                                .load_main_module(
+                                                    &main_module,
+                                                    get_service_module_code(open_chan.service)
+                                                        .expect("Error fetching module code")
+                                                )
                                                 .await
                                                 .unwrap();
                                             let result = js_runtime.mod_evaluate(mod_id);

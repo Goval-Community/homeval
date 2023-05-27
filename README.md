@@ -23,11 +23,11 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 
 Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). To compile and run a debug build use `cargo run`.
 
-When running a built binary there is currently one major requirement: you need to have a copy of the `services` directory wherever you invoke homeval. A fix for this is currently a WIP.
-
 # Implementing a service
 
 Make a new file in `services/` name it with the format `<service name>.js` then see existing services and `src/runtime.js` for the interface you need to provide. Docs focussed on implementing services are a WIP.
+
+> NOTE: The source code for services are compiled in to release builds, but loaded at runtime for debug builds.
 
 # Supported targets
 
