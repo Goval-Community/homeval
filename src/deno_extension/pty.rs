@@ -32,13 +32,7 @@ struct PtyWriter {
 
 impl Write for PtyWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // info!("Got new output for pty");
-
-        // let session = 0;
         let mut cmd = crate::goval::Command::default();
-        // let mut container_state = goval::Command::default();
-        // let mut inner = goval::Out::default();
-        // inner_state.state = goval::container_state::State::Ready.into();
         let output: String;
         match String::from_utf8(buf.to_vec()) {
             Ok(str) => output = str,
@@ -53,21 +47,17 @@ impl Write for PtyWriter {
         cmd.channel = self.channel;
 
         for session in PTY_SESSION_MAP.read(&self.pty_id).get().unwrap().iter() {
-            // info!("Aquiring lock....");
             if let Some(sender) = crate::SESSION_MAP.read(session).get() {
-                // info!("Aquired....");
                 let mut to_send = cmd.clone();
                 to_send.session = *session;
 
                 match sender.send(IPCMessage::from_cmd(to_send, *session)) {
                     Ok(_) => {}
                     Err(err) => {
-                        // error!("Error in pty writer: {}", err);
                         return Err(Error::new(ErrorKind::Other, err));
                     }
                 }
             } else {
-                // error!("Missing session in pty writer");
                 return Err(Error::new(
                     ErrorKind::NotFound,
                     "Missing session in pty writer",
@@ -119,8 +109,6 @@ async fn op_register_pty(_args: Vec<String>, channel: i32) -> Result<u32, AnyErr
     tokio::task::spawn(async move {
         tokio::task::spawn_blocking(move || {
             std::io::copy(&mut reader, &mut PtyWriter { channel, pty_id })
-            //     let buf: &mut Vec<u8> = &mut vec![];
-            //     reader.read(buf).expect("Blocking read from pty");
         });
     });
 
@@ -144,7 +132,6 @@ async fn op_register_pty(_args: Vec<String>, channel: i32) -> Result<u32, AnyErr
     let (task, handle) = abortable(async move {
         loop {
             let task = queue.pop().await;
-            // info!("Got new input in pty");
             writer
                 .write(task.as_bytes())
                 .expect("Error writing bytes to pty :/");
@@ -154,9 +141,6 @@ async fn op_register_pty(_args: Vec<String>, channel: i32) -> Result<u32, AnyErr
     PTY_CANCELATION_MAP.write(pty_id).insert(handle);
 
     tokio::spawn(task);
-
-    // Send data to the pty by writing to the master
-    // writeln!(pair.master.take_writer()?, "ls -l\r\n")?;
 
     Ok(pty_id)
 }

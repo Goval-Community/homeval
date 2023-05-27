@@ -27,9 +27,6 @@ pub enum JsMessage {
 
 #[op]
 async fn op_recv_info(channel: i32) -> Result<JsMessage, AnyError> {
-    // let queues_clone = CHANNEL_MESSAGES.clone();
-    // let internal = 0 as i32;
-    // info!("Checking for channel: {} in queue list", internal);
     let _read = crate::CHANNEL_MESSAGES.read().await;
     if !_read.contains_key(&channel) {
         return Err(AnyError::new(Error::new(

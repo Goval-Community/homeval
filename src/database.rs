@@ -17,8 +17,3 @@ lazy_static! {
             }
         });
 }
-
-// let rt = Builder::new_current_thread().build().unwrap();
-// rt.block_on(async {
-//     assert_eq!(FOO.get().await , &1)
-// })

@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientInfo {
+    // In the future this will indicate if the jwt signature was legit or not
+    // For now it'll always be false
+    is_secure: bool,
+
     username: String,
     id: u32,
 }
@@ -16,6 +20,8 @@ pub struct ClientInfo {
 impl ClientInfo {
     pub fn default() -> ClientInfo {
         ClientInfo {
+            is_secure: false,
+
             username: "homeval-user".to_owned(),
             id: 23054564,
         }
@@ -43,13 +49,13 @@ pub fn parse(token: &str) -> Result<ClientInfo, AnyError> {
     // currently doesn't verify signature
     let (msg, _sig) = decoded.split_at(decoded_len - 64);
 
-    // info!("base64: {:#?}", String::from_utf8(msg.to_vec()));
-
     let _inner = general_purpose::STANDARD.decode(msg)?;
     let inner = paseto_token::ReplToken::decode(_inner.as_slice())?;
 
     match inner.presenced {
         Some(user) => Ok(ClientInfo {
+            is_secure: false,
+
             username: user.bearer_name,
             id: user.bearer_id,
         }),

@@ -11,8 +11,6 @@ class Service extends ServiceBase {
 		if (cmd.input) {
 			await this.pty.write(cmd.input)
 		}
-
-        // console.log(cmd, this)
 	}
 
     async attach(session) {

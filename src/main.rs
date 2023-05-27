@@ -151,7 +151,6 @@ async fn main() -> Result<(), Error> {
         }
 
         if cmd.channel == 0 {
-            // info!("{:#?}", cmd);
             match cmd_body {
                 goval::command::Body::Ping(_) => {
                     let mut pong = goval::Command::default();
@@ -159,9 +158,7 @@ async fn main() -> Result<(), Error> {
                     pong.r#ref = cmd.r#ref;
                     pong.channel = 0;
 
-                    // info!("Aquiring pong lock...");
                     if let Some(sender) = session_map_clone.read(&message.session).get() {
-                        // info!("got pong lock...");
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
@@ -239,7 +236,6 @@ async fn main() -> Result<(), Error> {
                                 rt.block_on(async {
                                     local
                                         .run_until(async {
-                                            // local.spawn_local(async move {
                                             let mod_path =
                                                 &format!("services/{}.js", open_chan.service);
                                             debug!("Module path: {}", mod_path);
@@ -300,7 +296,6 @@ async fn main() -> Result<(), Error> {
 
                                             js_runtime.run_event_loop(false).await.unwrap();
                                             result.await.unwrap().unwrap();
-                                            // })
                                         })
                                         .await;
                                 });
@@ -354,7 +349,6 @@ async fn main() -> Result<(), Error> {
                             .write(message.session)
                             .entry()
                             .and_modify(|channels| channels.push(channel_id_held));
-                        // }
                     }
                 }
                 _ => {}
@@ -409,7 +403,7 @@ async fn send_message(
 
 async fn accept_connection(
     stream: TcpStream,
-    propogate: mpsc::UnboundedSender<IPCMessage>,
+    propagate: mpsc::UnboundedSender<IPCMessage>,
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
     session: i32,
 ) {
@@ -427,8 +421,6 @@ async fn accept_connection(
 
         Ok(res)
     };
-
-    // let mut websocket = accept_hdr(stream.unwrap(), copy_headers_callback).unwrap();
 
     let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback)
         .await
@@ -469,22 +461,9 @@ async fn accept_connection(
 
     SESSION_CLIENT_INFO.write(session).insert(client);
 
-    // let uri = _uri
-    //     .lock()
-    //     .expect("Header callback paniced when setting uri");
-
-    // match *uri {
-    //     Some(_) => {}
-    //     None => {}
-    // }
-
-    // drop(uri);
-
     info!("New WebSocket connection: {}", addr);
 
     let (mut write, read) = ws_stream.split();
-
-    //fake_boot(write).await;
 
     let mut boot_status = goval::Command::default();
     boot_status.body = Some(goval::command::Body::BootStatus(
@@ -521,8 +500,7 @@ async fn accept_connection(
             .try_for_each(|msg| {
                 match msg {
                     tungstenite::Message::Binary(buf) => {
-                        // let decode = buf.clone();
-                        if let Err(err) = propogate
+                        if let Err(err) = propagate
                             .send(IPCMessage {
                                 bytes: buf,
                                 session,
