@@ -23,8 +23,7 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 
 ## Installation
 1. Git clone the repository
-2. Run `git submodule update --init --recursive` 
-3. Install required dependencies
+2. Install required dependencies
     * `curl -fsSL https://bun.sh/install | bash`
     * `sudo apt install protobuf-compiler`
     * `curl --proto '=https' --tlsv1.3 https://sh.rustup.rs/ -sSf | sh`
