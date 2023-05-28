@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = [".", "migration", "include_directory/include_directory", "include_directory/macros"] # "entity", 
+members = [".", "migration"] # "entity", 
 
 [dependencies]
 async-trait = "0.1.66"
@@ -31,7 +31,7 @@ async_once = "0.2.6"
 
 migration = { path = "migration" }
 
-include_directory = {path = "./include_directory/include_directory"}
+include_directory = { git = "https://github.com/PotentialStyx/include_directory.git" }
 
 [build-dependencies]
 prost-build = "0.11.8"
