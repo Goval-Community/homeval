@@ -50,7 +50,6 @@ class Service extends ServiceBase {
             this.running = false
             await this.send(api.Command.create({state: api.State.Stopped}), 0)
         } else {
-            await this.send(api.Command.create({output:"[H[2J[3J"}), 0)
         }
         
         try {await this.pty.destroy()} catch(err) {}
