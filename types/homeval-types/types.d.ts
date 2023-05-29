@@ -7,7 +7,7 @@ declare global {
         service: string,
         name: string | null,
     }
-    
+
     // [goval::api.js] (api.js)
 
     var api: typeof replit.goval.api;
@@ -16,7 +16,7 @@ declare global {
     var CRC32: typeof import("crc-32");
 
     // [goval::runtime.js] (src/runtime.js)
-    
+
     namespace fs {
         function readDir(path: string): Promise<{
             path: string,
@@ -32,21 +32,21 @@ declare global {
 
     // @ts-ignore
     namespace Date {
-    function now(): BigInt;
+        function now(): BigInt;
     }
 
     class ServiceBase {
         id: number
         name: string
         service: string
-        clients: string[]
+        clients: number[]
 
         constructor(id: number, service: string, name: string | null)
 
         start(): Promise<null>
         ipc_recv(): Promise<null>
 
-        _recv(message: {ipc: {bytes: number[], session: number}}): Promise<null>
+        _recv(message: { ipc: { bytes: number[], session: number } }): Promise<null>
         recv(command: replit.goval.api.Command, session: number): Promise<replit.goval.api.Command | null>
 
         _send(cmd: replit.goval.api.Command, session: number): Promise<null>
@@ -57,6 +57,8 @@ declare global {
 
         _detach(session: number, forced: boolean): Promise<null>
         detach(session: number, forced: boolean): Promise<null>
+
+        pty_died(pty_id: number): Promise<null>
     }
 
     class PtyProcess {
@@ -66,8 +68,9 @@ declare global {
         args: string[]
 
         constructor(channel: number, command: string, args: string[])
-        
-        init(): Promise<null>
+
+        init(sessions: number[] | undefined): Promise<null>
+        destroy(): Promise<null>
         add_session(session: number): Promise<null>
         remove_session(session: number): Promise<null>
         write(input: string): Promise<null>

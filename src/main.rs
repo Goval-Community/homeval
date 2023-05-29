@@ -81,12 +81,12 @@ lazy_static! {
         Arc::new(HashMap::new());
     static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
         HashMap::new();
-    static ref PTY_CHANNEL_TO_ID: HashMap<i32, Vec<u32>> = HashMap::new();
+    static ref PTY_CHANNEL_TO_ID: HashMap<i32, u32> = HashMap::new();
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    console_subscriber::init();
+    // console_subscriber::init();
 
     let _ = env_logger::try_init();
     info!("starting...");
@@ -356,21 +356,18 @@ async fn main() -> Result<(), Error> {
         } else {
             // Directly deal with Command::Input, should be faster
             if let goval::command::Body::Input(input) = cmd_body {
-                if let Some(ptys) = PTY_CHANNEL_TO_ID.read(&cmd.channel).get() {
-                    if ptys.len() == 1 {
-                        let pty_id = ptys[0];
-                        let mut to_continue = false;
-                        if let Some(queue) = crate::PTY_WRITE_MESSAGES.read(&pty_id).get() {
-                            queue.push(input);
-                            to_continue = true;
-                        } else {
-                            error!("Couldn't find pty {} to write to", pty_id);
-                        }
-
-                        if to_continue {
-                            continue;
-                        }
+                if let Some(pty_id) = PTY_CHANNEL_TO_ID.read(&cmd.channel).get() {
+                    let mut to_continue = false;
+                    if let Some(queue) = crate::PTY_WRITE_MESSAGES.read(&pty_id).get() {
+                        queue.push(input);
+                        to_continue = true;
+                    } else {
+                        error!("Couldn't find pty {} to write to", pty_id);
                     }
+
+                    if to_continue {
+                        continue;
+                    } 
                 }
             }
 
@@ -466,8 +463,10 @@ async fn accept_connection(
     let (mut write, read) = ws_stream.split();
 
     let mut boot_status = goval::Command::default();
+    let mut inner  =goval::BootStatus::default();
+    inner.stage = goval::boot_status::Stage::Complete.into();
     boot_status.body = Some(goval::command::Body::BootStatus(
-        goval::BootStatus::default(),
+        inner,
     ));
 
     send_message(boot_status, &mut write)

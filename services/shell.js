@@ -2,7 +2,7 @@ class Service extends ServiceBase {
     constructor(...args) {
         super(...args)
         this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
-        this.pty.init().then(_ => {
+        this.pty.init(this.clients).then(_ => {
             console.debug("shell pty obtained:", this.pty.id)
         })
     }
@@ -15,6 +15,10 @@ class Service extends ServiceBase {
 
     async attach(session) {
         await this.pty.add_session(session)
+    }
+
+    async detach(session) {
+        await this.pty.remove_session(session)
     }
 }
 

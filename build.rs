@@ -3,7 +3,8 @@ extern crate prost_build;
 
 fn main() {
     // Only rerun if a protobuf changed, or if api.js changed
-    println!("cargo:rerun-if-changed=src/protobufs,src/api.js");
+    println!("cargo:rerun-if-changed=src/protobufs");
+    println!("cargo:rerun-if-changed=src/api.js");
 
     // Compile protobufs
     prost_build::compile_protos(

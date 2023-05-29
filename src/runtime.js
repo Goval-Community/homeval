@@ -84,9 +84,15 @@ class ServiceBase {
 			await this._detach(message.close, true);
 		} else if (message.detach) {
 			await this._detach(message.close, false);
+		} else if (message.pty_dead) {
+			await this.pty_died(message.pty_dead)
 		} else {
 			console.error("Unknown IPC message", message);
 		}
+	}
+
+	async pty_died(pty_id) {
+		console.warn(`Pty ${pty_id} died and channel ${this.id} doesn't have a listener`)
 	}
 
 	async _recv(message) {
@@ -164,8 +170,12 @@ class PtyProcess {
 		this.id = null;
 	}
 
-	async init() {
-		this.id = await Deno.core.ops.op_register_pty([this.command, ...this.args], this.channel);
+	async init(sessions = []) {
+		this.id = await Deno.core.ops.op_register_pty([this.command, ...this.args], this.channel, sessions);
+	}
+
+	async destroy() {
+		await Deno.core.ops.op_destroy_pty(this.id, this.channel);
 	}
 
 	async add_session(session) {
@@ -185,7 +195,7 @@ class PtyProcess {
 
 	// ensure pty exists, if not wait in a non-blocking manner
 	// used by functions that queue inputs instead of erroring
-	// when the pty isnt initialized yet
+	// when the pty isn't initialized yet
 	async _await_pty_exists() {
 		// fast path
 		if (this.id != null) return;
@@ -200,6 +210,7 @@ class PtyProcess {
 			loops += 1;
 
 			if (loops > 1000 && !warned) {
+				warned = true
 				console.warn(
 					"Pty has waited for more than 1 second to initialize, please check this out",
 				);
