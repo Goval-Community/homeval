@@ -31,7 +31,7 @@ async_once = "0.2.6"
 
 migration = { path = "migration" }
 
-include_directory = { git = "https://github.com/PotentialStyx/include_directory.git" }
+include_directory = { git = "https://github.com/goval-community/include_directory.git" }
 
 [build-dependencies]
 prost-build = "0.11.8"

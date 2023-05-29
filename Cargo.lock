@@ -1273,7 +1273,7 @@ checksum = "cb56e1aa765b4b4f3aadfab769793b7087bb03a4ea4920644a6d238e2df5b9ed"
 [[package]]
 name = "include_directory"
 version = "0.1.1"
-source = "git+https://github.com/PotentialStyx/include_directory.git#396475d2c8cd874768fb8ba841018863f5a6a2d1"
+source = "git+https://github.com/goval-community/include_directory.git#bea5083ad2fc87b98c0f425b82484d12134c5534"
 dependencies = [
  "include_directory_macros",
  "mime",
@@ -1282,7 +1282,7 @@ dependencies = [
 [[package]]
 name = "include_directory_macros"
 version = "0.1.0"
-source = "git+https://github.com/PotentialStyx/include_directory.git#396475d2c8cd874768fb8ba841018863f5a6a2d1"
+source = "git+https://github.com/goval-community/include_directory.git#bea5083ad2fc87b98c0f425b82484d12134c5534"
 dependencies = [
  "mime",
  "new_mime_guess",

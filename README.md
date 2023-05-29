@@ -3,10 +3,10 @@
     <br>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
-    <a href="https://github.com/potentialstyx/issues/1"><img alt="Services implemented: 4" src ="https://img.shields.io/badge/services%20implemented-4-9958f7"></a>
+    <a href="https://github.com/goval-community/homeval/issues/1"><img alt="Services implemented: 4" src ="https://img.shields.io/badge/services%20implemented-4-9958f7"></a>
     <!--
     uncomment when public repo
-        <a href="https://github.com/potentialstyx/homeval/pulls"><img alt="current # of open pull requests" src="https://img.shields.io/github/issues-pr/potentialstyx/homeval?color=9958f7"></a>
+        <a href="https://github.com/goval-community/homeval/pulls"><img alt="current # of open pull requests" src="https://img.shields.io/github/issues-pr/goval-community/homeval?color=9958f7"></a>
     -->
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>

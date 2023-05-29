@@ -2,9 +2,10 @@ use std::process::Command;
 extern crate prost_build;
 
 fn main() {
-    // Only rerun if a protobuf changed, or if api.js changed
+    // Only rerun if a protobuf changed, or api.js/package.json is changed
     println!("cargo:rerun-if-changed=src/protobufs");
     println!("cargo:rerun-if-changed=src/api.js");
+    println!("cargo:rerun-if-changed=package.json");
 
     // Compile protobufs
     prost_build::compile_protos(

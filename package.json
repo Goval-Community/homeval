@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@replit/protocol": "^0.3.10",
+    "@replit/protocol": "^0.3.11",
     "buffer": "^6.0.3",
     "crc-32": "^1.2.2",
     "protobufjs": "^7.2.3"
