@@ -2,7 +2,7 @@ use std::io::Error;
 
 use base64::{engine::general_purpose, Engine as _};
 use deno_core::error::AnyError;
-use homeval::paseto_token;
+use homeval::goval;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +50,7 @@ pub fn parse(token: &str) -> Result<ClientInfo, AnyError> {
     let (msg, _sig) = decoded.split_at(decoded_len - 64);
 
     let _inner = general_purpose::STANDARD.decode(msg)?;
-    let inner = paseto_token::ReplToken::decode(_inner.as_slice())?;
+    let inner = goval::ReplToken::decode(_inner.as_slice())?;
 
     match inner.presenced {
         Some(user) => Ok(ClientInfo {

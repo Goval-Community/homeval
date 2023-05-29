@@ -8,11 +8,7 @@ fn main() {
     println!("cargo:rerun-if-changed=package.json");
 
     // Compile protobufs
-    prost_build::compile_protos(
-        &["src/protobufs/goval.proto", "src/protobufs/client.proto"],
-        &["src/"],
-    )
-    .unwrap();
+    prost_build::compile_protos(&["src/protobufs/goval.proto"], &["src/"]).unwrap();
 
     // Run: bun install
     let output = Command::new("bun")
