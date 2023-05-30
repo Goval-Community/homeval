@@ -79,9 +79,11 @@ lazy_static! {
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
     static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
         Arc::new(HashMap::new());
-    static ref PTY_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
+    
+    // pty and cmd's
+    static ref PROCCESS_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
         HashMap::new();
-    static ref PTY_CHANNEL_TO_ID: HashMap<i32, u32> = HashMap::new();
+    static ref PROCCESS_CHANNEL_TO_ID: HashMap<i32, u32> = HashMap::new();
 }
 
 #[tokio::main]
@@ -356,9 +358,9 @@ async fn main() -> Result<(), Error> {
         } else {
             // Directly deal with Command::Input, should be faster
             if let goval::command::Body::Input(input) = cmd_body {
-                if let Some(pty_id) = PTY_CHANNEL_TO_ID.read(&cmd.channel).get() {
+                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read(&cmd.channel).get() {
                     let mut to_continue = false;
-                    if let Some(queue) = crate::PTY_WRITE_MESSAGES.read(&pty_id).get() {
+                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read(&pty_id).get() {
                         queue.push(input);
                         to_continue = true;
                     } else {

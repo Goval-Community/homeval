@@ -61,13 +61,13 @@ declare global {
         pty_died(pty_id: number): Promise<null>
     }
 
-    class PtyProcess {
+    class Process {
         channel: number
         id: number
         command: string
         args: string[]
 
-        constructor(channel: number, command: string, args: string[])
+        constructor(channel: number, command: string, args: string[], env_vars: { [id: string]: string })
 
         init(sessions: number[] | undefined): Promise<null>
         destroy(): Promise<null>
@@ -76,6 +76,8 @@ declare global {
         write(input: string): Promise<null>
         _await_pty_exists(): Promise<null>
     }
+
+    class PtyProcess extends Process { }
 
     namespace process {
         var env: { [id: string]: string | null }

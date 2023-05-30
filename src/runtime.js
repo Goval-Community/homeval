@@ -84,15 +84,15 @@ class ServiceBase {
 			await this._detach(message.close, true);
 		} else if (message.detach) {
 			await this._detach(message.close, false);
-		} else if (message.pty_dead) {
-			await this.pty_died(message.pty_dead)
+		} else if (message.processDead) {
+			await this.process_dead(message.processDead)
 		} else {
 			console.error("Unknown IPC message", message);
 		}
 	}
 
-	async pty_died(pty_id) {
-		console.warn(`Pty ${pty_id} died and channel ${this.id} doesn't have a listener`)
+	async process_dead(proc_id) {
+		console.warn(`PTY/CMD ${proc_id} died and channel ${this.id} doesn't have a listener`)
 	}
 
 	async _recv(message) {
@@ -163,7 +163,8 @@ class ServiceBase {
 }
 
 class PtyProcess {
-	constructor(channel, command, args = []) {
+	constructor(channel, command, args = [], env_vars = {}) {
+		this.env_vars = env_vars;
 		this.channel = channel;
 		this.command = command;
 		this.args = args;
@@ -171,7 +172,7 @@ class PtyProcess {
 	}
 
 	async init(sessions = []) {
-		this.id = await Deno.core.ops.op_register_pty([this.command, ...this.args], this.channel, sessions);
+		this.id = await Deno.core.ops.op_register_pty([this.command, ...this.args], this.channel, sessions, this.env_vars);
 	}
 
 	async destroy() {
@@ -213,6 +214,64 @@ class PtyProcess {
 				warned = true
 				console.warn(
 					"Pty has waited for more than 1 second to initialize, please check this out",
+				);
+			}
+		}
+	}
+}
+
+class Process {
+	constructor(channel, command, args = [], env_vars = {}) {
+		this.env_vars = env_vars;
+		this.channel = channel;
+		this.command = command;
+		this.args = args;
+		this.id = null;
+	}
+
+	async init(sessions = []) {
+		this.id = await Deno.core.ops.op_register_cmd([this.command, ...this.args], this.channel, sessions, this.env_vars);
+	}
+
+	async destroy() {
+		await Deno.core.ops.op_destroy_cmd(this.id, this.channel);
+	}
+
+	async add_session(session) {
+		await this._await_cmd_exists();
+		await Deno.core.ops.op_cmd_add_session(this.id, session);
+	}
+
+	async remove_session(session) {
+		await this._await_cmd_exists();
+		await Deno.core.ops.op_cmd_remove_session(this.id, session);
+	}
+
+	async write(input) {
+		await this._await_cmd_exists();
+		await Deno.core.ops.op_cmd_write_msg(this.id, input);
+	}
+
+	// ensure cmd exists, if not wait in a non-blocking manner
+	// used by functions that queue inputs instead of erroring
+	// when the cmd isn't initialized yet
+	async _await_cmd_exists() {
+		// fast path
+		if (this.id != null) return;
+
+		let loops = 0;
+		let warned = false;
+
+		while (true) {
+			if (this.id != null) break;
+
+			await Deno.core.ops.op_sleep(1);
+			loops += 1;
+
+			if (loops > 1000 && !warned) {
+				warned = true
+				console.warn(
+					"Cmd has waited for more than 1 second to initialize, please check this out",
 				);
 			}
 		}

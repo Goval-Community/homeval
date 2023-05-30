@@ -5,6 +5,16 @@ class Service extends ServiceBase {
         this.pty.init(this.clients).then(_ => {
             console.debug("shell pty obtained:", this.pty.id)
         })
+        this.dead_ptys = []
+    }
+
+    async process_dead(_) {
+        if (this.dead_ptys.includes(pty)) {return}
+        this.dead_ptys.push(pty)
+
+        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
+        await this.pty.init(this.clients)
+        console.debug("shell pty obtained:", this.pty.id)
     }
     
 	async recv(cmd, session) {

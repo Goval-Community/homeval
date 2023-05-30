@@ -42,7 +42,7 @@ class Service extends ServiceBase {
         await this.pty.remove_session(session)
     }
 
-    async pty_died(pty) {
+    async process_dead(pty) {
         if (this.dead_ptys.includes(pty)) {return}
         this.dead_ptys.push(pty)
         // 

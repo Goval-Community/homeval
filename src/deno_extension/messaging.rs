@@ -23,8 +23,7 @@ pub enum JsMessage {
     Attach(i32),
     Detach(i32),
     Close(i32),
-    #[serde(rename = "pty_dead")]
-    PTYDead(u32),
+    ProcessDead(u32),
 }
 
 #[op]

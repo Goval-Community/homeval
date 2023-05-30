@@ -2,7 +2,7 @@ use futures_util::{future::abortable, stream::AbortHandle};
 use log::error;
 use portable_pty::PtySize;
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     io::{Error, ErrorKind, Write},
     sync::Arc,
 };
@@ -21,10 +21,9 @@ lazy_static! {
     static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
 }
 
-use c_map::HashMap;
 lazy_static! {
-    static ref PTY_CANCELLATION_MAP: HashMap<u32, AbortHandle> = HashMap::new();
-    static ref PTY_SESSION_MAP: HashMap<u32, Vec<i32>> = HashMap::new();
+    static ref PTY_CANCELLATION_MAP: c_map::HashMap<u32, AbortHandle> = c_map::HashMap::new();
+    static ref PTY_SESSION_MAP: c_map::HashMap<u32, Vec<i32>> = c_map::HashMap::new();
 }
 
 struct PtyWriter {
@@ -91,6 +90,7 @@ async fn op_register_pty(
     _args: Vec<String>,
     channel: i32,
     sessions: Option<Vec<i32>>,
+    env: Option<HashMap<String, String>>,
 ) -> Result<u32, AnyError> {
     let pty_system = portable_pty::native_pty_system();
 
@@ -115,6 +115,12 @@ async fn op_register_pty(
         cmd.arg(arg);
     }
     cmd.cwd(std::env::current_dir()?);
+
+    if let Some(env_vars) = env {
+        for (key, val) in env_vars.into_iter() {
+            cmd.env(key, val)
+        }
+    }
 
     let mut child = pair.slave.spawn_command(cmd)?;
 
@@ -143,7 +149,7 @@ async fn op_register_pty(
 
         let queue = _read.get(&channel).unwrap().clone();
         drop(_read);
-        queue.push(JsMessage::PTYDead(pty_id));
+        queue.push(JsMessage::ProcessDead(pty_id));
         Ok(())
     });
 
@@ -155,18 +161,18 @@ async fn op_register_pty(
         PTY_SESSION_MAP.write(pty_id).insert(vec![]);
     }
 
-    let pty_channel_writer = crate::PTY_CHANNEL_TO_ID.write(channel);
+    let pty_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write(channel);
     if pty_channel_writer.contains_key() {
         drop(pty_channel_writer);
         return Err(AnyError::new(Error::new(
             ErrorKind::AlreadyExists,
-            "Channel already has a PTY",
+            "Channel already has a PTY/CMD",
         )));
     } else {
         pty_channel_writer.insert(pty_id);
     }
 
-    crate::PTY_WRITE_MESSAGES
+    crate::PROCCESS_WRITE_MESSAGES
         .write(pty_id)
         .insert(queue.clone());
 
@@ -216,7 +222,7 @@ async fn op_pty_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
 
 #[op]
 async fn op_pty_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
-    match crate::PTY_WRITE_MESSAGES.read(&id).get() {
+    match crate::PROCCESS_WRITE_MESSAGES.read(&id).get() {
         Some(queue) => {
             queue.push(msg);
 
@@ -242,8 +248,10 @@ async fn op_destroy_pty(id: u32, channel_id: i32) -> Result<(), AnyError> {
 
     PTY_CANCELLATION_MAP.write(id).remove();
     PTY_SESSION_MAP.write(id).remove();
-    crate::PTY_WRITE_MESSAGES.write(id).remove();
-    crate::PTY_CHANNEL_TO_ID.write(channel_id.clone()).remove();
+    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
+    crate::PROCCESS_CHANNEL_TO_ID
+        .write(channel_id.clone())
+        .remove();
 
     Ok(())
 }
