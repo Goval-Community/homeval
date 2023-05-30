@@ -85,14 +85,14 @@ class ServiceBase {
 		} else if (message.detach) {
 			await this._detach(message.close, false);
 		} else if (message.processDead) {
-			await this.process_dead(message.processDead)
+			await this.process_dead(message.processDead[0], message.processDead[1])
 		} else {
 			console.error("Unknown IPC message", message);
 		}
 	}
 
-	async process_dead(proc_id) {
-		console.warn(`PTY/CMD ${proc_id} died and channel ${this.id} doesn't have a listener`)
+	async process_dead(proc_id, exit_code) {
+		console.warn(`PTY/CMD ${proc_id} died with status ${exit_code} and channel ${this.id} doesn't have a listener`)
 	}
 
 	async _recv(message) {

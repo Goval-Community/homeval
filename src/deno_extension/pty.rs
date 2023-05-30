@@ -122,7 +122,7 @@ async fn op_register_pty(
         }
     }
 
-    let mut child = pair.slave.spawn_command(cmd)?;
+    let child = pair.slave.spawn_command(cmd)?;
 
     // Read and parse output from the pty with reader
     let mut reader = pair.master.try_clone_reader()?;
@@ -130,6 +130,9 @@ async fn op_register_pty(
 
     let pty_id = child.process_id().expect("Missing process id????");
 
+    let child_lock = Arc::new(Mutex::new(child));
+
+    let child_lock_reaper = child_lock.clone();
     tokio::task::spawn(async move {
         if let Err(err) = tokio::task::spawn_blocking(move || {
             std::io::copy(&mut reader, &mut PtyWriter { channel, pty_id })
@@ -147,9 +150,17 @@ async fn op_register_pty(
             )));
         }
 
+        let exit_code;
+
+        if let Some(code) = child_lock_reaper.lock().await.try_wait()? {
+            exit_code = code.exit_code() as i32;
+        } else {
+            exit_code = 0;
+        }
+
         let queue = _read.get(&channel).unwrap().clone();
         drop(_read);
-        queue.push(JsMessage::ProcessDead(pty_id));
+        queue.push(JsMessage::ProcessDead(pty_id, exit_code));
         Ok(())
     });
 
@@ -193,7 +204,9 @@ async fn op_register_pty(
                 error!("Error occurred while passing writes to pty: {}", err)
             }
             Err(_) => {
+                let mut child = child_lock.lock().await;
                 child.kill().expect("Failed to kill pty child");
+                drop(child);
             }
         }
     });

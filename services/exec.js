@@ -6,6 +6,7 @@ class Service extends ServiceBase {
         this.queue = []
 
         this.dead_procs = []
+        this.current_ref = null
     }
     
 	async recv(cmd, session) {
@@ -29,20 +30,24 @@ class Service extends ServiceBase {
                     return invalid
                 }
 
-                this.queue.push(cmd.exec)
+                this.queue.push(cmd)
             }
 
             await this.start_proc(cmd.exec)
 
-            return api.Command.create({ok: {}})
+            this.current_ref = cmd.ref
         } else {
             console.debug("Unknown exec cmd", cmd)
         }
 	}
 
-    async process_dead(proc_id) {
+    async process_dead(proc_id, exit_code) {
         if (this.dead_procs.includes(proc_id)) {return}
         this.dead_procs.push(proc_id)
+
+        if (exit_code !== 0) {
+            await this.send(api.Command.create({error: `exit status ${exit_code}`}), 0)
+        }
         
         try {
             await this.proc.destroy()
@@ -50,12 +55,16 @@ class Service extends ServiceBase {
 
         await Deno.core.ops.op_sleep(100);
         await this.send(api.Command.create({state: api.State.Stopped}), 0)
+        await this.send(api.Command.create({ok: {}, ref: this.current_ref}), 0)
         
+        this.current_ref = null
         if (this.queue.length === 0) {
             return
         }
         
-        await this.start_proc(this.queue.shift())
+        let cmd = this.queue.shift();
+        this.current_ref = cmd.ref
+        await this.start_proc(cmd.exec)
     }
 
     async validate_exec(cmd) {

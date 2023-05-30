@@ -58,7 +58,7 @@ declare global {
         _detach(session: number, forced: boolean): Promise<null>
         detach(session: number, forced: boolean): Promise<null>
 
-        pty_died(pty_id: number): Promise<null>
+        process_died(proc_id: number, exit_code: number): Promise<null>
     }
 
     class Process {

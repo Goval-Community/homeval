@@ -248,9 +248,19 @@ async fn op_register_cmd(
             )));
         }
 
+        let mut child = child_lock.lock().await;
+
+        let exit_code;
+
+        if let Some(code) = child.try_wait()? {
+            exit_code = code.code().unwrap_or(1);
+        } else {
+            exit_code = 0;
+        }
+
         let queue = _read.get(&channel).unwrap().clone();
         drop(_read);
-        queue.push(JsMessage::ProcessDead(cmd_id));
+        queue.push(JsMessage::ProcessDead(cmd_id, exit_code));
 
         match res {
             Ok(res) => {
@@ -259,12 +269,7 @@ async fn op_register_cmd(
                 }
             }
             Err(_) => {
-                child_lock
-                    .lock()
-                    .await
-                    .kill()
-                    .await
-                    .expect("Failed to kill cmd child");
+                child.kill().await.expect("Failed to kill cmd child");
             }
         }
 
