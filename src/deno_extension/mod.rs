@@ -22,8 +22,7 @@ pub fn make_extension() -> Extension {
     ops.append(&mut pty::get_op_decls());
     ops.append(&mut cmd::get_op_decls());
     ops.append(&mut quick_cmd::get_op_decls());
-
-    // ops.append(&mut sysinfo::get_op_decls());
+    ops.append(&mut sysinfo::get_op_decls());
     // ops.append(&mut database::get_op_decls());
 
     Extension::builder().ops(ops).build()

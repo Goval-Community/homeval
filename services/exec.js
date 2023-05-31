@@ -2,13 +2,16 @@ class Service extends ServiceBase {
     constructor(...args) {
         super(...args)
         this.running = false
+        this.proc = null
         this.queue = []
+
+        this.dead_procs = []
         this.current_ref = null
     }
     
 	async recv(cmd, session) {
 		if (cmd.input) {
-			// await this.proc.write(cmd.input)
+			await this.proc.write(cmd.input)
 		} else if (cmd.exec) {
             if (cmd.exec.args.length === 3) {
                 let arg = cmd.exec.args[2]
@@ -18,7 +21,8 @@ class Service extends ServiceBase {
                 }
                 
                 if (arg === "cat /repl/stats/subvolume_usage_bytes /repl/stats/subvolume_total_bytes") {
-                    cmd.exec.args[2] = "echo 49152 && echo 1073741824"
+                    let disk = await Deno.core.ops.op_disk_info();
+                    cmd.exec.args[2] = `echo ${disk.free} && echo ${disk.total}`
                 }
             }
             if (this.running) {
@@ -42,10 +46,17 @@ class Service extends ServiceBase {
         }
 	}
 
-    async process_dead(_proc_id, exit_code) {
+    async process_dead(proc_id, exit_code) {
+        if (this.dead_procs.includes(proc_id)) {return}
+        this.dead_procs.push(proc_id)
+
         if (exit_code !== 0) {
             await this.send(api.Command.create({error: `exit status ${exit_code}`}), 0)
         }
+        
+        try {
+            await this.proc.destroy()
+        } catch (_) {}
 
         await Deno.core.ops.op_sleep(100);
         await this.send(api.Command.create({state: api.State.Stopped}), 0)
@@ -72,14 +83,20 @@ class Service extends ServiceBase {
         const args = msg.args.slice(1)
         const env = msg.env ? msg.env : {}
 
+        
+        this.proc = new Process(this.id, cmd, args, env)
+        
         await this.send(api.Command.create({state: api.State.Running}), 0)
-        await Deno.core.ops.op_run_cmd([cmd, ...args], this.id, this.clients, env)
+        await this.proc.init(this.clients)
+
     }
 
     async attach(session) {
+        if (this.proc) await this.proc.add_session(session)
     }
 
     async detach(session) {
+        if (this.proc) await this.proc.remove_session(session)
     }
 }
 
