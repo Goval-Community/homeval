@@ -24,6 +24,7 @@ pub enum JsMessage {
     Detach(i32),
     Close(i32),
     ProcessDead(u32, i32),
+    CmdDead(i32),
 }
 
 #[op]

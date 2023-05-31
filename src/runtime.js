@@ -86,6 +86,8 @@ class ServiceBase {
 			await this._detach(message.close, false);
 		} else if (message.processDead) {
 			await this.process_dead(message.processDead[0], message.processDead[1])
+		} else if (message.cmdDead != null) {
+			await this.process_dead(-1, message.cmdDead)
 		} else {
 			console.error("Unknown IPC message", message);
 		}
