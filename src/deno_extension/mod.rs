@@ -1,6 +1,5 @@
 use deno_core::{Extension, OpDecl};
 
-// pub mod database;
 pub mod cmd;
 pub mod fs;
 pub mod messaging;
@@ -23,7 +22,6 @@ pub fn make_extension() -> Extension {
     ops.append(&mut cmd::get_op_decls());
     ops.append(&mut quick_cmd::get_op_decls());
     ops.append(&mut sysinfo::get_op_decls());
-    // ops.append(&mut database::get_op_decls());
 
     Extension::builder().ops(ops).build()
 }
