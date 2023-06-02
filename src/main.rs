@@ -84,6 +84,8 @@ lazy_static! {
     static ref PROCCESS_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
         HashMap::new();
     static ref PROCCESS_CHANNEL_TO_ID: HashMap<i32, u32> = HashMap::new();
+
+    static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
 }
 
 #[tokio::main]
@@ -178,7 +180,9 @@ async fn main() -> Result<(), Error> {
 
                         let attach = open_chan.action()
                             == goval::open_channel::Action::AttachOrCreate
-                            || open_chan.action() == goval::open_channel::Action::Attach;
+                            || open_chan.action() == goval::open_channel::Action::Attach
+                            || open_chan.service == "git"; // git is just use for replspace api stuff 
+                            // from what I can tell, so its just easier to have it as one instance.
                         let create = open_chan.action()
                             == goval::open_channel::Action::AttachOrCreate
                             || open_chan.action() == goval::open_channel::Action::Create;

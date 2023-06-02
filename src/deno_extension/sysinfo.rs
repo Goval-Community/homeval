@@ -1,24 +1,39 @@
 use deno_core::{error::AnyError, op, OpDecl};
-use log::trace;
+use log::info;
 use serde::Serialize;
-use sysinfo::{self, CpuRefreshKind, DiskExt, RefreshKind, SystemExt};
+// use sysinfo::{self, CpuRefreshKind, RefreshKind, SystemExt};
+use systemstat::{Platform, System};
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CpuInfo {}
+
+#[op]
+async fn op_cpu_info() -> Result<String, AnyError> {
+    tokio::task::spawn_blocking(move || Ok(crate::CPU_STATS.elapsed().as_nanos().to_string()))
+        .await?
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CpuInfo {
-    // pub path: String,
-    // pub r#type: FileType,
+pub struct MemoryInfo {
+    total: u64,
+    free: u64,
 }
 
 #[op]
-fn op_cpu_info() -> Result<CpuInfo, AnyError> {
-    let refresh = RefreshKind::new();
-    let mut system =
-        sysinfo::System::new_with_specifics(refresh.with_cpu(CpuRefreshKind::everything()));
+async fn op_memory_info() -> Result<MemoryInfo, AnyError> {
+    let info = tokio::task::spawn_blocking(move || -> std::io::Result<MemoryInfo> {
+        match System::new().memory() {
+            Ok(mem) => Ok(MemoryInfo {
+                total: mem.total.as_u64(),
+                free: mem.free.as_u64(),
+            }),
+            Err(_) => Ok(MemoryInfo { total: 0, free: 0 }),
+        }
+    })
+    .await??;
 
-    system.refresh_cpu();
-
-    Ok(CpuInfo {})
+    Ok(info)
 }
 
 #[derive(Serialize)]
@@ -31,40 +46,39 @@ pub struct DiskInfo {
 
 #[op]
 async fn op_disk_info() -> Result<DiskInfo, AnyError> {
-    let refresh = RefreshKind::new();
-    let mut system = sysinfo::System::new_with_specifics(refresh.with_disks());
+    let info = tokio::task::spawn_blocking(move || -> std::io::Result<DiskInfo> {
+        match System::new().mount_at("/") {
+            Ok(disk) => {
+                let mut info = DiskInfo {
+                    available: 0,
+                    total: 0,
+                    free: 0,
+                };
 
-    system = tokio::task::spawn_blocking(move || {
-        system.refresh_disks();
-        system
-    })
-    .await?;
-
-    let info = tokio::task::spawn_blocking(move || {
-        let disks = system.disks();
-
-        trace!("Disks: {:#?}", disks);
-
-        let mut info = DiskInfo {
-            available: 0,
-            total: 0,
-            free: 0,
-        };
-
-        for disk in disks {
-            info.total += disk.total_space();
-            info.available += disk.available_space();
+                // for disk in disks {
+                // info!("{}", disk.fs_mounted_on);
+                info.available += disk.avail.as_u64();
+                info.total += disk.total.as_u64();
+                info.free += disk.free.as_u64();
+                // }
+                Ok(info)
+            }
+            Err(_) => Ok(DiskInfo {
+                available: 0,
+                total: 0,
+                free: 0,
+            }),
         }
-
-        info.free = info.total - info.available;
-
-        info
     })
-    .await?;
+    .await??;
 
     Ok(info)
 }
 
 pub fn get_op_decls() -> Vec<OpDecl> {
-    vec![op_cpu_info::decl(), op_disk_info::decl()]
+    vec![
+        op_cpu_info::decl(),
+        op_memory_info::decl(),
+        op_disk_info::decl(),
+    ]
 }
