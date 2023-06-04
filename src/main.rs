@@ -119,12 +119,20 @@ async fn main() -> Result<(), Error> {
             let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
             session_map_clone.write(session_id).insert(send_to_session);
 
-            tokio::spawn(accept_connection(
-                stream,
-                tx.clone(),
-                session_recv,
-                session_id,
-            ));
+            let tx_clone = tx.clone();
+            tokio::spawn(async move{
+                match accept_connection(
+                    stream,
+                    tx_clone,
+                    session_recv,
+                    session_id,
+                ).await {
+                    Ok(_) => {},
+                    Err(err) => {
+                        error!("accept_connection errored: {}", err)
+                    }
+                }
+            });
         }
     });
 
@@ -132,16 +140,15 @@ async fn main() -> Result<(), Error> {
     let _channel_map: RwLock<HashMap<i32, deno_core::JsRuntime>> = RwLock::new(HashMap::new());
     while let Some(message) = rx.recv().await {
         let cmd: Command;
-        let command_res = message.to_cmd();
-        if let Err(err) = command_res {
-            error!(
-                "Following error occured when decoding message in main loop: {}",
-                err
-            );
-            continue;
-        } else {
-            cmd = command_res
-                .expect("Impossible condition, decoded message was already verified as not None")
+        match message.to_cmd() {
+            Err(err) => {
+                error!(
+                    "Following error occured when decoding message in main loop: {}",
+                    err
+                );
+                continue;
+            },
+            Ok(res) => cmd = res,
         }
 
         let cmd_body: goval::command::Body;
@@ -411,10 +418,9 @@ async fn accept_connection(
     propagate: mpsc::UnboundedSender<IPCMessage>,
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
     session: i32,
-) {
+) -> Result<(), AnyError> {
     let addr = stream
-        .peer_addr()
-        .expect("connected streams should have a peer address");
+        .peer_addr()?;
     info!("Peer address: {}", addr);
 
     let _uri: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
@@ -428,15 +434,22 @@ async fn accept_connection(
     };
 
     let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback)
-        .await
-        .expect("Error during the websocket handshake occurred");
+        .await?;
 
     // needed due to futures stuff :/
     let client: ClientInfo;
     match tokio::task::spawn_blocking(move || -> Result<ClientInfo, AnyError> {
-        let __uri = _uri
-            .lock()
-            .expect("Header callback paniced when setting uri");
+        let __uri;
+        match _uri
+            .lock() {
+                Ok(res) => __uri = res,
+                Err(_err) => {
+                    return Err(
+                        Error::new(std::io::ErrorKind::InvalidData, 
+                            "Header callback paniced when setting uri").into()
+                    )
+                }
+            }
 
         let uri = __uri.clone().unwrap_or("".to_string());
 
@@ -449,8 +462,7 @@ async fn accept_connection(
 
         Ok(ClientInfo::default())
     })
-    .await
-    .expect("Error converting uri to client info")
+    .await?
     {
         Ok(_client) => client = _client,
         Err(err) => {
@@ -464,7 +476,7 @@ async fn accept_connection(
 
     info!("New connection from: {:#?}", client);
 
-    SESSION_CLIENT_INFO.write(session).insert(client);
+    SESSION_CLIENT_INFO.write(session).insert(client.clone());
 
     info!("New WebSocket connection: {}", addr);
 
@@ -478,8 +490,7 @@ async fn accept_connection(
     ));
 
     send_message(boot_status, &mut write)
-        .await
-        .expect("Error sending spoofed boot status");
+        .await?;
 
     // Sending container state
     let mut container_state = goval::Command::default();
@@ -488,18 +499,16 @@ async fn accept_connection(
     container_state.body = Some(goval::command::Body::ContainerState(inner_state));
 
     send_message(container_state, &mut write)
-        .await
-        .expect("Error sending spoofed container state");
+        .await?;
 
     // Sending server info message
     let mut toast = goval::Command::default();
     let mut inner_state = goval::Toast::default();
-    inner_state.text = "Hello from an unnamed goval impl".to_owned();
+    inner_state.text = format!("Hello @{}, welcome to homeval!", client.username);
     toast.body = Some(goval::command::Body::Toast(inner_state));
 
     send_message(toast, &mut write)
-        .await
-        .expect("Error sending server info toast");
+        .await?;
 
     SESSION_CHANNELS.write(session).insert(vec![]);
     tokio::spawn(async move {
@@ -558,5 +567,7 @@ async fn accept_connection(
                 )
             }
         }
-    }
+    };
+
+    Ok(())
 }
