@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 pub struct ClientInfo {
     // In the future this will indicate if the jwt signature was legit or not
     // For now it'll always be false
-    is_secure: bool,
+    pub is_secure: bool,
 
-    username: String,
-    id: u32,
+    pub username: String,
+    pub id: u32,
 }
 
 impl ClientInfo {
