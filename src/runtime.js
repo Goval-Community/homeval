@@ -291,7 +291,6 @@ class FileWatcher {
 	}
 
 	async watch(paths) {
-		console.log(paths)
 		this.watched_files += paths.length
 		await this._await_watcher_exists()
 		await Deno.core.ops.op_watch_files(this.id, paths)
@@ -308,7 +307,7 @@ class FileWatcher {
 			const msg = await Deno.core.ops.op_recv_fsevent(this.id)
 			if (msg.err) {
 				if (attempts === 3) {
-					throw new Error("FileWatcher has had 20 consecutive errors")
+					throw new Error("FileWatcher has had 3 consecutive errors")
 				}
 
 				console.warn("Got error in FileWatcher, retrying:", msg.err)

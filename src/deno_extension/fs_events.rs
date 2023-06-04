@@ -1,5 +1,5 @@
 use deno_core::{op, OpDecl};
-use log::{error, info};
+use log::error;
 use notify_debouncer_full::{
     new_debouncer,
     notify::{self, event::ModifyKind, Event, EventKind, RecommendedWatcher, Watcher},
@@ -141,7 +141,6 @@ async fn op_watch_files(watcher: u32, files: Vec<String>) -> Result<(), AnyError
 
     for file in files {
         let path = Path::new(&file);
-        info!("Now adding watcher for: {:#?}", path);
         debouncer
             .watcher()
             .watch(path, notify::RecursiveMode::NonRecursive)?;
