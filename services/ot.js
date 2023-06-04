@@ -7,6 +7,13 @@ class Service extends ServiceBase {
 		this.cursors = {}
 		this.history = []
 		this.session_info = {}
+
+		this.watcher = new FileWatcher();
+		this.watcher.add_listener(this.file_event.bind(this));
+		this.watcher.init();
+		this.watcher.start().catch((err) => {
+			throw err;
+		});
 	}
 
 	async recv(cmd, session) {
@@ -18,6 +25,9 @@ class Service extends ServiceBase {
 		if (cmd.otLinkFile) {
 			const path = cmd.otLinkFile.file.path;
 			const content = await fs.readFile(path);
+
+			this.watcher.watch([path])
+
 			this.path = path
 			this.contents = await fs.readFileString(path);
 
@@ -69,6 +79,18 @@ class Service extends ServiceBase {
 			this.version += 1
 			this.contents = final_contents
 
+			let userId = 0; 
+			
+			if (cmd.ot.author !== api.OTPacket.Author.GHOSTWRITER) {
+				if (this.session_info[session]) {
+					userId = this.session_info[session].id
+				} else {
+					userId = 0
+				}
+			} else {
+				userId = 22261053
+			}
+
 			const inner_packet = {
 				spookyVersion: this.version,
 				op: cmd.ot.op,
@@ -80,24 +102,22 @@ class Service extends ServiceBase {
 				version: this.version,
 				author: cmd.ot.author,
 				// use https://replit.com/@ghostwriterai if ghostwriter wrote it (for history)
-				userId: cmd.ot.author !== api.OTPacket.Author.GHOSTWRITER ? this.session_info[session].id : 22261053
+				userId
 			}
 
 			this.history.push(inner_packet)
 
 			const msg = api.Command.create({
-				ot: inner_packet,
-				ref: cmd.ref
+				ot: inner_packet
 			})
 
-			await this.send(msg,session)
-
-			for (const arr_session of this.clients) {
-				if (arr_session === session) {continue}
-				await this.send(msg, arr_session)
-			}
+			await this.send(msg, 0)
 
 			await fs.writeFileString(this.path, final_contents)
+
+			return api.Command.create({
+				ok: {}
+			})
 		} else if (cmd.otNewCursor) {
 			const cursor = cmd.otNewCursor
 			this.cursors[cursor.id] = cursor
@@ -120,8 +140,25 @@ class Service extends ServiceBase {
 					)
 				}
 			})
-		} else {
+		} else if (cmd.flush) {
+			return api.Command.create({
+				ok: {}
+			})
+		}else {
 			console.warn("Unknown ot command", cmd)
+		}
+	}
+
+	async file_event(event) {
+		if (event.modify === this.path) {
+			let diff = await Deno.core.ops.op_diff_texts(this.contents, await fs.readFileString(this.path))
+			if (diff.length === 0) {
+				return
+			}
+
+			await this.recv(api.Command.create({ot:{op: diff}, author: api.OTPacket.Author.USER, userId: 0}), 0)
+		} else {
+			console.log(event.modify, this.path)
 		}
 	}
 

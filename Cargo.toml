@@ -29,6 +29,7 @@ systemstat = "0.2.3"
 cpu-time = "1.0.0"
 notify-debouncer-full = { version = "0.1.0", default-features = false, features = ["serde"] }
 deadqueue = { version = "0.2.4", default-features = false, features = ["unlimited"] }
+similar = "2.2.1"
 
 [build-dependencies]
 prost-build = "0.11.8"
