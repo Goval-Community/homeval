@@ -1,5 +1,5 @@
 use futures_util::{future::abortable, stream::AbortHandle, Future};
-use log::{debug, error};
+use log::error;
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, ErrorKind},
@@ -56,8 +56,6 @@ async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Er
             return Err(Error::new(ErrorKind::Other, err.utf8_error()));
         }
     }
-
-    debug!("CMD OUTPUT: {}", output);
 
     cmd.body = Some(crate::goval::command::Body::Output(output));
 
@@ -123,7 +121,6 @@ async fn op_register_cmd(
     sessions: Option<Vec<i32>>,
     env: Option<HashMap<String, String>>,
 ) -> Result<u32, AnyError> {
-    debug!("ARGS: {:#?}", _args);
     let args = &mut VecDeque::from(_args.to_vec());
     let mut cmd = Command::new(VecDeque::pop_front(args).expect("Missing command"));
     for arg in args {
