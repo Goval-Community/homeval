@@ -355,6 +355,8 @@ async fn main() -> Result<(), Error> {
                             .write(message.session)
                             .entry()
                             .and_modify(|channels| channels.push(channel_id_held));
+                    } else {
+                        warn!("Missing service requested by openChan: {}", open_chan.service)
                     }
                 }
                 _ => {}
