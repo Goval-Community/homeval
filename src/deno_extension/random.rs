@@ -64,7 +64,7 @@ fn op_console_log(
             name = format!(":{}", _name);
         }
     }
-    let target = &format!("goval_impl/v8: {}{}", service.service, name);
+    let target = &format!("homeval/v8: {}{}", service.service, name);
 
     log!(
         target: target,
