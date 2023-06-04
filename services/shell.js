@@ -12,7 +12,10 @@ class Service extends ServiceBase {
         if (this.dead_ptys.includes(pty)) {return}
         this.dead_ptys.push(pty)
 
-        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
+        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh", [], {
+            "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+        });
+        
         await this.pty.init(this.clients)
         console.debug("shell pty obtained:", this.pty.id)
     }

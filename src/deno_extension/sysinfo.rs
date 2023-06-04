@@ -1,5 +1,4 @@
 use deno_core::{error::AnyError, op, OpDecl};
-use log::info;
 use serde::Serialize;
 // use sysinfo::{self, CpuRefreshKind, RefreshKind, SystemExt};
 use systemstat::{Platform, System};

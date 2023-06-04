@@ -1,5 +1,5 @@
 use homeval::goval;
-use log::warn;
+use log::{debug, warn};
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, Read},
@@ -44,10 +44,13 @@ async fn op_run_cmd(
 
     let output = tokio::task::spawn_blocking(move || -> Result<String, Error> {
         let mut output = String::new();
-        reader.read_to_string(&mut output)?;
+        debug!("Reading quick cmd output");
+        reader.read_to_string(&mut output).unwrap();
         Ok(output)
     })
     .await??;
+
+    debug!("Done with quick cmd output");
 
     let status = child.wait().await?;
 

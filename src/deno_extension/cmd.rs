@@ -1,5 +1,5 @@
 use futures_util::{future::abortable, stream::AbortHandle, Future};
-use log::error;
+use log::{debug, error};
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, ErrorKind},
@@ -36,6 +36,14 @@ struct CmdWriter {
     channel: i32,
     cmd_id: u32,
 }
+async fn remove_refs(id: u32, channel_id: i32) {
+    CMD_CANCELLATION_MAP.write(id).remove();
+    CMD_SESSION_MAP.write(id).remove();
+    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
+    crate::PROCCESS_CHANNEL_TO_ID
+        .write(channel_id.clone())
+        .remove();
+}
 
 async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Error> {
     let mut cmd = crate::goval::Command::default();
@@ -48,6 +56,8 @@ async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Er
             return Err(Error::new(ErrorKind::Other, err.utf8_error()));
         }
     }
+
+    debug!("CMD OUTPUT: {}", output);
 
     cmd.body = Some(crate::goval::command::Body::Output(output));
 
@@ -113,6 +123,7 @@ async fn op_register_cmd(
     sessions: Option<Vec<i32>>,
     env: Option<HashMap<String, String>>,
 ) -> Result<u32, AnyError> {
+    debug!("ARGS: {:#?}", _args);
     let args = &mut VecDeque::from(_args.to_vec());
     let mut cmd = Command::new(VecDeque::pop_front(args).expect("Missing command"));
     for arg in args {
@@ -187,17 +198,17 @@ async fn op_register_cmd(
                     let stdout_cpy;
 
                     if let Some(mut stdout) = stdout_opt {
-                        let mut pty_writer_out = CmdWriter { channel, cmd_id };
-                        stdout_cpy = Some(async move {
+                    let mut pty_writer_out = CmdWriter { channel, cmd_id };
+                    stdout_cpy = Some(async move {
                             tokio::io::copy(&mut stdout, &mut pty_writer_out).await
-                        });
+                    });
                     } else {
                         stdout_cpy = None;
                     }
 
                     if let Some(mut stderr) = stderr_opt {
-                        let mut pty_writer_err = CmdWriter { channel, cmd_id };
-                        stderr_cpy = Some(async move {
+                    let mut pty_writer_err = CmdWriter { channel, cmd_id };
+                    stderr_cpy = Some(async move {
                             tokio::io::copy(&mut stderr, &mut pty_writer_err).await
                         })
                     } else {
@@ -239,6 +250,8 @@ async fn op_register_cmd(
     // tokio::spawn();
     tokio::spawn(async move {
         let res = task.await;
+
+        remove_refs(cmd_id, channel).await;
 
         let _read = crate::CHANNEL_MESSAGES.read().await;
         if !_read.contains_key(&channel) {
@@ -324,12 +337,7 @@ async fn op_destroy_cmd(id: u32, channel_id: i32) -> Result<(), AnyError> {
         )));
     }
 
-    CMD_CANCELLATION_MAP.write(id).remove();
-    CMD_SESSION_MAP.write(id).remove();
-    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
-    crate::PROCCESS_CHANNEL_TO_ID
-        .write(channel_id.clone())
-        .remove();
+    remove_refs(id, channel_id).await;
 
     Ok(())
 }
