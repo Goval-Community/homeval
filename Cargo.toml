@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 c-map = { version = "0.2.1", features=["parking-lot"]}
-deadqueue = "0.2.4"
 deno_core = "0.157.0"
 env_logger = "0.10.0"
 futures-channel = "0.3.26"
@@ -28,6 +27,8 @@ os_pipe = "1.1.4"
 axum = "0.6.18"
 systemstat = "0.2.3"
 cpu-time = "1.0.0"
+notify-debouncer-full = { version = "0.1.0", default-features = false, features = ["serde"] }
+deadqueue = { version = "0.2.4", default-features = false, features = ["unlimited"] }
 
 [build-dependencies]
 prost-build = "0.11.8"

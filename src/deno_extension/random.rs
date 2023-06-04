@@ -66,7 +66,12 @@ fn op_console_log(
     }
     let target = &format!("goval_impl/v8: {}{}", service.service, name);
 
-    log!(target: target, level.to_log(), "{}", message);
+    log!(
+        target: target,
+        level.to_log(),
+        "{}",
+        message.replace("\\n", "\n")
+    );
     Ok(())
 }
 

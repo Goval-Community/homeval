@@ -106,7 +106,7 @@ class ServiceBase {
 			res = await this.recv(cmd, message.ipc.session);
 		} catch (err) {
 			res = api.Command.create({ error: err.toString(), ref: cmd.ref });
-			console.error(err.toString());
+			console.error(err.toString() + err.stack ? `\n${err.stack}` : "");
 		}
 
 		if (res) {
@@ -274,6 +274,73 @@ class Process {
 				warned = true
 				console.warn(
 					"Cmd has waited for more than 1 second to initialize, please check this out",
+				);
+			}
+		}
+	}
+}
+
+class FileWatcher {
+	constructor() {
+		this.listeners = []
+		this.watched_files = 0
+	}
+
+	async init() {
+		this.id = await Deno.core.ops.op_make_filewatcher();
+	}
+
+	async watch(paths) {
+		console.log(paths)
+		this.watched_files += paths.length
+		await this._await_watcher_exists()
+		await Deno.core.ops.op_watch_files(this.id, paths)
+	}
+
+	add_listener(listener) {
+		this.listeners.push(listener)
+	}
+
+	async start() {
+		await this._await_watcher_exists()
+		let attempts = 0;
+		while (true) {
+			const msg = await Deno.core.ops.op_recv_fsevent(this.id)
+			if (msg.err) {
+				if (attempts === 3) {
+					throw new Error("FileWatcher has had 20 consecutive errors")
+				}
+
+				console.warn("Got error in FileWatcher, retrying:", msg.err)
+				attempts += 1;
+				await Deno.core.ops.op_sleep(100);
+				continue
+			}
+
+			for (let listener of this.listeners) {
+				listener(msg)
+			}
+			attempts = 0;
+		}
+	}
+
+	async _await_watcher_exists() {
+		// fast path
+		if (this.id != null) return;
+
+		let loops = 0;
+		let warned = false;
+
+		while (true) {
+			if (this.id != null) break;
+
+			await Deno.core.ops.op_sleep(1);
+			loops += 1;
+
+			if (loops > 1000 && !warned) {
+				warned = true
+				console.warn(
+					"File watcher has waited for more than 1 second to initialize, please check this out",
 				);
 			}
 		}

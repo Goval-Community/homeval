@@ -79,6 +79,27 @@ declare global {
 
     class PtyProcess extends Process { }
 
+    type FileEvent = {
+        remove?: string,
+        create?: String,
+        modify?: String,
+        rename?: [string, string],
+        err?: string
+    };
+    class FileWatcher {
+        constructor()
+
+        init(): Promise<null>
+
+        watch(paths: string[]): Promise<null>
+
+        add_listener(listener: (event: FileEvent) => Promise<null>): null
+
+        start(): Promise<null>
+
+        _await_watcher_exists(): Promise<null>
+    }
+
     namespace process {
         var env: { [id: string]: string | null }
 
