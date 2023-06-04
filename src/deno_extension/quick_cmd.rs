@@ -1,8 +1,8 @@
 use homeval::goval;
-use log::{debug, warn};
+use log::{error, warn};
 use std::{
     collections::{HashMap, VecDeque},
-    io::{Error, Read},
+    io::Error,
     process::Stdio,
 };
 
@@ -32,31 +32,28 @@ async fn op_run_cmd(
         cmd.envs(env_vars);
     }
 
-    let (mut reader, writer) = os_pipe::pipe()?;
-    let writer_clone = writer.try_clone()?;
-    cmd.stdout(writer);
-    cmd.stderr(writer_clone);
-    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
 
-    let mut child = cmd.spawn()?;
+    let child = cmd.spawn()?;
+
+    let output = child.wait_with_output().await?;
+    // TODO: handle actual status
+    let mut status = 0;
 
     drop(cmd);
 
-    let output = tokio::task::spawn_blocking(move || -> Result<String, Error> {
-        let mut output = String::new();
-        debug!("Reading quick cmd output");
-        reader.read_to_string(&mut output).unwrap();
-        Ok(output)
-    })
-    .await??;
-
-    debug!("Done with quick cmd output");
-
-    let status = child.wait().await?;
+    // TODO: handle actual stderr
+    if output.stderr.len() > 0 {
+        status = 1;
+        error!("QUICK CMD STDERR: {}", String::from_utf8(output.stderr)?);
+    }
 
     let mut output_cmd = goval::Command::default();
 
-    output_cmd.body = Some(crate::goval::command::Body::Output(output));
+    output_cmd.body = Some(crate::goval::command::Body::Output(String::from_utf8(
+        output.stdout,
+    )?));
     output_cmd.channel = channel;
 
     for session in sessions.iter() {
@@ -84,7 +81,7 @@ async fn op_run_cmd(
     let queue = _read.get(&channel).unwrap().clone();
     drop(_read);
 
-    let exit_code = status.code().unwrap_or(0);
+    let exit_code = status;
     queue.push(JsMessage::CmdDead(exit_code));
 
     Ok(exit_code)

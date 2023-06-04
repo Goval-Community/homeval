@@ -19,7 +19,9 @@ class Service extends ServiceBase {
             }
 
             if (this.running) {
-                if (!cmd.exec.blocking) {
+                const is_blocking = cmd.exec.blocking || (cmd.exec.lifecycle ===  api.Exec.Lifecycle.BLOCKING)
+
+                if (!is_blocking) {
                     return api.Command.create({error: "Already running"})
                 }
 
@@ -37,6 +39,7 @@ class Service extends ServiceBase {
     async process_dead(proc_id, exit_code) {
         if (this.dead_procs.includes(proc_id) && proc_id !== -1) {return}
         this.dead_procs.push(proc_id)
+        this.running = false
 
         if (exit_code !== 0) {
             await this.send(api.Command.create({error: `exit status ${exit_code}`}), 0)
@@ -48,7 +51,6 @@ class Service extends ServiceBase {
             } catch (_) {}
         }
 
-        await Deno.core.ops.op_sleep(100);
         await this.send(api.Command.create({state: api.State.Stopped}), 0)
         await this.send(api.Command.create({ok: {}, ref: this.current_ref}), 0)
         
@@ -102,22 +104,37 @@ class Service extends ServiceBase {
     }
 
     async start_proc(msg) {
-        const cmd = msg.args[0];
+        this.running = true
+        // TODO: splitLogs, splitStderr
+        let cmd = msg.args[0];
+        const env = msg.env ? msg.env : {};
 
-        if (msg.args.length === 3 && msg.args[0] === "bash" && msg.args[1] === "-c") {
-            let arg = msg.args[2]
+        if (msg.args.length === 3 && msg.args[1] === "-c") {
+            const search = "rg --json --context 0 --fixed-strings" 
+            if (cmd === "bash") {
+                let arg = msg.args[2]
 
-            let new_cmd = await this.resource_usage(arg)
-            if (new_cmd) {
-                msg.args[2] = new_cmd
-            } else {
-                return
+                let new_cmd = await this.resource_usage(arg)
+                if (new_cmd) {
+                    msg.args[2] = new_cmd
+                } else {
+                    return
+                }
+            } else if (cmd === "sh") {
+                if (msg.args[2].slice(0, search.length) === search) {
+                    await this.send(api.Command.create({state: api.State.Running}), 0)
+                    msg.args[0] = "bash"
+                    const exit = await Deno.core.ops.op_run_cmd(msg.args, this.id, this.clients, env)
+
+                    await this.process_dead(-1, exit)
+                    return 
+                }
             }
+            
         }
-        const args = msg.args.slice(1)
-        const env = msg.env ? msg.env : {}
 
-        
+        const args = msg.args.slice(1)
+
         await this.send(api.Command.create({state: api.State.Running}), 0)
         this.proc = new Process(this.id, cmd, args, env)
         
