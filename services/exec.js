@@ -40,10 +40,6 @@ class Service extends ServiceBase {
         if (this.dead_procs.includes(proc_id) && proc_id !== -1) {return}
         this.dead_procs.push(proc_id)
         this.running = false
-
-        if (exit_code !== 0) {
-            await this.send(api.Command.create({error: `exit status ${exit_code}`}), 0)
-        }
         
         if (proc_id !== -1) {
             try {
@@ -52,7 +48,15 @@ class Service extends ServiceBase {
         }
 
         await this.send(api.Command.create({state: api.State.Stopped}), 0)
-        await this.send(api.Command.create({ok: {}, ref: this.current_ref}), 0)
+
+        let final_exit = api.Command.create({ok: {}})
+        if (exit_code !== 0) {
+            final_exit = api.Command.create({error: `exit status ${exit_code}`})
+        }
+
+        final_exit.ref = this.current_ref
+        await this.send(final_exit, 0)
+
         
         this.current_ref = null
         if (this.queue.length === 0) {
