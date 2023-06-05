@@ -18,3 +18,7 @@ services/*.py
 
 test.*
 site
+
+flamegraph.svg
+perf.data
+perf.data.old
