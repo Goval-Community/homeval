@@ -12,7 +12,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
 };
-use log::{debug, error, info, warn};
+use log::{error, info, warn, trace};
 
 mod channels;
 use channels::IPCMessage;
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Error> {
     // console_subscriber::init();
 
     let _ = env_logger::try_init();
-    info!("starting...");
+    info!("Starting homeval!");
     let addr = env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
@@ -209,7 +209,7 @@ async fn main() -> Result<(), Error> {
                         }
 
                         if !found && create {
-                            info!("executing openchan main block");
+                            trace!("executing openchan main block");
                             let service = open_chan.service.clone();
                             let mut max_channel = MAX_CHANNEL.lock().await;
                             *max_channel += 1;
@@ -231,7 +231,7 @@ async fn main() -> Result<(), Error> {
                                 name: _channel_name,
                             };
 
-                            info!("Awaiting queue write for channel {}", channel_id);
+                            trace!("Awaiting queue write for channel {}", channel_id);
 
                             CHANNEL_MESSAGES.write().await.insert(
                                 channel_id_held,
@@ -240,7 +240,7 @@ async fn main() -> Result<(), Error> {
                             let mut metadata = CHANNEL_METADATA.write().await;
                             metadata.push(service_data.clone());
                             drop(metadata);
-                            info!("Added channel: {} to queue list", channel_id_held);
+                            trace!("Added channel: {} to queue list", channel_id_held);
 
                             tokio::task::spawn_blocking(move || {
                                 let local = tokio::task::LocalSet::new();
@@ -251,7 +251,7 @@ async fn main() -> Result<(), Error> {
                                         .run_until(async {
                                             let mod_path =
                                                 &format!("services/{}.js", open_chan.service);
-                                            debug!("Module path: {}", mod_path);
+                                            trace!("Loading module path: {} for service: {}", mod_path, open_chan.service);
                                             let main_module: deno_core::url::Url;
                                             let main_module_res = deno_core::resolve_path(mod_path);
                                             match main_module_res {
@@ -421,7 +421,7 @@ async fn accept_connection(
 ) -> Result<(), AnyError> {
     let addr = stream
         .peer_addr()?;
-    info!("Peer address: {}", addr);
+    trace!("New connection with peer address: {}", addr);
 
     let _uri: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
 
@@ -474,11 +474,11 @@ async fn accept_connection(
         }
     }
 
-    info!("New connection from: {:#?}", client);
+    info!("New client: {:#?}", client);
 
     SESSION_CLIENT_INFO.write(session).insert(client.clone());
 
-    info!("New WebSocket connection: {}", addr);
+    trace!("New WebSocket connection: {}", addr);
 
     let (mut write, read) = ws_stream.split();
 
