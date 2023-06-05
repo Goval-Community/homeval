@@ -1,4 +1,4 @@
-// @replit/protocol 0.2.97
+// @replit/protocol 0.3.12
 syntax = "proto3";
 
 package goval;
@@ -190,6 +190,9 @@ message Command {
 		ToolchainGetRequest toolchainGetRequest = 435;
 		ToolchainGetResponse toolchainGetResponse = 436;
 		ToolchainChanged toolchainChanged = 437;
+		ReplspaceApiOpenMultipleFiles replspaceApiOpenMultipleFiles = 438;
+		NixModulesGetRegistryRequest nixModulesGetRegistryRequest = 439;
+		NixModulesGetRegistryResponse nixModulesGetRegistryResponse = 440;
 	}
 }
 
@@ -309,6 +312,7 @@ message BootStatus {
 		PROXY = 5;
 		PULL_FILES = 6;
 		LOAD_BLOCK = 7;
+		BLOCK_MIGRATION = 9;
 		RETRY = 8;
 	}
 
@@ -815,6 +819,10 @@ message ReplspaceApiGitHubToken {
 	string token = 2;
 }
 
+message ReplspaceApiOpenMultipleFiles {
+	repeated string files = 1;
+}
+
 message Focused {
 }
 
@@ -1099,6 +1107,7 @@ message DotReplit {
 	repeated string refreshWebViewOnFileChange = 21;
 	DeploymentConfig deployment = 22;
 	repeated string modules = 23;
+	ExtensionConfig extension = 24;
 }
 
 message DotReplitEnvVar {
@@ -1121,8 +1130,24 @@ message GitHubImportConfig {
 }
 
 message DeploymentConfig {
+	enum Target {
+		GCE = 0;
+		CLOUDRUN = 1;
+		STATIC = 2;
+	}
+
 	Exec run = 1;
 	Exec build = 2;
+	bool ignorePorts = 3;
+	DeploymentConfig.Target target = 4;
+	string publicDir = 5;
+}
+
+message ExtensionConfig {
+	bool isExtension = 1;
+	string extensionID = 2;
+	string buildCommand = 3;
+	string outputDirectory = 4;
 }
 
 message NixConfig {
@@ -1251,6 +1276,10 @@ message NixModule {
 	repeated DebuggerOption debuggers = 6;
 	repeated PackagerOption packagers = 7;
 	repeated LanguageServerOption languageServers = 8;
+	string buildType = 9;
+	repeated string resolutionPath = 10;
+	string resolvedId = 11;
+	string referencedId = 12;
 }
 
 message NixModulesChanged {
@@ -1258,6 +1287,31 @@ message NixModulesChanged {
 }
 
 message NixModulesBuildRequest {
+}
+
+message NixModulesGetRegistryRequest {
+}
+
+message NixModulesGetRegistryResponse {
+	repeated NixModulesRegistryEntry modules = 1;
+	map<string,NixModulesUpgradeMapEntry> autoUpgrade = 2;
+	map<string,NixModulesUpgradeMapEntry> recommendUpgrade = 3;
+}
+
+message NixModulesRegistryEntry {
+	string id = 1;
+	string name = 2;
+	string description = 3;
+	int32 version = 4;
+	string tag = 5;
+	repeated string tags = 6;
+	string commit = 7;
+	string path = 8;
+}
+
+message NixModulesUpgradeMapEntry {
+	string to = 1;
+	string changelog = 2;
 }
 
 message ToolchainGetRequest {
@@ -1319,6 +1373,38 @@ message PackagerOption {
 	bool guessImports = 7;
 }
 
+message ReplDomainDoubleDash {
+	string user = 1;
+	string slug = 2;
+	string suffix = 3;
+}
+
+message ReplDomainDots {
+	string user = 1;
+	string slug = 2;
+	string suffix = 3;
+}
+
+message ReplDomainSingleDomain {
+	string user = 1;
+	string suffix = 2;
+}
+
+message ReplDomainId {
+	string id = 1;
+	string suffix = 2;
+}
+
+message ReplDomain {
+	oneof kind {
+		string custom = 1;
+		ReplDomainId id = 2;
+		ReplDomainDoubleDash doubleDash = 3;
+		ReplDomainDots dots = 4;
+		ReplDomainSingleDomain singleDomain = 5;
+	}
+}
+
 message ReplToken {
 	message ClassroomMetadata {
 		string id = 1;
@@ -1372,6 +1458,7 @@ message ReplTransfer {
 	repeated string customDomains = 4;
 	repeated TLSCertificate certificates = 5;
 	repeated string flags = 6;
+	repl.Metadata metadata = 7;
 }
 
 message AllowReplRequest {
@@ -1416,6 +1503,8 @@ enum FlagClaim {
 	SIGN_INTERMEDIATE_CERT = 1;
 	IDENTITY = 5;
 	GHOSTWRITER = 6;
+	RENEW_IDENTITY = 7;
+	RENEW_KV = 8;
 	ANY_REPLID = 2;
 	ANY_USER = 3;
 	ANY_CLUSTER = 4;
@@ -1455,70 +1544,83 @@ message GovalReplIdentity {
 	bool ephemeral = 5;
 	string originReplid = 6;
 	int64 userId = 7;
+	repl.BuildInfo buildInfo = 8;
+	bool isTeam = 9;
+	repeated string roles = 10;
 }
 
-message LoreCommand {
-	oneof command {
-		ClusterTransfer clusterTransfer = 1;
-		SoftTakedown softTakedown = 2;
-		GovalCommand govalCommand = 3;
-		MultiGovalCommand multiGovalCommand = 5;
-		Restore restore = 4;
+message lore {
+	message LoreCommand {
+		oneof command {
+			lore.ClusterTransfer clusterTransfer = 1;
+			lore.SoftTakedown softTakedown = 2;
+			lore.Takedown takedown = 6;
+			lore.GovalCommand govalCommand = 3;
+			lore.MultiGovalCommand multiGovalCommand = 5;
+			lore.Restore restore = 4;
+		}
 	}
-}
 
-message ClusterTransfer {
-	string replId = 1;
-	string user = 2;
-	string transferId = 4;
-	oneof location {
-		string newClusterId = 3;
-		string newContinentId = 5;
+	message ClusterTransfer {
+		string replId = 1;
+		string user = 2;
+		string transferId = 4;
+		oneof location {
+			string newClusterId = 3;
+			string newContinentId = 5;
+		}
 	}
-}
 
-message SoftTakedown {
-	string replId = 1;
-	string softTakedownId = 2;
-}
-
-message GovalCommand {
-	oneof command {
-		repl.Metadata updateMetadata = 1;
-		PartialUpdateMetadata partialUpdateMetadata = 2;
-		KillRepl killRepl = 3;
-		UpdateSourceRepl updateSourceRepl = 4;
-		UpdateReplFlags updateReplFlags = 5;
+	message SoftTakedown {
+		string replId = 1;
+		string softTakedownId = 2;
 	}
-}
 
-message PartialUpdateMetadata {
-	google.protobuf.FieldMask fieldMask = 1;
-	repl.Metadata updateMetadata = 2;
-}
+	message Takedown {
+		string replId = 1;
+	}
 
-message MultiGovalCommand {
-	string replId = 1;
-	repeated GovalCommand govalCommands = 2;
-}
+	message GovalCommand {
+		oneof command {
+			repl.Metadata updateMetadata = 1;
+			lore.PartialUpdateMetadata partialUpdateMetadata = 2;
+			lore.KillRepl killRepl = 3;
+			lore.UpdateSourceRepl updateSourceRepl = 4;
+			lore.UpdateReplFlags updateReplFlags = 5;
+			lore.SoftTakedown softTakedown = 6;
+			lore.Takedown takedown = 7;
+		}
+	}
 
-message KillRepl {
-	string replId = 1;
-}
+	message PartialUpdateMetadata {
+		google.protobuf.FieldMask fieldMask = 1;
+		repl.Metadata updateMetadata = 2;
+	}
 
-message Restore {
-	string replId = 1;
-	string restoreReplId = 2;
-}
+	message MultiGovalCommand {
+		string replId = 1;
+		repeated lore.GovalCommand govalCommands = 2;
+	}
 
-message UpdateSourceRepl {
-	string replId = 1;
-	string sourceReplId = 2;
-}
+	message KillRepl {
+		string replId = 1;
+	}
 
-message UpdateReplFlags {
-	string replId = 1;
-	repeated string flags = 2;
+	message Restore {
+		string replId = 1;
+		string restoreReplId = 2;
+	}
+
+	message UpdateSourceRepl {
+		string replId = 1;
+		string sourceReplId = 2;
+	}
+
+	message UpdateReplFlags {
+		string replId = 1;
+		repeated string flags = 2;
+	}
+
 }
 
 message features {
@@ -1542,6 +1644,7 @@ message repl {
 	message Buckets {
 		string snapshots = 1;
 		string metadata = 2;
+		string diskBlocks = 3;
 	}
 
 	message Repl {
@@ -1554,6 +1657,8 @@ message repl {
 		string database = 7;
 		repl.Buckets buckets = 8;
 		repl.UserId userId = 9;
+		bool isTeam = 10;
+		repeated string roles = 11;
 	}
 
 	enum Environment {
@@ -1608,7 +1713,36 @@ message repl {
 	message BuildInfo {
 		string deploymentId = 1;
 		string url = 2;
+		string buildId = 3;
+		string machineTier = 4;
 	}
 
+}
+
+message PrivateReplsPowerup {
+	bool enabled = 1;
+}
+
+message GhostwriterPowerup {
+	bool enabled = 1;
+}
+
+message ConnectivityPowerup {
+	bool enabled = 1;
+}
+
+message PowerUp {
+	google.protobuf.Timestamp expiresAt = 1;
+	oneof powerup {
+		PrivateReplsPowerup private = 10;
+		GhostwriterPowerup ghostwriter = 11;
+		ConnectivityPowerup connectivity = 12;
+	}
+}
+
+message UserPowerUps {
+	uint32 userId = 1;
+	string username = 2;
+	repeated PowerUp powerups = 3;
 }
 
