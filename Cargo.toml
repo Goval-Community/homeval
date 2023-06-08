@@ -30,6 +30,8 @@ cpu-time = "1.0.0"
 notify-debouncer-full = { version = "0.1.0", default-features = false, features = ["serde"] }
 deadqueue = { version = "0.2.4", default-features = false, features = ["unlimited"] }
 similar = "2.2.1"
+prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt/", rev="15bc0a06"}
+toml = "0.7.4"
 
 [build-dependencies]
 prost-build = "0.11.8"
