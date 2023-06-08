@@ -33,6 +33,9 @@ mod services_release;
 #[cfg(not(debug_assertions))]
 use services_release as services;
 
+mod config;
+use config::dotreplit::DotReplit;
+
 use lazy_static::lazy_static;
 lazy_static! {
     pub static ref IMPLEMENTED_SERVICES: Vec<String> = {
@@ -63,6 +66,10 @@ lazy_static! {
         }
         services
     };
+
+    pub static ref DOTREPLIT_CONFIG: DotReplit = 
+        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap();
+    
 }
 
 lazy_static! {
@@ -91,8 +98,8 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     // console_subscriber::init();
-
     let _ = env_logger::try_init();
+
     info!("Starting homeval!");
     let addr = env::args()
         .nth(1)
