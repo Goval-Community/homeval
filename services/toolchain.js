@@ -9,7 +9,7 @@ class Service extends ServiceBase {
 
 		for (const [key, value] of Object.entries(input.languages ? input.languages : {})) {
 			res.languageServers.push(
-				{id: key, name: key, language: key, fileTypeAttrs: {filePattern: value.pattern}}
+				{id: key, name: key, language: value.syntax || key, fileTypeAttrs: {filePattern: value.pattern}}
 			);
 		}
 
