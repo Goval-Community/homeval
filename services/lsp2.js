@@ -5,6 +5,8 @@ class Service extends ServiceBase {
         this.proc = null
 
         this.dead_procs = []
+
+        this.config = Deno.core.ops.op_get_dotreplit_config()
     }
     
 	async recv(cmd, session) {
@@ -19,11 +21,14 @@ class Service extends ServiceBase {
             this.current_ref = cmd.ref
             this.running = true
 
-            const cmd = msg.args[0];
-            const args = msg.args.slice(1)
+            const _args = this.config.languages[cmd.startLSP.languageServerId].languageServer.start.args
+            console.log(cmd.startLSP.languageServerId, _args)
+
+            const runcmd = _args[0];
+            const args = _args.slice(1)
 
             
-            this.proc = new Process(this.id, cmd, args, {})
+            this.proc = new Process(this.id, runcmd, args, {})
             
             await this.proc.init(this.clients)
             await this.send(api.Command.create({ok: {}, ref: cmd.ref}), 0)
