@@ -93,6 +93,11 @@ fn op_get_dotreplit_config() -> Result<DotReplit, AnyError> {
     Ok(crate::DOTREPLIT_CONFIG.clone())
 }
 
+#[op]
+fn op_get_supported_services() -> Result<Vec<String>, AnyError> {
+    Ok(crate::IMPLEMENTED_SERVICES.clone())
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         // Time
@@ -104,5 +109,6 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_get_env_var::decl(),
         // Config
         op_get_dotreplit_config::decl(),
+        op_get_supported_services::decl(),
     ]
 }

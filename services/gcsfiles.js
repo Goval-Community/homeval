@@ -22,7 +22,20 @@ class Service extends ServiceBase {
 			return api.Command.create({ok:{}})
 		}
 		if (cmd.read) {
-			const contents = await fs.readFile(cmd.read.path)
+			let contents;
+			if (cmd.read.path === ".config/goval/info") {
+				const encoder = new TextEncoder();
+				contents = encoder.encode(JSON.stringify({
+					"server": "homeval",
+					"version": "1.0.0a", // TODO: real thing
+					"author": "PotentialStyx",
+					"uptime": 0, // seconds, TODO: real thing
+					"services": Deno.core.ops.op_get_supported_services()
+				}))
+			} else {
+				contents = await fs.readFile(cmd.read.path);
+			}
+
 			return api.Command.create({file:{path:cmd.read.path, content: contents}})
 		}
 		if (cmd.remove) {
