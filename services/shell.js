@@ -1,7 +1,10 @@
 class Service extends ServiceBase {
     constructor(...args) {
         super(...args)
-        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
+        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh", [], {
+            "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+        })
+
         this.pty.init(this.clients).then(_ => {
             console.debug("shell pty obtained:", this.pty.id)
         })

@@ -1,13 +1,14 @@
 #[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 use deno_core::error::AnyError;
+use deno_extension::messaging::ReplspaceMessage;
 #[allow(unused_imports)]
 use homeval::goval;
 use homeval::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use std::{env, io::Error, sync::Arc};
+use std::{env, io::Error, sync::Arc, collections::HashMap};
 
 use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
 use tokio::{
@@ -37,6 +38,10 @@ use services_release as services;
 
 mod config;
 use config::dotreplit::DotReplit;
+
+#[cfg(feature = "replspace")]
+mod replspace;
+
 
 use lazy_static::lazy_static;
 lazy_static! {
@@ -79,22 +84,27 @@ lazy_static! {
     static ref MAX_CHANNEL: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
 }
 
-use c_map::HashMap;
 lazy_static! {
-    static ref SESSION_CHANNELS: HashMap<i32, Vec<i32>> = HashMap::new();
-    static ref SESSION_CLIENT_INFO: HashMap<i32, ClientInfo> = HashMap::new();
-    static ref CHANNEL_MESSAGES: Arc<RwLock<std::collections::HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
-        Arc::new(RwLock::new(std::collections::HashMap::new()));
+    static ref SESSION_CHANNELS: c_map::HashMap<i32, Vec<i32>> = c_map::HashMap::new();
+    static ref SESSION_CLIENT_INFO: c_map::HashMap<i32, ClientInfo> = c_map::HashMap::new();
+    static ref CHANNEL_MESSAGES: Arc<RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
-    static ref SESSION_MAP: Arc<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
-        Arc::new(HashMap::new());
+    static ref SESSION_MAP: Arc<c_map::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
+        Arc::new(c_map::HashMap::new());
     
     // pty and cmd's
-    static ref PROCCESS_WRITE_MESSAGES: HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
-        HashMap::new();
-    static ref PROCCESS_CHANNEL_TO_ID: HashMap<i32, u32> = HashMap::new();
+    static ref PROCCESS_WRITE_MESSAGES: c_map::HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
+    c_map::HashMap::new();
+    static ref PROCCESS_CHANNEL_TO_ID: c_map::HashMap<i32, u32> = c_map::HashMap::new();
 
     static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
+
+    // Hashmap for channel id -> last session that sent it a message
+    static ref LAST_SESSION_USING_CHANNEL: Arc<RwLock<HashMap<i32, i32>>> = Arc::new(RwLock::new(HashMap::new()));
+
+    static ref REPLSPACE_CALLBACKS: Arc<RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
 }
 
 #[tokio::main]
@@ -106,6 +116,9 @@ async fn main() -> Result<(), Error> {
     let addr = env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+
+    #[cfg(feature = "replspace")]
+    tokio::spawn(replspace::start_server());
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
@@ -146,7 +159,7 @@ async fn main() -> Result<(), Error> {
     });
 
     let session_map_clone = SESSION_MAP.clone();
-    let _channel_map: RwLock<HashMap<i32, deno_core::JsRuntime>> = RwLock::new(HashMap::new());
+    let _channel_map: RwLock<c_map::HashMap<i32, deno_core::JsRuntime>> = RwLock::new(c_map::HashMap::new());
     while let Some(message) = rx.recv().await {
         let cmd: Command;
         match message.to_cmd() {
@@ -401,7 +414,13 @@ async fn main() -> Result<(), Error> {
 
             drop(msg_lock);
 
-            queue.push(JsMessage::IPC(message));
+            queue.push(JsMessage::IPC(message.clone()));
+
+            let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
+
+            hashmap_lock.insert(cmd.channel, message.session);
+
+            drop(hashmap_lock);
         }
     }
 

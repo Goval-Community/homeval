@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+default = ["replspace"]
+replspace = ["axum"]
 fun-stuff = ["chrono", "chrono-tz"]
 
 [dependencies]
@@ -27,7 +29,7 @@ portable-pty = "0.8.1"
 include_directory = { git = "https://github.com/goval-community/include_directory.git", rev = "bea5083a" }
 futures = "0.3.28"
 os_pipe = "1.1.4"
-axum = "0.6.18"
+axum = { version = "0.6.18", optional = true }
 systemstat = "0.2.3"
 cpu-time = "1.0.0"
 notify-debouncer-full = { version = "0.1.0", default-features = false, features = ["serde"] }
@@ -37,7 +39,7 @@ prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt/", rev="15bc0a
 toml = "0.7.4"
 chrono = { version = "0.4.26", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
 chrono-tz =  { version = "0.8.2", optional = true }
+textnonce = "1.0.0"
 
 [build-dependencies]
 prost-build = "0.11.8"
-

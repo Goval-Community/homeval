@@ -111,7 +111,8 @@ class Service extends ServiceBase {
         this.running = true
         // TODO: splitLogs, splitStderr
         let cmd = msg.args[0];
-        const env = msg.env ? msg.env : {};
+        let env = msg.env ? msg.env : {};
+        env.REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN = this.id.toString()
 
         if (msg.args.length === 3 && msg.args[1] === "-c") {
             const search = "rg --json --context 0 --fixed-strings" 

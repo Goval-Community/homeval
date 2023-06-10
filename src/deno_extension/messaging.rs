@@ -1,7 +1,7 @@
 use deno_core::{error::AnyError, op, OpDecl};
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::io::Error;
+use std::{io::Error, sync::Arc};
 
 use crate::{channels::IPCMessage, parse_paseto::ClientInfo};
 
@@ -15,7 +15,7 @@ async fn op_send_msg(msg: IPCMessage) -> Result<(), AnyError> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum JsMessage {
     #[serde(rename = "ipc")]
@@ -25,6 +25,18 @@ pub enum JsMessage {
     Close(i32),
     ProcessDead(u32, i32),
     CmdDead(i32),
+    Replspace(i32, ReplspaceMessage), // session, message
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ReplspaceMessage {
+    GithubTokenReq(String),                 // nonce
+    OpenFileReq(String, String),            // file, nonce
+    OpenMultipleFiles(Vec<String>, String), // files, nonce
+
+    GithubTokenRes(String), // token
+    OpenFileRes,
 }
 
 #[op]
@@ -41,6 +53,23 @@ async fn op_recv_info(channel: i32) -> Result<JsMessage, AnyError> {
 
     let res = queue.pop().await;
     Ok(res)
+}
+
+#[op]
+async fn op_replspace_reply(nonce: String, reply: ReplspaceMessage) -> Result<(), AnyError> {
+    crate::REPLSPACE_CALLBACKS
+        .write()
+        .await
+        .entry(nonce.clone())
+        .and_modify(|entry| {
+            let sender = entry.take().unwrap();
+            // let sender = Arc::try_unwrap(_sender.clone()).unwrap();
+            match sender.send(reply) {
+                Ok(_) => {}
+                Err(val) => error!("Failed to send replspace api reply: {:#?}", val),
+            };
+        });
+    Ok(())
 }
 
 #[op]
@@ -61,5 +90,6 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_recv_info::decl(),
         op_send_msg::decl(),
         op_user_info::decl(),
+        op_replspace_reply::decl(),
     ]
 }

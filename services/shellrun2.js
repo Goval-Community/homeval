@@ -3,7 +3,9 @@ class Service extends ServiceBase {
         super(...args)
         this.running = false
         this.dead_ptys = []
-        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh")
+        this.pty = new PtyProcess(this.id, process.env.SHELL || "sh", [], {
+            "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+        })
         this.pty.init(this.clients).then(_ => {
             console.debug("shell pty obtained:", this.pty.id)
         })
@@ -18,7 +20,9 @@ class Service extends ServiceBase {
             await this.pty.destroy()
             this.running = true
 
-            this.pty = new PtyProcess(this.id, "./target/release/homeval", ["127.0.0.1:8081"])
+            this.pty = new PtyProcess(this.id, "./target/release/homeval", ["127.0.0.1:8081"], {
+                "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+            })
             await this.send(api.Command.create({output:"[H[2J[3J" + "\u001b[33m\u001b[39m ./target/release/homeval 127.0.0.1:8081\u001b[K\r\n\u001b[0m"}), 0)
             await this.pty.init(this.clients)
             console.debug("Running command now", this.pty.id)

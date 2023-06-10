@@ -88,6 +88,8 @@ class ServiceBase {
 			await this.process_dead(message.processDead[0], message.processDead[1])
 		} else if (message.cmdDead != null) {
 			await this.process_dead(-1, message.cmdDead)
+		} else if (message.replspace) {
+			await this.on_replspace(message.replspace[0], message.replspace[1])
 		} else {
 			console.error("Unknown IPC message", message);
 		}
@@ -162,6 +164,8 @@ class ServiceBase {
 	}
 
 	async detach(_session, _forced) {}
+
+	async on_replspace(_session, _msg) {}
 }
 
 class PtyProcess {
