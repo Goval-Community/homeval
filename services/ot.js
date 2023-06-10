@@ -24,6 +24,11 @@ class Service extends ServiceBase {
 
 		if (cmd.otLinkFile) {
 			const path = cmd.otLinkFile.file.path;
+			
+			if (!await fs.stat(path).exists) {
+				return api.Command.create({error: `${path}: no such file or directory`})
+			}
+
 			const content = await fs.readFile(path);
 
 			this.watcher.watch([path])

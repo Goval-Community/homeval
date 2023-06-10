@@ -45,9 +45,11 @@ class Service extends ServiceBase {
 		);
 	}
 
-	async recv(cmd, session) {
+	async recv(cmd, _session) {
 		if (cmd.subscribeFile) {
+			// TODO: stat file to see if it really exists
 			await this.watcher.watch(cmd.subscribeFile.files.map(e => e.path));
+			return api.Command.create({ok: {}})
 		}
 	}
 }

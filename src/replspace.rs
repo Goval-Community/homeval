@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{extract::Query, http::StatusCode, routing::get, Json, Router};
 use deno_core::error::AnyError;
 use log::{error, info};

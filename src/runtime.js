@@ -30,6 +30,14 @@ Deno.core.initializeAsyncOps();
 })(globalThis);
 
 globalThis.fs = {
+	stat: async (path) => {
+		try {
+			return await Deno.core.ops.op_stat_file(path)
+		} catch(err) {
+			// file doesnt exist
+			return { exists: false }
+		}
+	},
 	readDir: async (path) => {
 		return await Deno.core.ops.op_list_dir(path);
 	},

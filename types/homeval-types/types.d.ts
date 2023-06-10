@@ -18,6 +18,13 @@ declare global {
     // [goval::runtime.js] (src/runtime.js)
 
     namespace fs {
+        function stat(path: string): Promise<{
+            exists: boolean,
+            type: "file" | "directory" | "symlink",
+            size: number,
+            fileMode: string,
+            modTime: number,
+        }>;
         function readDir(path: string): Promise<{
             path: string,
             type: "file" | "directory" | "symlink"
