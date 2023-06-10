@@ -9,11 +9,11 @@ fun-stuff = ["chrono", "chrono-tz"]
 [dependencies]
 c-map = { version = "0.2.1", features=["parking-lot"]}
 deno_core = "0.157.0"
-env_logger = "0.10.0"
+env_logger = { git = "https://github.com/tmccombs/env_logger", rev = "a47d1d99" }
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
 lazy_static = "1.4.0"
-log = "0.4.17"
+log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_serde"] }
 prost = "0.11.8"
 prost-types = "0.11.8"
 serde_json = "1.0.96"

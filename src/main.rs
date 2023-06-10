@@ -14,7 +14,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
 };
-use log::{error, info, warn, trace};
+use log::{error, info, warn, trace, as_debug, as_serde};
 
 mod channels;
 use channels::IPCMessage;
@@ -483,7 +483,7 @@ async fn accept_connection(
         }
     }
 
-    info!("New client: {:#?}", client);
+    info!(client = as_serde!(client); "New client");
 
     SESSION_CLIENT_INFO.write(session).insert(client.clone());
 
