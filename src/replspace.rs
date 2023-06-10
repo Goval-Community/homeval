@@ -1,4 +1,9 @@
-use axum::{extract::Query, http::StatusCode, routing::get, Json, Router};
+use axum::{
+    extract::Query,
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use deno_core::error::AnyError;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -9,7 +14,9 @@ use crate::deno_extension::{messaging::ReplspaceMessage, JsMessage};
 
 pub async fn start_server() -> Result<(), AnyError> {
     info!("Replspace api server listening on: 127.0.0.1:8283");
-    let app = Router::new().route("/github/token", get(get_gh_token));
+    let app = Router::new()
+        .route("/files/open", post(open_file))
+        .route("/github/token", get(get_gh_token));
 
     // run it with hyper on 127.0.0.1:3000
     axum::Server::bind(&"127.0.0.1:8283".parse().unwrap())
@@ -19,14 +26,15 @@ pub async fn start_server() -> Result<(), AnyError> {
 }
 
 #[derive(Serialize)]
-enum GHTokenStatus {
+#[serde(rename_all = "lowercase")]
+enum ReplspaceStatus {
     Ok,
     Err,
 }
 
 #[derive(Serialize)]
 struct GithubTokenRes {
-    status: GHTokenStatus,
+    status: ReplspaceStatus,
     token: Option<String>,
 }
 
@@ -78,7 +86,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(GithubTokenRes {
-                    status: GHTokenStatus::Err,
+                    status: ReplspaceStatus::Err,
                     token: None,
                 }),
             );
@@ -97,7 +105,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(GithubTokenRes {
-                    status: GHTokenStatus::Err,
+                    status: ReplspaceStatus::Err,
                     token: None,
                 }),
             );
@@ -107,8 +115,118 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
     (
         StatusCode::OK,
         Json(GithubTokenRes {
-            status: GHTokenStatus::Ok,
+            status: ReplspaceStatus::Ok,
             token: Some(token),
         }),
     )
+}
+
+/* */
+#[derive(Deserialize)]
+struct OpenFileReq {
+    filename: String,
+    #[serde(rename = "waitForClose")]
+    wait_for_close: bool,
+    channel: Option<i32>,
+}
+
+#[derive(Serialize)]
+struct OpenFileRes {
+    pub status: ReplspaceStatus,
+}
+
+async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFileRes>) {
+    info!("Got git open file");
+    let session;
+    if let Some(channel) = query.channel {
+        if channel != 0 {
+            info!("Got git open file for channel #{}", channel);
+
+            let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
+            session = last_session.get(&channel).unwrap_or(&0).clone();
+        } else {
+            info!("Got git open file with channel id set to 0 (unknown)");
+            session = 0;
+        }
+    } else {
+        info!("Got git open file without channel id");
+        session = 0;
+    }
+
+    let nonce = TextNonce::new().into_string();
+    let tx;
+    let rx;
+    if query.wait_for_close {
+        let res = channel();
+        tx = res.0;
+        rx = Some(res.1);
+
+        let mut callback_table = crate::REPLSPACE_CALLBACKS.write().await;
+
+        callback_table.insert(nonce.clone(), Some(tx));
+
+        drop(callback_table);
+    } else {
+        rx = None
+    }
+
+    let to_send = JsMessage::Replspace(
+        session,
+        ReplspaceMessage::OpenFileReq(query.filename, query.wait_for_close, nonce),
+    );
+
+    let msg_lock = crate::CHANNEL_MESSAGES.read().await;
+
+    for channel in msg_lock.values() {
+        channel.push(to_send.clone());
+    }
+
+    drop(msg_lock);
+
+    if !query.wait_for_close {
+        return (
+            StatusCode::OK,
+            Json(OpenFileRes {
+                status: ReplspaceStatus::Ok,
+            }),
+        );
+    }
+
+    let res;
+    match rx.expect("rx must be defined for this code to run").await {
+        Ok(token) => res = token,
+        Err(err) => {
+            error!(
+                "Got error awaiting replspace api open file fetcher callback {:#?}",
+                err
+            );
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(OpenFileRes {
+                    status: ReplspaceStatus::Err,
+                }),
+            );
+        }
+    }
+
+    match res {
+        ReplspaceMessage::OpenFileRes => (
+            StatusCode::OK,
+            Json(OpenFileRes {
+                status: ReplspaceStatus::Ok,
+            }),
+        ),
+        _ => {
+            error!(
+                "Got unexpected result in replspace api github token fetcher {:#?}",
+                res
+            );
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(OpenFileRes {
+                    status: ReplspaceStatus::Err,
+                }),
+            );
+        }
+    }
 }

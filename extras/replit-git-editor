@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eou pipefail
+f="${1#"$HOMEVAL_START_DIR"/}"
+if ${REPLIT_GIT_TOOLS_CHANNEL_FROM+"false"}
+then 
+  env | rg REPLIT
+  echo "manually setting channel to 0"
+  REPLIT_GIT_TOOLS_CHANNEL_FROM=0
+fi
+curl -S -s -o /dev/null -X POST "localhost:8283/files/open" \
+  -H "Accept: application/json" -H "Content-Type: application/json" \
+  --data "{ \"filename\": \"$f\", \"waitForClose\": true, \"channel\": $REPLIT_GIT_TOOLS_CHANNEL_FROM}"

@@ -150,6 +150,12 @@ async fn op_write_file_string(path: String, contents: String) -> Result<(), AnyE
     Ok(())
 }
 
+#[op]
+fn op_get_working_dir() -> Result<String, AnyError> {
+    // TODO: deal with possible panic from unwrap
+    Ok(std::env::current_dir()?.to_str().unwrap().to_string())
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         op_stat_file::decl(),
@@ -160,5 +166,6 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_move_file::decl(),
         op_read_file_string::decl(),
         op_write_file_string::decl(),
+        op_get_working_dir::decl(),
     ]
 }

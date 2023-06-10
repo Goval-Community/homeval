@@ -1,7 +1,7 @@
 use deno_core::{error::AnyError, op, OpDecl};
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::{io::Error, sync::Arc};
+use std::io::Error;
 
 use crate::{channels::IPCMessage, parse_paseto::ClientInfo};
 
@@ -32,7 +32,7 @@ pub enum JsMessage {
 #[serde(rename_all = "camelCase")]
 pub enum ReplspaceMessage {
     GithubTokenReq(String),                 // nonce
-    OpenFileReq(String, String),            // file, nonce
+    OpenFileReq(String, bool, String),      // file, wait for close, nonce
     OpenMultipleFiles(Vec<String>, String), // files, nonce
 
     GithubTokenRes(String), // token
