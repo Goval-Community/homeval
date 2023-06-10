@@ -1,4 +1,46 @@
 import { replit } from "@replit/protocol";
+
+type DotReplit = {
+    run?: Exec,
+    language?: string,
+    entrypoint?: string,
+    languages?: { [id: string]: DotReplitLanguage },
+    hidden?: string[]
+}
+
+type DotReplitLanguage = {
+    pattern?: string,
+    syntax?: string,
+    languageServer: LanguageServerConfig,
+}
+
+type LanguageServerConfig = {
+    start?: Exec,
+    configurationJson?: string,
+    initializationOptionsJson?: string,
+}
+
+type ExecLifecycle = "NonBlocking" | "Stdin" | "Blocking";
+
+type Exec = {
+    args?: string[],
+    env?: { [id: string]: string },
+    blocking?: boolean,
+    // TODO: confirm if this is actually how it is returned
+    lifecycle?: ExecLifecycle,
+    split_stderr?: boolean,
+    split_logs?: boolean,
+}
+
+type ReplspaceMessage = {
+    githubTokenReq?: string,
+    openFileReq?: [string, boolean, string],
+    openMultipleFiles?: [string[], string],
+
+    githubTokenRes?: string,
+    openFileRes?: {},
+}
+
 declare global {
     // [goval::generated::globals] (generated on the fly)
 
@@ -66,6 +108,9 @@ declare global {
         detach(session: number, forced: boolean): Promise<null>
 
         process_died(proc_id: number, exit_code: number): Promise<null>
+
+        on_replspace(session: number, msg: ReplspaceMessage): Promise<null>
+        replspace_reply(nonce: string, message: ReplspaceMessage): Promise<null>
     }
 
     class Process {
@@ -108,8 +153,30 @@ declare global {
     }
 
     namespace process {
+        namespace system {
+            function cpuTime(): Promise<number>;
+            function memoryUsage(): Promise<{
+                total: number,
+                free: number
+            }>;
+            function diskUsage(): Promise<{
+                available: number,
+                total: number,
+                free: number
+            }>;
+        }
+
         var env: { [id: string]: string | null }
 
         function getUserInfo(session: number): { username: string, id: number }
+        function getDotreplitConfig(): DotReplit
+
+        function quickCommand(args: string[], channel: number, sessions: number[], env: { [id: string]: string }): Promise<number>
     }
+
+    function diffText(old_text: string, new_text: string): Promise<{
+        insert?: string,
+        delete?: number,
+        skip?: number,
+    }[]>
 }

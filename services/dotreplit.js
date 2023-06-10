@@ -1,7 +1,7 @@
 class Service extends ServiceBase {
 	constructor(...args) {
 		super(...args)
-		this.config = Deno.core.ops.op_get_dotreplit_config()
+		this.config = process.getDotreplitConfig()
 	}
 	async recv(cmd, _session) {
 		if (cmd.dotReplitGetRequest) {

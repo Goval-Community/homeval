@@ -86,12 +86,12 @@ class Service extends ServiceBase {
             let output = "";
 
             if (is_storage_req) {
-                const disk = await Deno.core.ops.op_disk_info();
+                const disk = await process.system.diskUsage();
                 output = `${disk.free}\n${disk.total}\n`
             }
             if (is_cpu_req) {
-                const cpuTime = await Deno.core.ops.op_cpu_info();
-                const memory = await Deno.core.ops.op_memory_info();
+                const cpuTime = await process.system.cpuTime();
+                const memory = await process.system.memoryUsage();
                 const memoryUsage = memory.total - memory.free;
                 const totalMemory = memory.total
                 output = `${new Number(Date.now()) * 1000000}\n${cpuTime}\n200000\n100000\n${memoryUsage}\n${totalMemory}\n${totalMemory}\ntotal_cache 0\ntotal_rss ${memoryUsage}`
@@ -129,7 +129,7 @@ class Service extends ServiceBase {
                 if (msg.args[2].slice(0, search.length) === search) {
                     await this.send(api.Command.create({state: api.State.Running}), 0)
                     msg.args[0] = "bash"
-                    const exit = await Deno.core.ops.op_run_cmd(msg.args, this.id, this.clients, env)
+                    const exit = await process.quickCommand(msg.args, this.id, this.clients, env)
 
                     await this.process_dead(-1, exit)
                     return 

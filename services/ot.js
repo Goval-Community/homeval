@@ -157,7 +157,7 @@ class Service extends ServiceBase {
 
 	async file_event(event) {
 		if (event.modify === this.path) {
-			let diff = await Deno.core.ops.op_diff_texts(this.contents, await fs.readFileString(this.path))
+			let diff = await diffText(this.contents, await fs.readFileString(this.path))
 			if (diff.length === 0) {
 				return
 			}

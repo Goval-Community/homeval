@@ -16,7 +16,7 @@ class Service extends ServiceBase {
 			const nonce = cmd.replspaceApiGitHubToken.nonce
 			const token = cmd.replspaceApiGitHubToken.token
 
-			await Deno.core.ops.op_replspace_reply(nonce, {githubTokenRes: token});
+			await this.replspace_reply(nonce, {githubTokenRes: token});
 		} else if (cmd.replspaceApiCloseFile) {
 			const nonce = cmd.replspaceApiCloseFile.nonce
 			const send = this.send_reply[nonce];
@@ -25,7 +25,7 @@ class Service extends ServiceBase {
 				return
 			}
 
-			await Deno.core.ops.op_replspace_reply(nonce, {openFileRes: {}});
+			await this.replspace_reply(nonce, {openFileRes: {}});
 		} else {
 			console.log("Unknown message:", cmd)
 		}

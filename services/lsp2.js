@@ -6,7 +6,7 @@ class Service extends ServiceBase {
 
         this.dead_procs = []
 
-        this.config = Deno.core.ops.op_get_dotreplit_config()
+        this.config = process.getDotreplitConfig()
     }
     
 	async recv(cmd, session) {

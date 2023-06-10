@@ -174,6 +174,10 @@ class ServiceBase {
 	async detach(_session, _forced) {}
 
 	async on_replspace(_session, _msg) {}
+
+	async replspace_reply(nonce, message) {
+		await Deno.core.ops.op_replspace_reply(nonce, message);
+	}
 }
 
 class PtyProcess {
@@ -367,7 +371,29 @@ globalThis.process = {
 			throw new Error("Setting env vars is currently unimplemented");
 		},
 	}),
+	system: {
+		cpuTime: async () => {
+			return await Deno.core.ops.op_cpu_info()
+		},
+		memoryUsage: async () => {
+			return await Deno.core.ops.op_memory_info()
+		},
+		diskUsage: async () => {
+			return await Deno.core.ops.op_disk_info();
+		}
+	},
 	getUserInfo: (session) => {
 		return Deno.core.ops.op_user_info(session)
+	},
+	getDotreplitConfig: () => {
+		return Deno.core.ops.op_get_dotreplit_config()
+	},
+
+	quickCommand: async (args, channel, sessions, env = {}) => {
+		return await Deno.core.ops.op_run_cmd(args, channel, sessions, env)
 	}
 };
+
+globalThis.diffText = async (old_text, new_text) => {
+	return await Deno.core.ops.op_diff_texts(old_text, new_text)
+}
