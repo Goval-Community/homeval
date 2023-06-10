@@ -2,7 +2,7 @@ class Service extends ServiceBase {
     constructor(...args) {
         super(...args)
         this.pty = new PtyProcess(this.id, process.env.SHELL || "sh", [], {
-            "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+            "REPLIT_GIT_TOOLS_CHANNEL_FROM": this.id.toString()
         })
 
         this.pty.init(this.clients).then(_ => {
@@ -16,7 +16,7 @@ class Service extends ServiceBase {
         this.dead_ptys.push(pty)
 
         this.pty = new PtyProcess(this.id, process.env.SHELL || "sh", [], {
-            "REPLIT_GIT_ASKPASS_GODS_PLS_SEND_TO_RIGHT_SESSION_SHELL_TOKEN": this.id.toString()
+            "REPLIT_GIT_TOOLS_CHANNEL_FROM": this.id.toString()
         });
         
         await this.pty.init(this.clients)
