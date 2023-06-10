@@ -3,7 +3,7 @@
     <br>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
-    <a href="https://github.com/goval-community/homeval/issues/1"><img alt="Services implemented: 4" src ="https://img.shields.io/badge/services%20implemented-4-9958f7"></a>
+    <img alt="Services implemented: 14" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
     <!--
     uncomment when public repo
         <a href="https://github.com/goval-community/homeval/pulls"><img alt="current # of open pull requests" src="https://img.shields.io/github/issues-pr/goval-community/homeval?color=9958f7"></a>
