@@ -1,3 +1,5 @@
+#[cfg(fun_stuff)]
+use chrono::Datelike;
 use deno_core::error::AnyError;
 #[allow(unused_imports)]
 use homeval::goval;
@@ -516,6 +518,21 @@ async fn accept_connection(
 
     send_message(toast, &mut write)
         .await?;
+
+    #[cfg(fun_stuff)]
+    let date = 
+        chrono::Local::now().with_timezone(&chrono_tz::GMT)
+            + chrono::Duration::hours(24);
+    #[cfg(fun_stuff)]
+    if date.month() == 6 && date.day() == 10 {
+        let mut toast = goval::Command::default();
+        let mut inner_state = goval::Toast::default();
+        inner_state.text = "Say happy birthday to @haroon!".to_string();
+        toast.body = Some(goval::command::Body::Toast(inner_state));
+
+        send_message(toast, &mut write)
+            .await?;
+    }
 
     SESSION_CHANNELS.write(session).insert(vec![]);
     tokio::spawn(async move {

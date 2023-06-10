@@ -3,6 +3,9 @@ name = "homeval"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+fun-stuff = ["chrono", "chrono-tz"]
+
 [dependencies]
 c-map = { version = "0.2.1", features=["parking-lot"]}
 deno_core = "0.157.0"
@@ -32,6 +35,8 @@ deadqueue = { version = "0.2.4", default-features = false, features = ["unlimite
 similar = "2.2.1"
 prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt/", rev="15bc0a06"}
 toml = "0.7.4"
+chrono = { version = "0.4.26", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
+chrono-tz =  { version = "0.8.2", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"
