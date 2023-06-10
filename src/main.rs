@@ -1,4 +1,4 @@
-#[cfg(fun_stuff)]
+#[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 use deno_core::error::AnyError;
 #[allow(unused_imports)]
@@ -519,11 +519,11 @@ async fn accept_connection(
     send_message(toast, &mut write)
         .await?;
 
-    #[cfg(fun_stuff)]
+    #[cfg(feature = "fun-stuff")]
     let date = 
         chrono::Local::now().with_timezone(&chrono_tz::GMT)
-            + chrono::Duration::hours(24);
-    #[cfg(fun_stuff)]
+            + chrono::Duration::hours(1);
+    #[cfg(feature = "fun-stuff")]
     if date.month() == 6 && date.day() == 10 {
         let mut toast = goval::Command::default();
         let mut inner_state = goval::Toast::default();
