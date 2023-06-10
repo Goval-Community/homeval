@@ -31,6 +31,12 @@ class Service extends ServiceBase {
 					"services": Deno.core.ops.op_get_supported_services()
 				}))
 			} else {
+				const fstat = await fs.stat(cmd.read.path);
+			
+				if (!fstat.exists) {
+					return api.Command.create({error: `${cmd.read.path}: no such file or directory`})
+				}
+				
 				contents = await fs.readFile(cmd.read.path);
 			}
 
