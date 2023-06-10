@@ -158,7 +158,7 @@ class Service extends ServiceBase {
 
 			await this.recv(api.Command.create({ot:{op: diff}, author: api.OTPacket.Author.USER, userId: 0}), 0)
 		} else {
-			console.log(event.modify, this.path)
+			console.debug(event.modify, this.path, event)
 		}
 	}
 
