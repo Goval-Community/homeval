@@ -14,7 +14,7 @@ use crate::channels::IPCMessage;
 use tokio::{
     io::{AsyncWrite, AsyncWriteExt},
     process::Command,
-    sync::Mutex,
+    sync::{Mutex, RwLock},
 };
 
 use deno_core::{error::AnyError, op, OpDecl};
@@ -28,8 +28,9 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref CMD_CANCELLATION_MAP: c_map::HashMap<u32, AbortHandle> = c_map::HashMap::new();
-    static ref CMD_SESSION_MAP: c_map::HashMap<u32, Vec<i32>> = c_map::HashMap::new();
+    static ref CMD_CANCELLATION_MAP: RwLock<HashMap<u32, AbortHandle>> =
+        RwLock::new(HashMap::new());
+    static ref CMD_SESSION_MAP: RwLock<HashMap<u32, Vec<i32>>> = RwLock::new(HashMap::new());
 }
 
 struct CmdWriter {
@@ -37,12 +38,13 @@ struct CmdWriter {
     cmd_id: u32,
 }
 async fn remove_refs(id: u32, channel_id: i32) {
-    CMD_CANCELLATION_MAP.write(id).remove();
-    CMD_SESSION_MAP.write(id).remove();
-    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
+    CMD_CANCELLATION_MAP.write().await.remove(&id);
+    CMD_SESSION_MAP.write().await.remove(&id);
+    crate::PROCCESS_WRITE_MESSAGES.write().await.remove(&id);
     crate::PROCCESS_CHANNEL_TO_ID
-        .write(channel_id.clone())
-        .remove();
+        .write()
+        .await
+        .remove(&channel_id);
 }
 
 async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Error> {
@@ -62,8 +64,8 @@ async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Er
     cmd.channel = channel;
 
     let sessions;
-    let _key = CMD_SESSION_MAP.read(&cmd_id);
-    if let Some(session_map) = _key.get() {
+    let _key = CMD_SESSION_MAP.read().await;
+    if let Some(session_map) = _key.get(&cmd_id) {
         sessions = session_map;
     } else {
         return Err(std::io::Error::new(
@@ -73,7 +75,7 @@ async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Er
     }
 
     for session in sessions.iter() {
-        if let Some(sender) = crate::SESSION_MAP.read(session).get() {
+        if let Some(sender) = crate::SESSION_MAP.read().await.get(&session) {
             let mut to_send = cmd.clone();
             to_send.session = *session;
 
@@ -152,25 +154,28 @@ async fn op_register_cmd(
     let queue = Arc::new(deadqueue::unlimited::Queue::new());
 
     if let Some(session_map) = sessions {
-        CMD_SESSION_MAP.write(cmd_id).insert(session_map);
+        CMD_SESSION_MAP.write().await.insert(cmd_id, session_map);
     } else {
-        CMD_SESSION_MAP.write(cmd_id).insert(vec![]);
+        CMD_SESSION_MAP.write().await.insert(cmd_id, vec![]);
     }
 
-    let cmd_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write(channel);
-    if cmd_channel_writer.contains_key() {
+    let mut cmd_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write().await;
+    if cmd_channel_writer.contains_key(&channel) {
         drop(cmd_channel_writer);
         return Err(AnyError::new(Error::new(
             ErrorKind::AlreadyExists,
             "Channel already has a PTY/CMDs",
         )));
     } else {
-        cmd_channel_writer.insert(cmd_id);
+        cmd_channel_writer.insert(channel, cmd_id);
     }
 
+    drop(cmd_channel_writer);
+
     crate::PROCCESS_WRITE_MESSAGES
-        .write(cmd_id)
-        .insert(queue.clone());
+        .write()
+        .await
+        .insert(cmd_id, queue.clone());
 
     let child_lock = Arc::new(Mutex::new(child));
 
@@ -242,7 +247,7 @@ async fn op_register_cmd(
         }
     }));
 
-    CMD_CANCELLATION_MAP.write(cmd_id).insert(handle);
+    CMD_CANCELLATION_MAP.write().await.insert(cmd_id, handle);
 
     // tokio::spawn();
     tokio::spawn(async move {
@@ -292,25 +297,30 @@ async fn op_register_cmd(
 #[op]
 async fn op_cmd_add_session(id: u32, session: i32) -> Result<(), AnyError> {
     CMD_SESSION_MAP
-        .write(id)
-        .entry()
+        .write()
+        .await
+        .entry(id)
         .and_modify(|sessions| sessions.push(session));
     Ok(())
 }
 
 #[op]
 async fn op_cmd_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
-    CMD_SESSION_MAP.write(id).entry().and_modify(|sessions| {
-        if let Some(pos) = sessions.iter().position(|x| *x == session) {
-            sessions.swap_remove(pos);
-        }
-    });
+    CMD_SESSION_MAP
+        .write()
+        .await
+        .entry(id)
+        .and_modify(|sessions| {
+            if let Some(pos) = sessions.iter().position(|x| *x == session) {
+                sessions.swap_remove(pos);
+            }
+        });
     Ok(())
 }
 
 #[op]
 async fn op_cmd_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
-    match crate::PROCCESS_WRITE_MESSAGES.read(&id).get() {
+    match crate::PROCCESS_WRITE_MESSAGES.read().await.get(&id) {
         Some(queue) => {
             queue.push(msg);
 
@@ -325,7 +335,7 @@ async fn op_cmd_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
 
 #[op]
 async fn op_destroy_cmd(id: u32, channel_id: i32) -> Result<(), AnyError> {
-    if let Some(cancel) = CMD_CANCELLATION_MAP.read(&id).get() {
+    if let Some(cancel) = CMD_CANCELLATION_MAP.read().await.get(&id) {
         cancel.abort();
     } else {
         return Err(AnyError::new(Error::new(

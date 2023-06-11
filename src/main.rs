@@ -6,17 +6,17 @@ use deno_extension::messaging::ReplspaceMessage;
 use homeval::goval;
 use homeval::goval::Command;
 use prost::Message;
+use std::time::Instant;
+use std::{collections::HashMap, env, io::Error, sync::Arc};
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use std::time::Instant;
-use std::{env, io::Error, sync::Arc, collections::HashMap};
 
-use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
+use futures_util::{SinkExt, StreamExt};
+use log::{error, info, trace, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex, RwLock},
 };
-use log::{error, info, warn, trace};
 
 mod channels;
 use channels::IPCMessage;
@@ -42,7 +42,6 @@ use config::dotreplit::DotReplit;
 
 #[cfg(feature = "replspace")]
 mod replspace;
-
 
 use lazy_static::lazy_static;
 lazy_static! {
@@ -75,10 +74,8 @@ lazy_static! {
         }
         services
     };
-
-    pub static ref DOTREPLIT_CONFIG: DotReplit = 
+    pub static ref DOTREPLIT_CONFIG: DotReplit =
         toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap();
-    
 }
 
 lazy_static! {
@@ -87,18 +84,18 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref SESSION_CHANNELS: c_map::HashMap<i32, Vec<i32>> = c_map::HashMap::new();
-    static ref SESSION_CLIENT_INFO: c_map::HashMap<i32, ClientInfo> = c_map::HashMap::new();
+    static ref SESSION_CHANNELS: RwLock<HashMap<i32, Vec<i32>>> = RwLock::new(HashMap::new());
+    static ref SESSION_CLIENT_INFO: RwLock<HashMap<i32, ClientInfo>> = RwLock::new(HashMap::new());
     static ref CHANNEL_MESSAGES: Arc<RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
         Arc::new(RwLock::new(HashMap::new()));
     static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
-    static ref SESSION_MAP: Arc<c_map::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>> =
-        Arc::new(c_map::HashMap::new());
-    
+    static ref SESSION_MAP: Arc<RwLock<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+
     // pty and cmd's
-    static ref PROCCESS_WRITE_MESSAGES: c_map::HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
-    c_map::HashMap::new();
-    static ref PROCCESS_CHANNEL_TO_ID: c_map::HashMap<i32, u32> = c_map::HashMap::new();
+    static ref PROCCESS_WRITE_MESSAGES: RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>>> =
+    RwLock::new(HashMap::new());
+    static ref PROCCESS_CHANNEL_TO_ID: RwLock<HashMap<i32, u32>> = RwLock::new(HashMap::new());
 
     static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
 
@@ -142,17 +139,15 @@ async fn main() -> Result<(), Error> {
             let session_id = max_session.clone();
 
             let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
-            session_map_clone.write(session_id).insert(send_to_session);
+            session_map_clone
+                .write()
+                .await
+                .insert(session_id, send_to_session);
 
             let tx_clone = tx.clone();
-            tokio::spawn(async move{
-                match accept_connection(
-                    stream,
-                    tx_clone,
-                    session_recv,
-                    session_id,
-                ).await {
-                    Ok(_) => {},
+            tokio::spawn(async move {
+                match accept_connection(stream, tx_clone, session_recv, session_id).await {
+                    Ok(_) => {}
                     Err(err) => {
                         error!("accept_connection errored: {}", err)
                     }
@@ -162,7 +157,6 @@ async fn main() -> Result<(), Error> {
     });
 
     let session_map_clone = SESSION_MAP.clone();
-    let _channel_map: RwLock<c_map::HashMap<i32, deno_core::JsRuntime>> = RwLock::new(c_map::HashMap::new());
     while let Some(message) = rx.recv().await {
         let cmd: Command;
         match message.to_cmd() {
@@ -172,7 +166,7 @@ async fn main() -> Result<(), Error> {
                     err
                 );
                 continue;
-            },
+            }
             Ok(res) => cmd = res,
         }
 
@@ -194,7 +188,7 @@ async fn main() -> Result<(), Error> {
                     pong.r#ref = cmd.r#ref;
                     pong.channel = 0;
 
-                    if let Some(sender) = session_map_clone.read(&message.session).get() {
+                    if let Some(sender) = session_map_clone.read().await.get(&message.session) {
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
@@ -213,8 +207,8 @@ async fn main() -> Result<(), Error> {
                         let attach = open_chan.action()
                             == goval::open_channel::Action::AttachOrCreate
                             || open_chan.action() == goval::open_channel::Action::Attach
-                            || open_chan.service == "git"; // git is just use for replspace api stuff 
-                            // from what I can tell, so its just easier to have it as one instance.
+                            || open_chan.service == "git"; // git is just use for replspace api stuff
+                                                           // from what I can tell, so its just easier to have it as one instance.
                         let create = open_chan.action()
                             == goval::open_channel::Action::AttachOrCreate
                             || open_chan.action() == goval::open_channel::Action::Create;
@@ -276,7 +270,11 @@ async fn main() -> Result<(), Error> {
                                         .run_until(async {
                                             let mod_path =
                                                 &format!("services/{}.js", open_chan.service);
-                                            trace!("Loading module path: {} for service: {}", mod_path, open_chan.service);
+                                            trace!(
+                                                "Loading module path: {} for service: {}",
+                                                mod_path,
+                                                open_chan.service
+                                            );
                                             let main_module: deno_core::url::Url;
                                             let main_module_res = deno_core::resolve_path(mod_path);
                                             match main_module_res {
@@ -318,7 +316,10 @@ async fn main() -> Result<(), Error> {
                                             js_runtime
                                                 .execute_script(
                                                     "[goval::api.js]",
-                                                    include_str!(concat!(env!("OUT_DIR"), "/api.js")),
+                                                    include_str!(concat!(
+                                                        env!("OUT_DIR"),
+                                                        "/api.js"
+                                                    )),
                                                 )
                                                 .unwrap();
 
@@ -326,7 +327,7 @@ async fn main() -> Result<(), Error> {
                                                 .load_main_module(
                                                     &main_module,
                                                     services::get_module_core(open_chan.service)
-                                                        .expect("Error fetching module code")
+                                                        .expect("Error fetching module code"),
                                                 )
                                                 .await
                                                 .unwrap();
@@ -352,8 +353,9 @@ async fn main() -> Result<(), Error> {
                             protocol_error.channel = 0;
 
                             session_map_clone
-                                .read(&message.session)
-                                .get()
+                                .read()
+                                .await
+                                .get(&message.session)
                                 .unwrap()
                                 .send(message.replace_cmd(protocol_error))
                                 .unwrap();
@@ -369,8 +371,9 @@ async fn main() -> Result<(), Error> {
                         open_chan_res.channel = 0;
 
                         session_map_clone
-                            .read(&message.session)
-                            .get()
+                            .read()
+                            .await
+                            .get(&message.session)
                             .unwrap()
                             .send(message.replace_cmd(open_chan_res))
                             .unwrap();
@@ -384,11 +387,15 @@ async fn main() -> Result<(), Error> {
                         queue.push(JsMessage::Attach(message.session));
 
                         SESSION_CHANNELS
-                            .write(message.session)
-                            .entry()
+                            .write()
+                            .await
+                            .entry(message.session)
                             .and_modify(|channels| channels.push(channel_id_held));
                     } else {
-                        warn!("Missing service requested by openChan: {}", open_chan.service)
+                        warn!(
+                            "Missing service requested by openChan: {}",
+                            open_chan.service
+                        )
                     }
                 }
                 _ => {}
@@ -396,9 +403,9 @@ async fn main() -> Result<(), Error> {
         } else {
             // Directly deal with Command::Input, should be faster
             if let goval::command::Body::Input(input) = cmd_body {
-                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read(&cmd.channel).get() {
+                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
                     let mut to_continue = false;
-                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read(&pty_id).get() {
+                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(&pty_id) {
                         queue.push(input);
                         to_continue = true;
                     } else {
@@ -407,7 +414,7 @@ async fn main() -> Result<(), Error> {
 
                     if to_continue {
                         continue;
-                    } 
+                    }
                 }
             }
 
@@ -450,8 +457,7 @@ async fn accept_connection(
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
     session: i32,
 ) -> Result<(), AnyError> {
-    let addr = stream
-        .peer_addr()?;
+    let addr = stream.peer_addr()?;
     trace!("New connection with peer address: {}", addr);
 
     let _uri: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
@@ -464,23 +470,22 @@ async fn accept_connection(
         Ok(res)
     };
 
-    let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback)
-        .await?;
+    let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback).await?;
 
     // needed due to futures stuff :/
     let client: ClientInfo;
     match tokio::task::spawn_blocking(move || -> Result<ClientInfo, AnyError> {
         let __uri;
-        match _uri
-            .lock() {
-                Ok(res) => __uri = res,
-                Err(_err) => {
-                    return Err(
-                        Error::new(std::io::ErrorKind::InvalidData, 
-                            "Header callback paniced when setting uri").into()
-                    )
-                }
+        match _uri.lock() {
+            Ok(res) => __uri = res,
+            Err(_err) => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Header callback paniced when setting uri",
+                )
+                .into())
             }
+        }
 
         let uri = __uri.clone().unwrap_or("".to_string());
 
@@ -507,21 +512,21 @@ async fn accept_connection(
 
     info!("New client: {:#?}", client);
 
-    SESSION_CLIENT_INFO.write(session).insert(client.clone());
+    SESSION_CLIENT_INFO
+        .write()
+        .await
+        .insert(session, client.clone());
 
     trace!("New WebSocket connection: {}", addr);
 
-    let (mut write, read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
 
     let mut boot_status = goval::Command::default();
-    let mut inner  =goval::BootStatus::default();
+    let mut inner = goval::BootStatus::default();
     inner.stage = goval::boot_status::Stage::Complete.into();
-    boot_status.body = Some(goval::command::Body::BootStatus(
-        inner,
-    ));
+    boot_status.body = Some(goval::command::Body::BootStatus(inner));
 
-    send_message(boot_status, &mut write)
-        .await?;
+    send_message(boot_status, &mut write).await?;
 
     // Sending container state
     let mut container_state = goval::Command::default();
@@ -529,8 +534,7 @@ async fn accept_connection(
     inner_state.state = goval::container_state::State::Ready.into();
     container_state.body = Some(goval::command::Body::ContainerState(inner_state));
 
-    send_message(container_state, &mut write)
-        .await?;
+    send_message(container_state, &mut write).await?;
 
     // Sending server info message
     let mut toast = goval::Command::default();
@@ -538,13 +542,10 @@ async fn accept_connection(
     inner_state.text = format!("Hello @{}, welcome to homeval!", client.username);
     toast.body = Some(goval::command::Body::Toast(inner_state));
 
-    send_message(toast, &mut write)
-        .await?;
+    send_message(toast, &mut write).await?;
 
     #[cfg(feature = "fun-stuff")]
-    let date = 
-        chrono::Local::now().with_timezone(&chrono_tz::GMT)
-            + chrono::Duration::hours(1);
+    let date = chrono::Local::now().with_timezone(&chrono_tz::GMT) + chrono::Duration::hours(1);
     #[cfg(feature = "fun-stuff")]
     if date.month() == 6 && date.day() == 10 {
         let mut toast = goval::Command::default();
@@ -552,54 +553,52 @@ async fn accept_connection(
         inner_state.text = "Say happy birthday to @haroon!".to_string();
         toast.body = Some(goval::command::Body::Toast(inner_state));
 
-        send_message(toast, &mut write)
-            .await?;
+        send_message(toast, &mut write).await?;
     }
 
-    SESSION_CHANNELS.write(session).insert(vec![]);
+    SESSION_CHANNELS.write().await.insert(session, vec![]);
     tokio::spawn(async move {
-        if let Err(err) = read
-            .try_for_each(|msg| {
-                match msg {
+        while let Some(_msg) = read.next().await {
+            match _msg {
+                Ok(msg) => match msg {
                     tungstenite::Message::Binary(buf) => {
-                        if let Err(err) = propagate
-                            .send(IPCMessage {
-                                bytes: buf,
-                                session,
-                            }) {
-                                error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
-                            }
+                        if let Err(err) = propagate.send(IPCMessage {
+                            bytes: buf,
+                            session,
+                        }) {
+                            error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
+                        }
                     }
                     tungstenite::Message::Close(_) => {
                         warn!("CLOSING SESSION {}", session);
-                        for _channel in SESSION_CHANNELS.read(&session).get().unwrap().iter() {
+                        for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
+                        {
                             let channel = _channel.clone();
                             tokio::spawn(async move {
-                                let msg_lock = CHANNEL_MESSAGES
-                                .read().await;
+                                let msg_lock = CHANNEL_MESSAGES.read().await;
 
-                                let queue = msg_lock.get(&channel)
-                                    .unwrap()
-                                    .clone();
-                                
+                                let queue = msg_lock.get(&channel).unwrap().clone();
+
                                 drop(msg_lock);
-                                
+
                                 queue.push(JsMessage::Close(session));
                             });
-                            
                         }
+
+                        SESSION_MAP.write().await.remove(&session);
+                        SESSION_CLIENT_INFO.write().await.remove(&session);
+                        SESSION_CHANNELS.write().await.remove(&session);
                         warn!("CLOSED SESSION {}", session);
                     }
                     _ => {}
-                };
-                future::ok(())
-            })
-            .await
-        {
-            error!(
-                "The following error occured while reading messages (session {}): {}",
-                session, err
-            );
+                },
+                Err(err) => {
+                    error!(
+                        "The following error occured while reading messages (session {}): {}",
+                        session, err
+                    );
+                }
+            };
         }
     });
 
@@ -613,7 +612,7 @@ async fn accept_connection(
                 )
             }
         }
-    };
+    }
 
     Ok(())
 }
