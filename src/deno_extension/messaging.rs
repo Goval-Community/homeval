@@ -7,7 +7,7 @@ use crate::{channels::IPCMessage, parse_paseto::ClientInfo};
 
 #[op]
 async fn op_send_msg(msg: IPCMessage) -> Result<(), AnyError> {
-    if let Some(sender) = crate::SESSION_MAP.read(&msg.session.clone()).get() {
+    if let Some(sender) = crate::SESSION_MAP.read().await.get(&msg.session.clone()) {
         sender.send(msg)?;
     } else {
         error!("Missing session outbound message queue in op_send_msg")
@@ -73,13 +73,13 @@ async fn op_replspace_reply(nonce: String, reply: ReplspaceMessage) -> Result<()
 }
 
 #[op]
-fn op_user_info(session: i32) -> Result<ClientInfo, AnyError> {
-    let _read = crate::SESSION_CLIENT_INFO.read(&session);
-    if !_read.contains_key() {
+async fn op_user_info(session: i32) -> Result<ClientInfo, AnyError> {
+    let _read = crate::SESSION_CLIENT_INFO.read().await;
+    if !_read.contains_key(&session) {
         return Ok(ClientInfo::default());
     }
 
-    match _read.get() {
+    match _read.get(&session) {
         Some(info) => Ok(info.clone()),
         None => Ok(ClientInfo::default()),
     }

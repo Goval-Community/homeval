@@ -57,7 +57,7 @@ async fn op_run_cmd(
     output_cmd.channel = channel;
 
     for session in sessions.iter() {
-        if let Some(sender) = crate::SESSION_MAP.read(session).get() {
+        if let Some(sender) = crate::SESSION_MAP.read().await.get(session) {
             let mut to_send = output_cmd.clone();
             to_send.session = *session;
 

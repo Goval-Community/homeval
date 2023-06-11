@@ -73,7 +73,7 @@ async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Er
     }
 
     for session in sessions.iter() {
-        if let Some(sender) = crate::SESSION_MAP.read(session).get() {
+        if let Some(sender) = crate::SESSION_MAP.read().await.get(&session) {
             let mut to_send = cmd.clone();
             to_send.session = *session;
 

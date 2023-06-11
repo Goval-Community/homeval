@@ -59,7 +59,7 @@ impl Write for PtyWriter {
         }
 
         for session in sessions.iter() {
-            if let Some(sender) = crate::SESSION_MAP.read(session).get() {
+            if let Some(sender) = crate::SESSION_MAP.blocking_read().get(session) {
                 let mut to_send = cmd.clone();
                 to_send.session = *session;
 
