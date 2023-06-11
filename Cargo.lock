@@ -291,9 +291,9 @@ dependencies = [
 
 [[package]]
 name = "deno_core"
-version = "0.157.0"
+version = "0.174.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30aca929ef5ca246e0785d22bf4bfdcc9ff465190134fe91d1795fc0129d068a"
+checksum = "8077367e7e7ab2f52f1bc6285af301a1a6328b984991a3ff22236ad79862fce3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -308,6 +308,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_v8",
+ "smallvec",
  "sourcemap",
  "url",
  "v8",
@@ -315,11 +316,12 @@ dependencies = [
 
 [[package]]
 name = "deno_ops"
-version = "0.35.0"
+version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da14e47c67a75581740036a30ec4d6da6c28c3c26e72a8a2ac4afcced7a5a95d"
+checksum = "dc9d81c9e5cd9590be6043546f4565670cb6e6a7de1986fd1c354adce04eb9d4"
 dependencies = [
  "once_cell",
+ "pmutil",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
@@ -957,9 +959,12 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.18"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "518ef76f2f87365916b142844c16d8fefd85039bc5699050210a7778ee1cd1de"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "matchit"
@@ -1229,6 +1234,17 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pmutil"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3894e5d549cccbe44afecf72922f277f603cd4bb0219c8342631ef18fffbe004"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "portable-pty"
@@ -1651,9 +1667,9 @@ dependencies = [
 
 [[package]]
 name = "serde_v8"
-version = "0.68.0"
+version = "0.85.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1d3e2fcb3ad345e4d00630e42b59ae6793da94587f244529dfbcefeb17951d"
+checksum = "dba78050262072324b0b1efba11db7367735251adf7ec734fd75780c598c743b"
 dependencies = [
  "bytes",
  "derive_more",
@@ -2185,14 +2201,13 @@ checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
 name = "v8"
-version = "0.54.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b63103bd7caa4c3571e8baafe58f3e04818df70505304ed814737e655d1d8d6"
+checksum = "a2287b485fa902172da3722d7e557e083afd63921777e0c6e5c0fba28e6d59d3"
 dependencies = [
  "bitflags",
  "fslock",
  "lazy_static",
- "libc",
  "which",
 ]
 

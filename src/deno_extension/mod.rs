@@ -29,5 +29,5 @@ pub fn make_extension() -> Extension {
     ops.append(&mut server_info::get_op_decls());
     ops.append(&mut sysinfo::get_op_decls());
 
-    Extension::builder().ops(ops).build()
+    Extension::builder("homeval").ops(ops).build()
 }
