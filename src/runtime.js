@@ -382,6 +382,19 @@ globalThis.process = {
 			return await Deno.core.ops.op_disk_info();
 		}
 	},
+	server: {
+		name: Deno.core.ops.op_server_name,
+		version: Deno.core.ops.op_server_version,
+		license: Deno.core.ops.op_server_license,
+		repository: Deno.core.ops.op_server_repository,
+		description: Deno.core.ops.op_server_description,
+		uptime: Deno.core.ops.op_server_uptime,
+		services: Deno.core.ops.op_get_supported_services,
+		authors: () => {
+			const authors = Deno.core.ops.op_server_authors();
+			return authors.split(":")
+		}
+	},
 	getUserInfo: (session) => {
 		return Deno.core.ops.op_user_info(session)
 	},

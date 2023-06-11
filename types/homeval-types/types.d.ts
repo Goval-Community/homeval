@@ -166,6 +166,17 @@ declare global {
             }>;
         }
 
+        namespace server {
+            function name(): string;
+            function version(): string;
+            function license(): string;
+            function repository(): string;
+            function description(): string;
+            function services(): string[];
+            function authors(): string[];
+            function uptime(): number;
+        }
+
         var env: { [id: string]: string | null }
 
         function getUserInfo(session: number): { username: string, id: number }

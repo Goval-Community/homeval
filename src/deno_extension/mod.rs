@@ -8,6 +8,7 @@ pub mod messaging;
 pub mod pty;
 pub mod quick_cmd;
 pub mod random;
+pub mod server_info;
 pub mod sysinfo;
 
 pub use messaging::JsMessage;
@@ -25,6 +26,7 @@ pub fn make_extension() -> Extension {
     ops.append(&mut pty::get_op_decls());
     ops.append(&mut quick_cmd::get_op_decls());
     ops.append(&mut random::get_op_decls());
+    ops.append(&mut server_info::get_op_decls());
     ops.append(&mut sysinfo::get_op_decls());
 
     Extension::builder().ops(ops).build()

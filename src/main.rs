@@ -8,6 +8,7 @@ use homeval::goval::Command;
 use prost::Message;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use std::time::Instant;
 use std::{env, io::Error, sync::Arc, collections::HashMap};
 
 use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
@@ -45,6 +46,7 @@ mod replspace;
 
 use lazy_static::lazy_static;
 lazy_static! {
+    pub static ref START_TIME: Instant = Instant::now();
     pub static ref IMPLEMENTED_SERVICES: Vec<String> = {
         let mut services = vec![];
         for file in services::get_all().expect("Error when looping over `services/`") {
@@ -109,6 +111,7 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    lazy_static::initialize(&START_TIME);
     // console_subscriber::init();
     let _ = env_logger::try_init();
 

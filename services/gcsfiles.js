@@ -24,11 +24,14 @@ class Service extends ServiceBase {
 			if (cmd.read.path === ".config/goval/info") {
 				const encoder = new TextEncoder();
 				contents = encoder.encode(JSON.stringify({
-					"server": "homeval",
-					"version": "1.0.0a", // TODO: real thing
-					"author": "PotentialStyx",
-					"uptime": 0, // seconds, TODO: real thing
-					"services": Deno.core.ops.op_get_supported_services()
+					"server": process.server.name(),
+					"version": process.server.version(),
+					"license": process.server.license(),
+					"authors": process.server.authors(),
+					"repository": process.server.repository(),
+					"description": process.server.description(),
+					"uptime": process.server.uptime(),
+					"services": process.server.services()
 				}))
 			} else {
 				const fstat = await fs.stat(cmd.read.path);
