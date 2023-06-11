@@ -1,6 +1,7 @@
 #[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 use deno_core::error::AnyError;
+use deno_core::Snapshot;
 use deno_extension::messaging::ReplspaceMessage;
 #[allow(unused_imports)]
 use homeval::goval;
@@ -289,6 +290,9 @@ async fn main() -> Result<(), Error> {
 
                                             let mut js_runtime = deno_core::JsRuntime::new(
                                                 deno_core::RuntimeOptions {
+                                                    startup_snapshot: Some(Snapshot::Static(
+                                                        homeval::HOMEVAL_JS_SNAPSHOT,
+                                                    )),
                                                     module_loader: Some(std::rc::Rc::new(
                                                         deno_core::FsModuleLoader,
                                                     )),
@@ -307,21 +311,21 @@ async fn main() -> Result<(), Error> {
                                                     ),
                                                 )
                                                 .unwrap();
-                                            js_runtime
-                                                .execute_script(
-                                                    "[goval::runtime.js]",
-                                                    include_str!("./runtime.js"),
-                                                )
-                                                .unwrap();
-                                            js_runtime
-                                                .execute_script(
-                                                    "[goval::api.js]",
-                                                    include_str!(concat!(
-                                                        env!("OUT_DIR"),
-                                                        "/api.js"
-                                                    )),
-                                                )
-                                                .unwrap();
+                                            // js_runtime
+                                            //     .execute_script(
+                                            //         "[goval::runtime.js]",
+                                            //         include_str!("./runtime.js"),
+                                            //     )
+                                            //     .unwrap();
+                                            // js_runtime
+                                            //     .execute_script(
+                                            //         "[goval::api.js]",
+                                            //         include_str!(concat!(
+                                            //             env!("OUT_DIR"),
+                                            //             "/api.js"
+                                            //         )),
+                                            //     )
+                                            //     .unwrap();
 
                                             let mod_id = js_runtime
                                                 .load_main_module(
@@ -392,10 +396,10 @@ async fn main() -> Result<(), Error> {
                             .entry(message.session)
                             .and_modify(|channels| channels.push(channel_id_held));
                     } else {
-                        warn!(
-                            "Missing service requested by openChan: {}",
-                            open_chan.service
-                        )
+                        // warn!(
+                        //     "Missing service requested by openChan: {}",
+                        //     open_chan.service
+                        // )
                     }
                 }
                 _ => {}
