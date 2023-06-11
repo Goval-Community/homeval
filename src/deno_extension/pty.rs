@@ -186,8 +186,9 @@ async fn op_register_pty(
     drop(pty_channel_writer);
 
     crate::PROCCESS_WRITE_MESSAGES
-        .write(pty_id)
-        .insert(queue.clone());
+        .write()
+        .await
+        .insert(pty_id, queue.clone());
 
     let (task, handle) = abortable(async move {
         loop {
@@ -237,7 +238,7 @@ async fn op_pty_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
 
 #[op]
 async fn op_pty_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
-    match crate::PROCCESS_WRITE_MESSAGES.read(&id).get() {
+    match crate::PROCCESS_WRITE_MESSAGES.read().await.get(&id) {
         Some(queue) => {
             queue.push(msg);
 
@@ -263,7 +264,7 @@ async fn op_destroy_pty(id: u32, channel_id: i32) -> Result<(), AnyError> {
 
     PTY_CANCELLATION_MAP.write(id).remove();
     PTY_SESSION_MAP.write(id).remove();
-    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
+    crate::PROCCESS_WRITE_MESSAGES.write().await.remove(&id);
     crate::PROCCESS_CHANNEL_TO_ID
         .write()
         .await

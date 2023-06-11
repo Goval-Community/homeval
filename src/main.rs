@@ -93,8 +93,8 @@ lazy_static! {
         Arc::new(RwLock::new(HashMap::new()));
 
     // pty and cmd's
-    static ref PROCCESS_WRITE_MESSAGES: c_map::HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
-    c_map::HashMap::new();
+    static ref PROCCESS_WRITE_MESSAGES: RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>>> =
+    RwLock::new(HashMap::new());
     static ref PROCCESS_CHANNEL_TO_ID: RwLock<HashMap<i32, u32>> = RwLock::new(HashMap::new());
 
     static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
@@ -157,8 +157,6 @@ async fn main() -> Result<(), Error> {
     });
 
     let session_map_clone = SESSION_MAP.clone();
-    let _channel_map: RwLock<c_map::HashMap<i32, deno_core::JsRuntime>> =
-        RwLock::new(c_map::HashMap::new());
     while let Some(message) = rx.recv().await {
         let cmd: Command;
         match message.to_cmd() {
@@ -407,7 +405,7 @@ async fn main() -> Result<(), Error> {
             if let goval::command::Body::Input(input) = cmd_body {
                 if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
                     let mut to_continue = false;
-                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read(&pty_id).get() {
+                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(&pty_id) {
                         queue.push(input);
                         to_continue = true;
                     } else {

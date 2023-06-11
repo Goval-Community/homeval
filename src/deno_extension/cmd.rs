@@ -39,7 +39,7 @@ struct CmdWriter {
 async fn remove_refs(id: u32, channel_id: i32) {
     CMD_CANCELLATION_MAP.write(id).remove();
     CMD_SESSION_MAP.write(id).remove();
-    crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
+    crate::PROCCESS_WRITE_MESSAGES.write().await.remove(&id);
     crate::PROCCESS_CHANNEL_TO_ID
         .write()
         .await
@@ -172,8 +172,9 @@ async fn op_register_cmd(
     drop(cmd_channel_writer);
 
     crate::PROCCESS_WRITE_MESSAGES
-        .write(cmd_id)
-        .insert(queue.clone());
+        .write()
+        .await
+        .insert(cmd_id, queue.clone());
 
     let child_lock = Arc::new(Mutex::new(child));
 
@@ -313,7 +314,7 @@ async fn op_cmd_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
 
 #[op]
 async fn op_cmd_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
-    match crate::PROCCESS_WRITE_MESSAGES.read(&id).get() {
+    match crate::PROCCESS_WRITE_MESSAGES.read().await.get(&id) {
         Some(queue) => {
             queue.push(msg);
 
