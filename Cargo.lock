@@ -156,16 +156,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38fcc2979eff34a4b84e1cf9a1e3da42a7d44b3b690a40cdcb23e3d556cfb2e5"
 
 [[package]]
-name = "c-map"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14d764ae9f2295757f912b503db8c02663b6750b4994200a1cb00b2fd9bd6df1"
-dependencies = [
- "num_cpus",
- "parking_lot",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -661,7 +651,6 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.21.2",
- "c-map",
  "chrono",
  "chrono-tz",
  "cpu-time",

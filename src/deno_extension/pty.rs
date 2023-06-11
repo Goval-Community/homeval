@@ -9,7 +9,7 @@ use std::{
 
 use crate::channels::IPCMessage;
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use deno_core::{error::AnyError, op, OpDecl};
 
@@ -22,8 +22,9 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref PTY_CANCELLATION_MAP: c_map::HashMap<u32, AbortHandle> = c_map::HashMap::new();
-    static ref PTY_SESSION_MAP: c_map::HashMap<u32, Vec<i32>> = c_map::HashMap::new();
+    static ref PTY_CANCELLATION_MAP: RwLock<HashMap<u32, AbortHandle>> =
+        RwLock::new(HashMap::new());
+    static ref PTY_SESSION_MAP: RwLock<HashMap<u32, Vec<i32>>> = RwLock::new(HashMap::new());
 }
 
 struct PtyWriter {
@@ -48,8 +49,8 @@ impl Write for PtyWriter {
         cmd.channel = self.channel;
 
         let sessions;
-        let _key = PTY_SESSION_MAP.read(&self.pty_id);
-        if let Some(session_map) = _key.get() {
+        let _key = PTY_SESSION_MAP.blocking_read();
+        if let Some(session_map) = _key.get(&self.pty_id) {
             sessions = session_map;
         } else {
             return Err(std::io::Error::new(
@@ -167,9 +168,9 @@ async fn op_register_pty(
     let queue = Arc::new(deadqueue::unlimited::Queue::new());
 
     if let Some(session_map) = sessions {
-        PTY_SESSION_MAP.write(pty_id).insert(session_map);
+        PTY_SESSION_MAP.write().await.insert(pty_id, session_map);
     } else {
-        PTY_SESSION_MAP.write(pty_id).insert(vec![]);
+        PTY_SESSION_MAP.write().await.insert(pty_id, vec![]);
     }
 
     let mut pty_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write().await;
@@ -199,7 +200,7 @@ async fn op_register_pty(
         }
     });
 
-    PTY_CANCELLATION_MAP.write(pty_id).insert(handle);
+    PTY_CANCELLATION_MAP.write().await.insert(pty_id, handle);
 
     tokio::spawn(async move {
         match task.await {
@@ -220,19 +221,24 @@ async fn op_register_pty(
 #[op]
 async fn op_pty_add_session(id: u32, session: i32) -> Result<(), AnyError> {
     PTY_SESSION_MAP
-        .write(id)
-        .entry()
+        .write()
+        .await
+        .entry(id)
         .and_modify(|sessions| sessions.push(session));
     Ok(())
 }
 
 #[op]
 async fn op_pty_remove_session(id: u32, session: i32) -> Result<(), AnyError> {
-    PTY_SESSION_MAP.write(id).entry().and_modify(|sessions| {
-        if let Some(pos) = sessions.iter().position(|x| *x == session) {
-            sessions.swap_remove(pos);
-        }
-    });
+    PTY_SESSION_MAP
+        .write()
+        .await
+        .entry(id)
+        .and_modify(|sessions| {
+            if let Some(pos) = sessions.iter().position(|x| *x == session) {
+                sessions.swap_remove(pos);
+            }
+        });
     Ok(())
 }
 
@@ -253,7 +259,7 @@ async fn op_pty_write_msg(id: u32, msg: String) -> Result<(), AnyError> {
 
 #[op]
 async fn op_destroy_pty(id: u32, channel_id: i32) -> Result<(), AnyError> {
-    if let Some(cancel) = PTY_CANCELLATION_MAP.read(&id).get() {
+    if let Some(cancel) = PTY_CANCELLATION_MAP.read().await.get(&id) {
         cancel.abort();
     } else {
         return Err(AnyError::new(Error::new(
@@ -262,8 +268,8 @@ async fn op_destroy_pty(id: u32, channel_id: i32) -> Result<(), AnyError> {
         )));
     }
 
-    PTY_CANCELLATION_MAP.write(id).remove();
-    PTY_SESSION_MAP.write(id).remove();
+    PTY_CANCELLATION_MAP.write().await.remove(&id);
+    PTY_SESSION_MAP.write().await.remove(&id);
     crate::PROCCESS_WRITE_MESSAGES.write().await.remove(&id);
     crate::PROCCESS_CHANNEL_TO_ID
         .write()

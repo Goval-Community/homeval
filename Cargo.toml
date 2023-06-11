@@ -14,7 +14,6 @@ replspace = ["axum"]
 fun-stuff = ["chrono", "chrono-tz"]
 
 [dependencies]
-c-map = { version = "0.2.1", features=["parking-lot"]}
 deno_core = "0.157.0"
 env_logger = "0.10.0"
 futures-channel = "0.3.26"
