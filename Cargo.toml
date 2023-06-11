@@ -14,7 +14,7 @@ replspace = ["axum"]
 fun-stuff = ["chrono", "chrono-tz"]
 
 [dependencies]
-deno_core = "0.174.0"
+deno_core = "0.189.0"
 env_logger = "0.10.0"
 futures-channel = "0.3.26"
 futures-util = "0.3.26"

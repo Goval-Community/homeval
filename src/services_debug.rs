@@ -2,7 +2,7 @@ use std::io::Error;
 use std::path::PathBuf;
 
 #[inline(always)]
-pub fn get_module_core(_: String) -> Result<Option<String>, Error> {
+pub fn get_module_core(_: String) -> Result<Option<deno_core::FastString>, Error> {
     Ok(None)
 }
 

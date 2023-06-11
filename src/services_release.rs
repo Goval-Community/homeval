@@ -4,11 +4,11 @@ use include_directory::{include_directory, Dir};
 static SERVICES_DIR: Dir<'_> = include_directory!("$CARGO_MANIFEST_DIR/services");
 
 #[inline(always)]
-pub fn get_module_core(service: String) -> Result<Option<String>, Error> {
+pub fn get_module_core(service: String) -> Result<Option<deno_core::FastString>, Error> {
     match SERVICES_DIR.get_file(format!("{}.js", service)) {
         Some(file) => {
             return match file.contents_utf8() {
-                Some(contents) => Ok(Some(contents.to_string())),
+                Some(contents) => Ok(Some(deno_core::FastString::Static(contents))),
                 None => Err(Error::new(
                     std::io::ErrorKind::InvalidData,
                     format!("Module: {} has None for .contents_utf8()", service),

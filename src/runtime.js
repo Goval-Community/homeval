@@ -1,4 +1,3 @@
-Deno.core.initializeAsyncOps();
 // @ts-nocheck
 // rome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
 ((globalThis) => {

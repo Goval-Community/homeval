@@ -276,7 +276,10 @@ async fn main() -> Result<(), Error> {
                                                 open_chan.service
                                             );
                                             let main_module: deno_core::url::Url;
-                                            let main_module_res = deno_core::resolve_path(mod_path);
+                                            let main_module_res = deno_core::resolve_path(
+                                                mod_path,
+                                                std::env::current_dir().unwrap().as_path(),
+                                            );
                                             match main_module_res {
                                                 Err(err) => {
                                                     error!("Error resolving js module {}", err);
@@ -300,33 +303,38 @@ async fn main() -> Result<(), Error> {
                                             js_runtime
                                                 .execute_script(
                                                     "[goval::generated::globals]",
-                                                    &format!(
+                                                    format!(
                                                         "globalThis.serviceInfo = {};",
                                                         serde_json::to_string(&service_data)
                                                             .unwrap()
-                                                    ),
+                                                    )
+                                                    .into(),
                                                 )
                                                 .unwrap();
                                             js_runtime
                                                 .execute_script(
                                                     "[goval::runtime.js]",
-                                                    include_str!("./runtime.js"),
+                                                    deno_core::FastString::ensure_static_ascii(
+                                                        include_str!("./runtime.js"),
+                                                    ),
                                                 )
                                                 .unwrap();
                                             js_runtime
                                                 .execute_script(
                                                     "[goval::api.js]",
-                                                    include_str!(concat!(
-                                                        env!("OUT_DIR"),
-                                                        "/api.js"
-                                                    )),
+                                                    deno_core::FastString::ensure_static_ascii(
+                                                        include_str!(concat!(
+                                                            env!("OUT_DIR"),
+                                                            "/api.js"
+                                                        )),
+                                                    ),
                                                 )
                                                 .unwrap();
 
                                             let mod_id = js_runtime
                                                 .load_main_module(
                                                     &main_module,
-                                                    services::get_module_core(open_chan.service)
+                                                    services::get_module_core(open_chan.service.clone())
                                                         .expect("Error fetching module code"),
                                                 )
                                                 .await
@@ -334,7 +342,20 @@ async fn main() -> Result<(), Error> {
                                             let result = js_runtime.mod_evaluate(mod_id);
 
                                             js_runtime.run_event_loop(false).await.unwrap();
-                                            result.await.unwrap().unwrap();
+                                            
+                                            match result.await {
+                                                Ok(inner) => {
+                                                    match inner {
+                                                        Ok(_) => {},
+                                                        Err(err) => {
+                                                            error!("Got error in v8 thread for service {}:\n{}", open_chan.service, err)
+                                                        }
+                                                    }
+                                                },
+                                                Err(err) => {
+                                                    error!("Got the following canceled error in v8 thread for service {}: {}", open_chan.service, err)
+                                                }
+                                            }
                                         })
                                         .await;
                                 });
