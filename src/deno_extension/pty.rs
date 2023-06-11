@@ -172,16 +172,18 @@ async fn op_register_pty(
         PTY_SESSION_MAP.write(pty_id).insert(vec![]);
     }
 
-    let pty_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write(channel);
-    if pty_channel_writer.contains_key() {
+    let mut pty_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write().await;
+    if pty_channel_writer.contains_key(&channel) {
         drop(pty_channel_writer);
         return Err(AnyError::new(Error::new(
             ErrorKind::AlreadyExists,
             "Channel already has a PTY/CMD",
         )));
     } else {
-        pty_channel_writer.insert(pty_id);
+        pty_channel_writer.insert(channel, pty_id);
     }
+
+    drop(pty_channel_writer);
 
     crate::PROCCESS_WRITE_MESSAGES
         .write(pty_id)
@@ -263,8 +265,9 @@ async fn op_destroy_pty(id: u32, channel_id: i32) -> Result<(), AnyError> {
     PTY_SESSION_MAP.write(id).remove();
     crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
     crate::PROCCESS_CHANNEL_TO_ID
-        .write(channel_id.clone())
-        .remove();
+        .write()
+        .await
+        .remove(&channel_id);
 
     Ok(())
 }

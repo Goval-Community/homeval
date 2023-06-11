@@ -41,8 +41,9 @@ async fn remove_refs(id: u32, channel_id: i32) {
     CMD_SESSION_MAP.write(id).remove();
     crate::PROCCESS_WRITE_MESSAGES.write(id).remove();
     crate::PROCCESS_CHANNEL_TO_ID
-        .write(channel_id.clone())
-        .remove();
+        .write()
+        .await
+        .remove(&channel_id);
 }
 
 async fn write_to_cmd(buf: &[u8], channel: i32, cmd_id: u32) -> Result<usize, Error> {
@@ -157,16 +158,18 @@ async fn op_register_cmd(
         CMD_SESSION_MAP.write(cmd_id).insert(vec![]);
     }
 
-    let cmd_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write(channel);
-    if cmd_channel_writer.contains_key() {
+    let mut cmd_channel_writer = crate::PROCCESS_CHANNEL_TO_ID.write().await;
+    if cmd_channel_writer.contains_key(&channel) {
         drop(cmd_channel_writer);
         return Err(AnyError::new(Error::new(
             ErrorKind::AlreadyExists,
             "Channel already has a PTY/CMDs",
         )));
     } else {
-        cmd_channel_writer.insert(cmd_id);
+        cmd_channel_writer.insert(channel, cmd_id);
     }
+
+    drop(cmd_channel_writer);
 
     crate::PROCCESS_WRITE_MESSAGES
         .write(cmd_id)

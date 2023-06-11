@@ -11,7 +11,7 @@ use std::{collections::HashMap, env, io::Error, sync::Arc};
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 
-use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
+use futures_util::{SinkExt, StreamExt};
 use log::{error, info, trace, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -95,7 +95,7 @@ lazy_static! {
     // pty and cmd's
     static ref PROCCESS_WRITE_MESSAGES: c_map::HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>> =
     c_map::HashMap::new();
-    static ref PROCCESS_CHANNEL_TO_ID: c_map::HashMap<i32, u32> = c_map::HashMap::new();
+    static ref PROCCESS_CHANNEL_TO_ID: RwLock<HashMap<i32, u32>> = RwLock::new(HashMap::new());
 
     static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
 
@@ -405,7 +405,7 @@ async fn main() -> Result<(), Error> {
         } else {
             // Directly deal with Command::Input, should be faster
             if let goval::command::Body::Input(input) = cmd_body {
-                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read(&cmd.channel).get() {
+                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
                     let mut to_continue = false;
                     if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read(&pty_id).get() {
                         queue.push(input);
