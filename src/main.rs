@@ -106,11 +106,19 @@ lazy_static! {
         Arc::new(RwLock::new(HashMap::new()));
 }
 
+#[cfg(feature = "database")]
+mod database;
+#[cfg(feature = "database")]
+pub use database::DATABASE;
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     lazy_static::initialize(&START_TIME);
     // console_subscriber::init();
-    let _ = env_logger::try_init();
+    let _ = env_logger::try_init().unwrap();
+    
+    #[cfg(feature = "database")]
+    database::setup().await.unwrap();
 
     info!("Starting homeval!");
     let addr = env::args()

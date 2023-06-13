@@ -13,9 +13,9 @@ members = [".", "migration", "entity"]
 
 [features]
 default = ["replspace", "database"]
-database = ["sea-orm", "migration", "entity", "once_cell"]
-replspace = ["axum"]
-fun-stuff = ["chrono", "chrono-tz"]
+database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
+replspace = ["dep:axum"]
+fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 
 [dependencies]
 deno_core = "0.189.0"
@@ -55,7 +55,7 @@ chrono-tz =  { version = "0.8.2", optional = true }
 sea-orm = { version = "0.11.3", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
 migration = { path = "migration", optional = true}
 entity = { path = "entity", optional = true}
-once_cell = { version = "1.18.0", optional = true}
+sea-query = { version = "0.28.5", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"
