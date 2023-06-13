@@ -1,6 +1,6 @@
+use deno_core::{error::AnyError, op, OpDecl};
 use std::io::Error;
 
-use deno_core::{error::AnyError, op, OpDecl};
 #[op]
 fn op_database_exists() -> Result<bool, AnyError> {
     Ok(false)

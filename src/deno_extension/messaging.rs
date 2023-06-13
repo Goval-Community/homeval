@@ -1,5 +1,5 @@
 use deno_core::{error::AnyError, op, OpDecl};
-use log::error;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 
