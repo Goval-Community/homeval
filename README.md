@@ -49,3 +49,5 @@ All linux distros with an up to date enough GLIBC should work. The only distro o
 Using musl libc, Windows, or MacOS is not officially supported right now. You might encounter roadblocks attempting to compile targeting any of these targets.
 
 __Official windows support is a WIP.__
+
+E
