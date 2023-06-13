@@ -7,8 +7,9 @@ use tokio::sync::OnceCell;
 
 pub static DATABASE: OnceCell<sea_orm::DatabaseConnection> = OnceCell::const_new();
 
+// TODO: allow disabling of db at runtime as well as compile time
 pub async fn setup() -> Result<(), AnyError> {
-    let connect_options = ConnectOptions::new("postgres://localhost/potentialstyx".into())
+    let connect_options = ConnectOptions::new(std::env::var("HOMEVAL_DB")?)
         .acquire_timeout(Duration::from_secs(5))
         .sqlx_logging_level(log::LevelFilter::Trace)
         .to_owned();
