@@ -4,10 +4,6 @@
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
     <img alt="Services implemented: 14" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
-    <!--
-    uncomment when public repo
-        <a href="https://github.com/goval-community/homeval/pulls"><img alt="current # of open pull requests" src="https://img.shields.io/github/issues-pr/goval-community/homeval?color=9958f7"></a>
-    -->
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>
 </div>
@@ -25,6 +21,7 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 1. Git clone the repository
 2. Install required dependencies
     * `curl -fsSL https://bun.sh/install | bash`
+        * If you are on windows install `yarn` v1 and `npx` instead
     * `sudo apt install protobuf-compiler`
     * `curl --proto '=https' --tlsv1.3 https://sh.rustup.rs/ -sSf | sh`
     * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
@@ -34,6 +31,8 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). 
 
 ## Running
+> ⚠️ On windows you have to run it with `cargo run --profile=release` due to rusty_v8 related issues.
+
 To compile and run a debug build use `cargo run`.
 
 # Implementing a service
