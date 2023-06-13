@@ -11,6 +11,16 @@ pub mod random;
 pub mod server_info;
 pub mod sysinfo;
 
+#[cfg(feature = "database")]
+pub mod database_real;
+#[cfg(feature = "database")]
+use database_real as database;
+
+#[cfg(not(feature = "database"))]
+pub mod database_faux;
+#[cfg(not(feature = "database"))]
+use database_faux as database;
+
 pub use messaging::JsMessage;
 pub use random::Service;
 
@@ -28,6 +38,7 @@ pub fn make_extension() -> Extension {
     ops.append(&mut random::get_op_decls());
     ops.append(&mut server_info::get_op_decls());
     ops.append(&mut sysinfo::get_op_decls());
+    ops.append(&mut database::get_op_decls());
 
     Extension::builder("homeval").ops(ops).build()
 }

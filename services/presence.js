@@ -19,7 +19,7 @@ class Service extends ServiceBase {
 
         await this.send(roster, session)
         
-        const _user = process.getUserInfo(session);
+        const _user = await process.getUserInfo(session);
         
         const user = {
             id: _user.id,

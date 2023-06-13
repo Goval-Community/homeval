@@ -8,10 +8,14 @@ repository = "https://github.com/goval-community/homeval/"
 description = """A custom implementation of replits evaluation protocol.
 See https://govaldocs.pages.dev"""
 
+[workspace]
+members = [".", "migration", "entity"]
+
 [features]
-default = ["replspace"]
-replspace = ["axum"]
-fun-stuff = ["chrono", "chrono-tz"]
+default = ["replspace", "database"]
+database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
+replspace = ["dep:axum"]
+fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 
 [dependencies]
 deno_core = "0.189.0"
@@ -41,9 +45,17 @@ deadqueue = { version = "0.2.4", default-features = false, features = ["unlimite
 similar = "2.2.1"
 prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt/", rev="15bc0a06"}
 toml = "0.7.4"
+textnonce = "1.0.0"
+
+
 chrono = { version = "0.4.26", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
 chrono-tz =  { version = "0.8.2", optional = true }
-textnonce = "1.0.0"
+
+
+sea-orm = { version = "0.11.3", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
+migration = { path = "migration", optional = true}
+entity = { path = "entity", optional = true}
+sea-query = { version = "0.28.5", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"

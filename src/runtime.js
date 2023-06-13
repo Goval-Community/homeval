@@ -29,7 +29,7 @@
 })(globalThis);
 
 globalThis.fs = {
-	stat: async (path) => {
+	async stat(path) {
 		try {
 			return await Deno.core.ops.op_stat_file(path)
 		} catch(err) {
@@ -37,25 +37,25 @@ globalThis.fs = {
 			return { exists: false }
 		}
 	},
-	readDir: async (path) => {
+	async readDir(path) {
 		return await Deno.core.ops.op_list_dir(path);
 	},
-	writeFile: async (path, contents = []) => {
+	async writeFile(path, contents = []) {
 		return await Deno.core.ops.op_write_file(path, contents);
 	},
-	writeFileString: async (path, contents = "") => {
+	async writeFileString(path, contents = "") {
 		return await Deno.core.ops.op_write_file_string(path, contents);
 	},
-	readFile: async (path) => {
+	async readFile(path) {
 		return await Deno.core.ops.op_read_file(path);
 	},
-	readFileString: async (path) => {
+	async readFileString(path) {
 		return await Deno.core.ops.op_read_file_string(path);
 	},
-	remove: async (path) => {
+	async remove(path) {
 		return await Deno.core.ops.op_remove_file(path);
 	},
-	rename: async (oldPath, newPath) => {
+	async rename(oldPath, newPath) {
 		return await Deno.core.ops.op_move_file(oldPath, newPath);
 	},
 };
@@ -371,14 +371,40 @@ globalThis.process = {
 		},
 	}),
 	system: {
-		cpuTime: async () => {
+		async cpuTime() {
 			return await Deno.core.ops.op_cpu_info()
 		},
-		memoryUsage: async () => {
+		async memoryUsage() {
 			return await Deno.core.ops.op_memory_info()
 		},
-		diskUsage: async () => {
+		async diskUsage() {
 			return await Deno.core.ops.op_disk_info();
+		}
+	},
+	database: {
+		_supported: null,
+		get supported() {
+			if (process.database._supported != null) {
+				return process.database._supported
+			}
+
+			let support = Deno.core.ops.op_database_exists();
+			process.database._supported = support;
+			return support;
+		},
+		async getFile(name) {
+			if (!process.database.supported) {
+				throw new Error("No database support :/")
+			}
+
+			return await Deno.core.ops.op_database_get_file(name)
+		},
+		async setFile(file_model) {
+			if (!process.database.supported) {
+				throw new Error("No database support :/")
+			}
+
+			return await Deno.core.ops.op_database_set_file(file_model)
 		}
 	},
 	server: {
@@ -389,19 +415,19 @@ globalThis.process = {
 		description: Deno.core.ops.op_server_description,
 		uptime: Deno.core.ops.op_server_uptime,
 		services: Deno.core.ops.op_get_supported_services,
-		authors: () => {
+		authors() {
 			const authors = Deno.core.ops.op_server_authors();
 			return authors.split(":")
 		}
 	},
-	getUserInfo: (session) => {
-		return Deno.core.ops.op_user_info(session)
+	async getUserInfo(session) {
+		return await Deno.core.ops.op_user_info(session)
 	},
-	getDotreplitConfig: () => {
+	getDotreplitConfig() {
 		return Deno.core.ops.op_get_dotreplit_config()
 	},
 
-	quickCommand: async (args, channel, sessions, env = {}) => {
+	async quickCommand(args, channel, sessions, env = {}) {
 		return await Deno.core.ops.op_run_cmd(args, channel, sessions, env)
 	}
 };
