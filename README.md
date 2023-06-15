@@ -20,19 +20,23 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 ## Installation
 1. Git clone the repository
 2. Install required dependencies
-    * `curl -fsSL https://bun.sh/install | bash`
-        * If you are on windows install `yarn` v1 and `npx` instead
-    * `sudo apt install protobuf-compiler`
-    * `curl --proto '=https' --tlsv1.3 https://sh.rustup.rs/ -sSf | sh`
+    * If on macOS or linux: [Bun](https://bun.sh/) and [Git](https://git-scm.com/downloads)
+    * If on windows: [Node.js](https://nodejs.org/en/download), [Yarn v1](https://classic.yarnpkg.com/lang/en/docs/install/#windows-stable) and [Git for Windows](https://gitforwindows.org/)
+    * The [Protobuf Compiler](https://github.com/protocolbuffers/protobuf/releases)
+        * If using a debian linux based distro just run: `sudo apt install protobuf-compiler`
+    * [Rustup](https://rustup.rs/)
     * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
+
+## ⚠️ Notice for windows users
+On windows `cargo run` as well as invoking the built binary must happen inside the [Git Bash](https://gitforwindows.org/) shell.
+
+Console and shell will not work, this will be fixed later. You should submit a bug report for other broken features.
 
 ## Building
 
 Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). 
 
 ## Running
-> ⚠️ On windows you have to run it with `cargo run --profile=release` due to rusty_v8 related issues.
-
 To compile and run a debug build use `cargo run`.
 
 # Implementing a service
@@ -43,8 +47,27 @@ Make a new file in `services/` name it with the format `<service name>.js` then 
 
 # Supported targets
 
-All linux distros with an up to date enough GLIBC should work. The only distro official tested however is arch linux.
 
-Using musl libc, Windows, or MacOS is not officially supported right now. You might encounter roadblocks attempting to compile targeting any of these targets.
+| Target  | Will Compile | Officially Supported | Feature Complete | Tested[^testing] |
+| --- | --- | --- | --- | --- |
+| Linux[^linux]  | ✅ | ✅ | ✅ | ✅[^linux-tests] |
+| macOS[^macos]  | ✅ | ✅ | ✅ | ❎ | 
+| Windows | ✅ | ✅ | ❎[^windows] | ❎ |
 
-__Official windows support is a WIP.__
+
+[^testing]: This marks if every release is officially tested for this target.
+
+[^macos]: Please not that PotentialStyx (the main dev) does not have any machines that run macOS, so issues on macOS might take longer to fix.
+
+[^linux]: The distro has to have an up to date GLIBC version, musl is not supported. 
+
+[^linux-tests]: Currently, the only tested distribution is arch linux. Though all distros with an up to date GLIC *should* work.
+
+[^windows]: Shell and Console support are currently unavailable on windows.
+
+# TODO:
+
+- [ ] Embedded repldb server
+- [ ] Have windows builds feature complete
+- [ ] Debugger support
+- [ ] Audio channel support
