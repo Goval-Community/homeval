@@ -24,9 +24,9 @@ fn main() {
     let runner;
     if cfg!(target_os = "windows") {
         // Run: yarn install
-        output = Command::new("yarn")
-            .arg("install")
-            .arg("--pure-lockfile")
+        output = Command::new("cmd")
+            .arg("/C")
+            .arg("yarn install --pure-lockfile")
             .output()
             .expect("Getting yarn output failed");
         runner = "yarn";
@@ -44,7 +44,7 @@ fn main() {
 
     let out_file = format!("--outfile={}/api.js", std::env::var("OUT_DIR").unwrap());
 
-    let esbuild_args = vec![
+    let mut esbuild_args = vec![
         "esbuild",
         "src/api.js",
         "--bundle",
@@ -57,10 +57,13 @@ fn main() {
     let runner;
     if cfg!(target_os = "windows") {
         // Run: npx esbuild ...
-        output = Command::new("npx")
-            .args(esbuild_args)
+        let mut cmd_arg = vec!["npx"];
+        cmd_arg.append(&mut esbuild_args);
+        output = Command::new("cmd")
+            .arg("/C")
+            .arg(cmd_arg.join(" "))
             .output()
-            .expect("Getting `yarn dlx esbuild ...` output failed");
+            .expect("Getting `npx esbuild ...` output failed");
         runner = "npx";
     } else {
         // Run: bun x esbuild ...
