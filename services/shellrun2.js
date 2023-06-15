@@ -13,6 +13,8 @@ class Service extends ServiceBase {
             this.pty.init(this.clients).then(_ => {
                 console.debug("shell pty obtained:", this.pty.id)
             })
+        } else {
+            console.warn("Console isn't supported on windows")
         }
     }
     
@@ -20,7 +22,7 @@ class Service extends ServiceBase {
 		if (cmd.input && this.supported) {
 			await this.pty.write(cmd.input)
 		} else if (cmd.runMain) {
-            if (this.supported) {
+            if (!this.supported) {
                 await this.send(api.Command.create({state: api.State.Running}), 0)
                 await this.send(api.Command.create({output:"[H[2J[3J\u001b[33m\u001b[39m Console is not supported for homeval on windows right now."}), 0)
                 await this.send(api.Command.create({state: api.State.Stopped}), 0)
