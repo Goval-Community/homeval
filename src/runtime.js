@@ -379,6 +379,9 @@ globalThis.process = {
 		},
 		async diskUsage() {
 			return await Deno.core.ops.op_disk_info();
+		},
+		get os() {
+			return Deno.core.ops.op_get_running_os();
 		}
 	},
 	database: {

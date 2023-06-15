@@ -20,28 +20,64 @@ fn main() {
         .compile_protos(&["src/protobufs/goval.proto"], &["src/"])
         .unwrap();
 
-    // Run: bun install
-    let output = Command::new("bun")
-        .arg("install")
-        .output()
-        .expect("Getting bun output failed");
+    let output;
+    let runner;
+    if cfg!(target_os = "windows") {
+        // Run: yarn install
+        output = Command::new("cmd")
+            .arg("/C")
+            .arg("yarn install --pure-lockfile")
+            .output()
+            .expect("Getting yarn output failed");
+        runner = "yarn";
+    } else {
+        // Run: bun install
+        output = Command::new("bun")
+            .arg("install")
+            .arg("-y")
+            .output()
+            .expect("Getting bun output failed");
+        runner = "bun";
+    }
 
-    assert!(output.status.success(), "Running bun install failed");
+    assert!(output.status.success(), "Running {} install failed", runner);
 
-    // Run: bun x esbuild src/api.js --bundle --minify --platform=browser --outfile=$OUT_DIR/api.js
-    let output = Command::new("bun")
-        .arg("x")
-        .arg("esbuild")
-        .arg("src/api.js")
-        .arg("--bundle")
-        .arg("--minify")
-        .arg("--platform=browser")
-        .arg(format!(
-            "--outfile={}/api.js",
-            std::env::var("OUT_DIR").unwrap()
-        ))
-        .output()
-        .expect("Getting esbuild output failed");
+    let out_file = format!("--outfile={}/api.js", std::env::var("OUT_DIR").unwrap());
 
-    assert!(output.status.success(), "Running esbuild failed");
+    let mut esbuild_args = vec![
+        "esbuild",
+        "src/api.js",
+        "--bundle",
+        "--minify",
+        "--platform=browser",
+        &out_file,
+    ];
+
+    let output;
+    let runner;
+    if cfg!(target_os = "windows") {
+        // Run: npx esbuild ...
+        let mut cmd_arg = vec!["npx"];
+        cmd_arg.append(&mut esbuild_args);
+        output = Command::new("cmd")
+            .arg("/C")
+            .arg(cmd_arg.join(" "))
+            .output()
+            .expect("Getting `npx esbuild ...` output failed");
+        runner = "npx";
+    } else {
+        // Run: bun x esbuild ...
+        output = Command::new("bun")
+            .arg("x")
+            .args(esbuild_args)
+            .output()
+            .expect("Getting `bun x esbuild ...` output failed");
+        runner = "bun";
+    }
+
+    assert!(
+        output.status.success(),
+        "Running esbuild via {} failed",
+        runner
+    );
 }

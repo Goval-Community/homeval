@@ -4,10 +4,6 @@
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
     <img alt="Services implemented: 14" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
-    <!--
-    uncomment when public repo
-        <a href="https://github.com/goval-community/homeval/pulls"><img alt="current # of open pull requests" src="https://img.shields.io/github/issues-pr/goval-community/homeval?color=9958f7"></a>
-    -->
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>
 </div>
@@ -24,10 +20,17 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
 ## Installation
 1. Git clone the repository
 2. Install required dependencies
-    * `curl -fsSL https://bun.sh/install | bash`
-    * `sudo apt install protobuf-compiler`
-    * `curl --proto '=https' --tlsv1.3 https://sh.rustup.rs/ -sSf | sh`
+    * If on macOS or linux: [Bun](https://bun.sh/) and [Git](https://git-scm.com/downloads)
+    * If on windows: [Node.js](https://nodejs.org/en/download), [Yarn v1](https://classic.yarnpkg.com/lang/en/docs/install/#windows-stable) and [Git for Windows](https://gitforwindows.org/)
+    * The [Protobuf Compiler](https://github.com/protocolbuffers/protobuf/releases)
+        * If using a debian linux based distro just run: `sudo apt install protobuf-compiler`
+    * [Rustup](https://rustup.rs/)
     * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
+
+## ⚠️ Notice for windows users
+On windows `cargo run` as well as invoking the built binary must happen inside the [Git Bash](https://gitforwindows.org/) shell.
+
+Console and shell will not work, this will be fixed later. You should submit a bug report for other broken features.
 
 ## Building
 
@@ -44,8 +47,27 @@ Make a new file in `services/` name it with the format `<service name>.js` then 
 
 # Supported targets
 
-All linux distros with an up to date enough GLIBC should work. The only distro official tested however is arch linux.
 
-Using musl libc, Windows, or MacOS is not officially supported right now. You might encounter roadblocks attempting to compile targeting any of these targets.
+| Target  | Will Compile | Officially Supported | Feature Complete | Tested[^testing] |
+| --- | --- | --- | --- | --- |
+| Linux[^linux]  | ✅ | ✅ | ✅ | ✅[^linux-tests] |
+| macOS[^macos]  | ✅ | ✅ | ✅ | ❎ | 
+| Windows | ✅ | ✅ | ❎[^windows] | ❎ |
 
-__Official windows support is a WIP.__
+
+[^testing]: This marks if every release is officially tested for this target.
+
+[^macos]: Please not that PotentialStyx (the main dev) does not have any machines that run macOS, so issues on macOS might take longer to fix.
+
+[^linux]: The distro has to have an up to date GLIBC version, musl is not supported. 
+
+[^linux-tests]: Currently, the only tested distribution is arch linux. Though all distros with an up to date GLIC *should* work.
+
+[^windows]: Shell and Console support are currently unavailable on windows.
+
+# TODO:
+
+- [ ] Embedded repldb server
+- [ ] Have windows builds feature complete
+- [ ] Debugger support
+- [ ] Audio channel support
