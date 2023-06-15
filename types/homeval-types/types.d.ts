@@ -164,6 +164,7 @@ declare global {
                 total: number,
                 free: number
             }>;
+            let os: string;
         }
 
         namespace server {

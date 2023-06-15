@@ -46,6 +46,11 @@ fn op_get_dotreplit_config() -> Result<DotReplit, AnyError> {
     Ok(crate::DOTREPLIT_CONFIG.clone())
 }
 
+#[op]
+fn op_get_running_os() -> Result<String, AnyError> {
+    Ok(std::env::consts::OS.to_string())
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         op_server_name::decl(),
@@ -58,5 +63,7 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_get_supported_services::decl(),
         // Config
         op_get_dotreplit_config::decl(),
+        // System info
+        op_get_running_os::decl(),
     ]
 }
