@@ -18,7 +18,6 @@ pub async fn start_server() -> Result<(), AnyError> {
         .route("/files/open", post(open_file))
         .route("/github/token", get(get_gh_token));
 
-    // run it with hyper on 127.0.0.1:3000
     axum::Server::bind(&"127.0.0.1:8283".parse().unwrap())
         .serve(app.into_make_service())
         .await?;

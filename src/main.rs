@@ -43,6 +43,9 @@ use config::dotreplit::DotReplit;
 #[cfg(feature = "replspace")]
 mod replspace;
 
+#[cfg(feature = "repldb")]
+mod repldb_server;
+
 use lazy_static::lazy_static;
 lazy_static! {
     pub static ref START_TIME: Instant = Instant::now();
@@ -104,6 +107,8 @@ lazy_static! {
 
     static ref REPLSPACE_CALLBACKS: Arc<RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>> =
         Arc::new(RwLock::new(HashMap::new()));
+
+    static ref CHILD_PROCS_ENV_BASE: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
 }
 
 #[cfg(feature = "database")]
@@ -127,6 +132,9 @@ async fn main() -> Result<(), Error> {
 
     #[cfg(feature = "replspace")]
     tokio::spawn(replspace::start_server());
+
+    #[cfg(feature = "repldb")]
+    tokio::spawn(repldb_server::start_server());
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
