@@ -91,8 +91,14 @@ async fn op_register_pty(
     _args: Vec<String>,
     channel: i32,
     sessions: Option<Vec<i32>>,
-    env: Option<HashMap<String, String>>,
+    _env: Option<HashMap<String, String>>,
 ) -> Result<u32, AnyError> {
+    let mut env = crate::CHILD_PROCS_ENV_BASE.read().await.clone();
+
+    if let Some(env_vars) = _env {
+        env.extend(env_vars);
+    }
+
     let pty_system = portable_pty::native_pty_system();
 
     // Create a new pty
@@ -117,10 +123,8 @@ async fn op_register_pty(
     }
     cmd.cwd(std::env::current_dir()?);
 
-    if let Some(env_vars) = env {
-        for (key, val) in env_vars.into_iter() {
-            cmd.env(key, val)
-        }
+    for (key, val) in env.into_iter() {
+        cmd.env(key, val)
     }
 
     let child = pair.slave.spawn_command(cmd)?;
