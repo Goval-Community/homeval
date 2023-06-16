@@ -1,6 +1,6 @@
 [package]
 name = "homeval"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0-only"
 authors = ["PotentialStyx <62217716+PotentialStyx@users.noreply.github.com>"]
@@ -12,7 +12,8 @@ See https://govaldocs.pages.dev"""
 members = [".", "migration", "entity"]
 
 [features]
-default = ["replspace", "database"]
+default = ["replspace", "database", "repldb"]
+repldb = ["database", "dep:axum"]
 database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
 replspace = ["dep:axum"]
 fun-stuff = ["dep:chrono", "dep:chrono-tz"]
