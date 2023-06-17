@@ -1,5 +1,6 @@
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 
+use deno_core::Extension;
 use prost_build::Config;
 extern crate prost_build;
 
@@ -7,6 +8,8 @@ fn main() {
     // Only rerun if a protobuf changed, or api.js/package.json is changed
     println!("cargo:rerun-if-changed=src/protobufs");
     println!("cargo:rerun-if-changed=src/api.js");
+    println!("cargo:rerun-if-changed=src/runtime.js");
+
     println!("cargo:rerun-if-changed=package.json");
 
     // Compile protobufs
@@ -80,4 +83,47 @@ fn main() {
         "Running esbuild via {} failed",
         runner
     );
+
+    // TODO: snapshot api.js as well
+    let homeval_extension = Extension::builder("homeval")
+        .js(
+            vec![
+                deno_core::ExtensionFileSource {
+                    specifier: concat!("ext:homeval", "/", "src/runtime.js"),
+                    code: deno_core::ExtensionFileSourceCode::LoadedFromFsDuringSnapshot(
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/runtime.js"),
+                    ),
+                },
+                deno_core::ExtensionFileSource {
+                    specifier: concat!("ext:homeval", "/", "gen/api.js"),
+                    code: deno_core::ExtensionFileSourceCode::LoadedFromFsDuringSnapshot(
+                        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("api.js"),
+                    ),
+                },
+            ],
+            // include_js_files!(homeval "src/runtime.js",),
+        )
+        .build();
+
+    // Build the file path to the snapshot.
+    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    let snapshot_path = out_dir.join("HOMEVAL_JS_SNAPSHOT.bin");
+
+    // Create the snapshot.
+    for file in
+        deno_core::snapshot_util::create_snapshot(deno_core::snapshot_util::CreateSnapshotOptions {
+            cargo_manifest_dir: env!("CARGO_MANIFEST_DIR"),
+            snapshot_path,
+            startup_snapshot: None,
+            extensions: vec![homeval_extension],
+            compression_cb: None,
+            snapshot_module_load_cb: None,
+        })
+        .files_loaded_during_snapshot
+    {
+        println!(
+            "cargo:rerun-if-changed={}",
+            file.into_os_string().into_string().unwrap()
+        )
+    }
 }

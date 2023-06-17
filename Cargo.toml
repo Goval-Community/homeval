@@ -19,7 +19,7 @@ replspace = []
 fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 
 [dependencies]
-deno_core = "0.189.0"
+deno_core = "0.191.0"
 env_logger = "0.10.0"
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
@@ -58,3 +58,4 @@ sea-query = { version = "0.28.5", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"
+deno_core = { version = "0.191.0", features = ["include_js_files_for_snapshotting"] }
