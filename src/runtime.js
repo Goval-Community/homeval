@@ -1,4 +1,3 @@
-Deno.core.initializeAsyncOps();
 // @ts-nocheck
 // rome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
 ((globalThis) => {
@@ -30,25 +29,33 @@ Deno.core.initializeAsyncOps();
 })(globalThis);
 
 globalThis.fs = {
-	readDir: async (path) => {
+	async stat(path) {
+		try {
+			return await Deno.core.ops.op_stat_file(path)
+		} catch(err) {
+			// file doesnt exist
+			return { exists: false }
+		}
+	},
+	async readDir(path) {
 		return await Deno.core.ops.op_list_dir(path);
 	},
-	writeFile: async (path, contents = []) => {
+	async writeFile(path, contents = []) {
 		return await Deno.core.ops.op_write_file(path, contents);
 	},
-	writeFileString: async (path, contents = "") => {
+	async writeFileString(path, contents = "") {
 		return await Deno.core.ops.op_write_file_string(path, contents);
 	},
-	readFile: async (path) => {
+	async readFile(path) {
 		return await Deno.core.ops.op_read_file(path);
 	},
-	readFileString: async (path) => {
+	async readFileString(path) {
 		return await Deno.core.ops.op_read_file_string(path);
 	},
-	remove: async (path) => {
+	async remove(path) {
 		return await Deno.core.ops.op_remove_file(path);
 	},
-	rename: async (oldPath, newPath) => {
+	async rename(oldPath, newPath) {
 		return await Deno.core.ops.op_move_file(oldPath, newPath);
 	},
 };
@@ -88,6 +95,8 @@ class ServiceBase {
 			await this.process_dead(message.processDead[0], message.processDead[1])
 		} else if (message.cmdDead != null) {
 			await this.process_dead(-1, message.cmdDead)
+		} else if (message.replspace) {
+			await this.on_replspace(message.replspace[0], message.replspace[1])
 		} else {
 			console.error("Unknown IPC message", message);
 		}
@@ -162,6 +171,12 @@ class ServiceBase {
 	}
 
 	async detach(_session, _forced) {}
+
+	async on_replspace(_session, _msg) {}
+
+	async replspace_reply(nonce, message) {
+		await Deno.core.ops.op_replspace_reply(nonce, message);
+	}
 }
 
 class PtyProcess {
@@ -355,7 +370,85 @@ globalThis.process = {
 			throw new Error("Setting env vars is currently unimplemented");
 		},
 	}),
-	getUserInfo: (session) => {
-		return Deno.core.ops.op_user_info(session)
+	system: {
+		async cpuTime() {
+			return await Deno.core.ops.op_cpu_info()
+		},
+		async memoryUsage() {
+			return await Deno.core.ops.op_memory_info()
+		},
+		async diskUsage() {
+			return await Deno.core.ops.op_disk_info();
+		},
+		get os() {
+			return Deno.core.ops.op_get_running_os();
+		}
+	},
+	database: {
+		_supported: null,
+		get supported() {
+			if (process.database._supported != null) {
+				return process.database._supported
+			}
+
+			let support = Deno.core.ops.op_database_exists();
+			process.database._supported = support;
+			return support;
+		},
+		async getFile(name) {
+			if (!process.database.supported) {
+				throw new Error("No database support :/")
+			}
+
+			return await Deno.core.ops.op_database_get_file(name)
+		},
+		async setFile(file_model) {
+			if (!process.database.supported) {
+				throw new Error("No database support :/")
+			}
+
+			return await Deno.core.ops.op_database_set_file(file_model)
+		}
+	},
+	server: {
+		name() {
+			return Deno.core.ops.op_server_name()
+		},
+		version() {
+			return Deno.core.ops.op_server_version()
+		},
+		license() {
+			return Deno.core.ops.op_server_license()
+		},
+		repository() {
+			return Deno.core.ops.op_server_repository()
+		},
+		description() {
+			return Deno.core.ops.op_server_description()
+		},
+		uptime() {
+			return Deno.core.ops.op_server_uptime()
+		},
+		services() {
+			return Deno.core.ops.op_get_supported_services()
+		},
+		authors() {
+			const authors = Deno.core.ops.op_server_authors();
+			return authors.split(":")
+		}
+	},
+	async getUserInfo(session) {
+		return await Deno.core.ops.op_user_info(session)
+	},
+	getDotreplitConfig() {
+		return Deno.core.ops.op_get_dotreplit_config()
+	},
+
+	async quickCommand(args, channel, sessions, env = {}) {
+		return await Deno.core.ops.op_run_cmd(args, channel, sessions, env)
 	}
 };
+
+globalThis.diffText = async (old_text, new_text) => {
+	return await Deno.core.ops.op_diff_texts(old_text, new_text)
+}

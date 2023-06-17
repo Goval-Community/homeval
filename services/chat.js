@@ -1,3 +1,5 @@
+// console.log(globalThis.ServiceBase, globalThis.cookie, globalThis.cookie1, console.log)
+// console.mod()
 class Service extends ServiceBase {
     constructor(...args) {
         super(...args)

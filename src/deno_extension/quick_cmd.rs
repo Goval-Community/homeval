@@ -19,8 +19,14 @@ async fn op_run_cmd(
     _args: Vec<String>,
     channel: i32,
     sessions: Vec<i32>,
-    env: Option<HashMap<String, String>>,
+    _env: Option<HashMap<String, String>>,
 ) -> Result<i32, AnyError> {
+    let mut env = crate::CHILD_PROCS_ENV_BASE.read().await.clone();
+
+    if let Some(env_vars) = _env {
+        env.extend(env_vars);
+    }
+
     let args = &mut VecDeque::from(_args.to_vec());
     let mut cmd = Command::new(VecDeque::pop_front(args).expect("Missing command"));
     for arg in args {
@@ -28,9 +34,7 @@ async fn op_run_cmd(
     }
     cmd.current_dir(std::env::current_dir()?);
 
-    if let Some(env_vars) = env {
-        cmd.envs(env_vars);
-    }
+    cmd.envs(env);
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -57,7 +61,7 @@ async fn op_run_cmd(
     output_cmd.channel = channel;
 
     for session in sessions.iter() {
-        if let Some(sender) = crate::SESSION_MAP.read(session).get() {
+        if let Some(sender) = crate::SESSION_MAP.read().await.get(session) {
             let mut to_send = output_cmd.clone();
             to_send.session = *session;
 

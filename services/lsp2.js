@@ -6,7 +6,7 @@ class Service extends ServiceBase {
 
         this.dead_procs = []
 
-        this.config = Deno.core.ops.op_get_dotreplit_config()
+        this.config = process.getDotreplitConfig()
     }
     
 	async recv(cmd, session) {
@@ -22,7 +22,6 @@ class Service extends ServiceBase {
             this.running = true
 
             const _args = this.config.languages[cmd.startLSP.languageServerId].languageServer.start.args
-            console.log(cmd.startLSP.languageServerId, _args)
 
             const runcmd = _args[0];
             const args = _args.slice(1)

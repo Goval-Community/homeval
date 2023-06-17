@@ -24,26 +24,73 @@ class Service extends ServiceBase {
 
 		if (cmd.otLinkFile) {
 			const path = cmd.otLinkFile.file.path;
-			const content = await fs.readFile(path);
+			const fstat = await fs.stat(path);
+			
+			if (!fstat.exists) {
+				return api.Command.create({error: `${path}: no such file or directory`})
+			}
+
+			let db_file = null;
+
+			if (process.database.supported) {
+				db_file = await process.database.getFile(path)
+				if (db_file) {	
+					console.debug("Database has entry for file", path)
+				} else {
+					console.debug("Database missing entry for file", path)
+				}
+			}
 
 			this.watcher.watch([path])
 
 			this.path = path
-			this.contents = await fs.readFileString(path);
 
-			this.history.push({
-				spookyVersion: this.version,
-				op: [{insert: this.contents}],
-				crc32: CRC32.str(this.contents),
-				committed: {
-					seconds: (Date.now()/ 1000n).toString(),
-					nanos: 0
-				},
-				version: this.version,
-				author: api.OTPacket.Author.USER,
-				// use https://replit.com/@homeval for initial insert
-				userId: 23352071
-			})
+			const content = await fs.readFile(path);
+			const file_crc32 = CRC32.buf(content);
+			if (db_file) {
+				this.history = db_file.history.map(JSON.parse)
+				this.version = this.history.length
+
+				if (db_file.crc32 !== file_crc32) {
+					this.contents = await fs.readFileString(path);
+					this.version += 1
+					let diff = await diffText(db_file.contents, await fs.readFileString(this.path))
+
+					this.history.push({
+						spookyVersion: this.version,
+						op: diff,
+						crc32: file_crc32,
+						committed: {
+							seconds: (Date.now()/ 1000n).toString(),
+							nanos: 0
+						},
+						version: this.version,
+						author: api.OTPacket.Author.USER,
+						// use https://replit.com/@homeval for diffed insert
+						userId: 23352071
+					})
+				} else {
+					this.contents = db_file.contents
+				}
+			} else {
+				this.contents = await fs.readFileString(path);
+				this.history = [{
+					spookyVersion: this.version,
+					op: [{insert: this.contents}],
+					crc32: file_crc32,
+					committed: {
+						seconds: (Date.now()/ 1000n).toString(),
+						nanos: 0
+					},
+					version: this.version,
+					author: api.OTPacket.Author.USER,
+					// use https://replit.com/@homeval for initial insert
+					userId: 23352071
+				}]
+			}
+
+			await this.save_to_db(file_crc32, this.contents)
+
 
 			return api.Command.create({otLinkFileResponse:{version:this.version, linkedFile:{path, content}}})
 		} else if (cmd.ot) {
@@ -79,8 +126,8 @@ class Service extends ServiceBase {
 			this.version += 1
 			this.contents = final_contents
 
-			let userId = 0; 
-			
+			let userId = cmd.ot.userId; 
+						
 			if (cmd.ot.author !== api.OTPacket.Author.GHOSTWRITER) {
 				if (this.session_info[session]) {
 					userId = this.session_info[session].id
@@ -91,10 +138,12 @@ class Service extends ServiceBase {
 				userId = 22261053
 			}
 
+			const crc32 = CRC32.str(final_contents);
+
 			const inner_packet = {
 				spookyVersion: this.version,
 				op: cmd.ot.op,
-				crc32: CRC32.str(final_contents),
+				crc32,
 				committed: {
 					seconds: (Date.now()/ 1000n).toString(),
 					nanos: 0
@@ -114,6 +163,8 @@ class Service extends ServiceBase {
 			await this.send(msg, 0)
 
 			await fs.writeFileString(this.path, final_contents)
+
+			this.save_to_db(crc32, final_contents)
 
 			return api.Command.create({
 				ok: {}
@@ -149,22 +200,32 @@ class Service extends ServiceBase {
 		}
 	}
 
+	async save_to_db(crc32, contents) {
+		if (process.database.supported) {
+			await process.database.setFile({
+				history: this.history.map(JSON.stringify),
+				name: this.path,
+				contents,
+				crc32,
+			})
+		}
+	}
+
 	async file_event(event) {
 		if (event.modify === this.path) {
-			let diff = await Deno.core.ops.op_diff_texts(this.contents, await fs.readFileString(this.path))
+			let diff = await diffText(this.contents, await fs.readFileString(this.path))
 			if (diff.length === 0) {
 				return
 			}
 
 			await this.recv(api.Command.create({ot:{op: diff}, author: api.OTPacket.Author.USER, userId: 0}), 0)
 		} else {
-			console.log(event.modify, this.path)
+			console.debug(event.modify, this.path, event)
 		}
 	}
 
 	async attach(session) {
-		this.session_info[session] = process.getUserInfo(session)
-		
+		this.session_info[session] = await process.getUserInfo(session)		
 		if (!this.path) {
 			await this.send(api.Command.create({otstatus: {}}), session)
 			return

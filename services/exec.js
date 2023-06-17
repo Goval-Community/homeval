@@ -77,7 +77,7 @@ class Service extends ServiceBase {
     
     async resource_usage(cmd) {
         const is_cpu_req = cmd === "date '+%s%N' && cat /sys/fs/cgroup/cpu/cpuacct.usage /sys/fs/cgroup/cpu/cpu.cfs_quota_us /sys/fs/cgroup/cpu/cpu.cfs_period_us /sys/fs/cgroup/memory/memory.usage_in_bytes /sys/fs/cgroup/memory/memory.soft_limit_in_bytes /sys/fs/cgroup/memory/memory.limit_in_bytes &&grep '^\\(total_rss\\|total_cache\\) ' /sys/fs/cgroup/memory/memory.stat";
-        const is_storage_req = cmd === "cat /repl/stats/subvolume_usage_bytes /repl/stats/subvolume_total_bytes";
+        const is_storage_req = cmd === "cat /repl/stats/subvolume_usage_bytes /repl/stats/subvolume_total_bytes /repl/stats/scratch_usage_bytes /repl/stats/scratch_total_bytes";
         // if (is_cpu_req) {
         //     return "date '+%s%N' && echo 100000 && echo 200000 && cat /sys/fs/cgroup/cpu/cpu.cfs_period_us /sys/fs/cgroup/memory/memory.usage_in_bytes /sys/fs/cgroup/memory/memory.soft_limit_in_bytes /sys/fs/cgroup/memory/memory.limit_in_bytes &&grep '^\\(total_rss\\|total_cache\\) ' /sys/fs/cgroup/memory/memory.stat";
         // } else 
@@ -86,12 +86,12 @@ class Service extends ServiceBase {
             let output = "";
 
             if (is_storage_req) {
-                const disk = await Deno.core.ops.op_disk_info();
-                output = `${disk.free}\n${disk.total}\n`
+                const disk = await process.system.diskUsage();
+                output = `${disk.free}\n${disk.total}\n0\n0\n`
             }
             if (is_cpu_req) {
-                const cpuTime = await Deno.core.ops.op_cpu_info();
-                const memory = await Deno.core.ops.op_memory_info();
+                const cpuTime = await process.system.cpuTime();
+                const memory = await process.system.memoryUsage();
                 const memoryUsage = memory.total - memory.free;
                 const totalMemory = memory.total
                 output = `${new Number(Date.now()) * 1000000}\n${cpuTime}\n200000\n100000\n${memoryUsage}\n${totalMemory}\n${totalMemory}\ntotal_cache 0\ntotal_rss ${memoryUsage}`
@@ -111,7 +111,8 @@ class Service extends ServiceBase {
         this.running = true
         // TODO: splitLogs, splitStderr
         let cmd = msg.args[0];
-        const env = msg.env ? msg.env : {};
+        let env = msg.env ? msg.env : {};
+        env.REPLIT_GIT_TOOLS_CHANNEL_FROM = this.id.toString()
 
         if (msg.args.length === 3 && msg.args[1] === "-c") {
             const search = "rg --json --context 0 --fixed-strings" 
@@ -128,7 +129,7 @@ class Service extends ServiceBase {
                 if (msg.args[2].slice(0, search.length) === search) {
                     await this.send(api.Command.create({state: api.State.Running}), 0)
                     msg.args[0] = "bash"
-                    const exit = await Deno.core.ops.op_run_cmd(msg.args, this.id, this.clients, env)
+                    const exit = await process.quickCommand(msg.args, this.id, this.clients, env)
 
                     await this.process_dead(-1, exit)
                     return 

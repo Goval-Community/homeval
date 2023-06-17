@@ -7,8 +7,6 @@ use log::{log, warn};
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::config::dotreplit::DotReplit;
-
 #[op]
 fn op_time_milliseconds() -> String {
     let timestamp = SystemTime::now()
@@ -88,16 +86,6 @@ fn op_get_env_var(key: String) -> Result<Option<String>, AnyError> {
     }
 }
 
-#[op]
-fn op_get_dotreplit_config() -> Result<DotReplit, AnyError> {
-    Ok(crate::DOTREPLIT_CONFIG.clone())
-}
-
-#[op]
-fn op_get_supported_services() -> Result<Vec<String>, AnyError> {
-    Ok(crate::IMPLEMENTED_SERVICES.clone())
-}
-
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         // Time
@@ -107,8 +95,5 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_console_log::decl(),
         // Env
         op_get_env_var::decl(),
-        // Config
-        op_get_dotreplit_config::decl(),
-        op_get_supported_services::decl(),
     ]
 }

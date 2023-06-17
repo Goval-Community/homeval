@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::{io::Error, time::SystemTime};
 
 use deno_core::{error::AnyError, op, OpDecl};
 use log::error;
@@ -39,6 +39,47 @@ impl FileType {
         }
 
         Ok(ret)
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileStat {
+    pub exists: bool,
+    #[serde(rename = "type")]
+    pub file_type: FileType,
+    pub size: u64,
+    pub file_mode: String,
+    pub mod_time: u64,
+}
+
+async fn inner_stat(path: String) -> Result<Option<FileStat>, AnyError> {
+    match fs::metadata(path).await {
+        Err(_) => Ok(None),
+        Ok(stat_info) => Ok(Some(FileStat {
+            exists: true,
+            file_type: FileType::from_file_type(stat_info.file_type())?,
+            size: stat_info.len(),
+            file_mode: "".to_string(),
+            mod_time: stat_info
+                .modified()?
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_secs(),
+        })),
+    }
+}
+
+// TODO: function to stat multiple files at once
+
+#[op]
+async fn op_stat_file(path: String) -> Result<FileStat, AnyError> {
+    match inner_stat(path.clone()).await? {
+        None => Err(Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("File not found: {}", path),
+        )
+        .into()),
+        Some(stat) => Ok(stat),
     }
 }
 
@@ -112,8 +153,15 @@ async fn op_write_file_string(path: String, contents: String) -> Result<(), AnyE
     Ok(())
 }
 
+#[op]
+fn op_get_working_dir() -> Result<String, AnyError> {
+    // TODO: deal with possible panic from unwrap
+    Ok(std::env::current_dir()?.to_str().unwrap().to_string())
+}
+
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
+        op_stat_file::decl(),
         op_list_dir::decl(),
         op_write_file::decl(),
         op_read_file::decl(),
@@ -121,5 +169,6 @@ pub fn get_op_decls() -> Vec<OpDecl> {
         op_move_file::decl(),
         op_read_file_string::decl(),
         op_write_file_string::decl(),
+        op_get_working_dir::decl(),
     ]
 }
