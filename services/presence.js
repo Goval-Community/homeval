@@ -11,7 +11,7 @@ class Service extends ServiceBase {
 		if (cmd.followUser) {
             await this.send(api.Command.create({followUser: {session}}), cmd.followUser.session)
         } else if (cmd.unfollowUser) {
-            await this.send(api.Command.create({unfollowUser: {session}}), cmd.followUser.session)
+            await this.send(api.Command.create({unfollowUser: {session}}), cmd.unfollowUser.session)
         } else if (cmd.openFile) {
             const user = this.session_map[session];
             
