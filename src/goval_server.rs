@@ -83,10 +83,10 @@ async fn default_handler() -> String {
 }
 
 async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr: SocketAddr) {
-    println!("Waiting for mutex...");
+    debug!("Waiting for mutex...");
     let mut max_session = MAX_SESSION.lock().await;
 
-    println!("Mutex acquired...");
+    debug!("Mutex acquired...");
     *max_session += 1;
     let session_id = max_session.clone();
 
