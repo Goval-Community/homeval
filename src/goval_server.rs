@@ -89,6 +89,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
     debug!("Mutex acquired...");
     *max_session += 1;
     let session_id = max_session.clone();
+    drop(max_session);
 
     let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
     SESSION_MAP
