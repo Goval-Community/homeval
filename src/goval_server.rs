@@ -1,8 +1,19 @@
-use axum::extract::{State, Path, ConnectInfo};
-use axum::extract::ws::WebSocket;
-use axum::response::Response;
-use axum::routing::get;
-use axum::{Router, extract::ws::{WebSocketUpgrade, Message as WsMessage}};
+use axum::{
+    extract::{
+        State, 
+        Path,
+        ConnectInfo,
+        ws::{
+            WebSocket,
+            WebSocketUpgrade,
+            Message as WsMessage,
+        }
+    },
+    response::{Response, IntoResponse},
+    routing::get,
+    Router
+};
+
 #[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 
@@ -16,9 +27,7 @@ use std::{env, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
 use log::{error, info, trace, warn, debug};
-use tokio::{
-    sync::mpsc,
-};
+use tokio::sync::mpsc;
 
 use crate::{
     MAX_CHANNEL,
@@ -52,6 +61,8 @@ struct AppState {
     sender: UnboundedSender<IPCMessage>
 }
 
+static DEFAULT_REPLY: &str = "(づ ◕‿◕ )づ Hello there";
+
 pub async fn start_server() -> Result<(), AnyError> {
     let addr = std::env::args()
         .nth(1)
@@ -61,7 +72,7 @@ pub async fn start_server() -> Result<(), AnyError> {
 
     let app = Router::new()
         .route("/wsv2/:token", get(wsv2))
-        .route("/", get(default_handler))
+        .fallback(get(default_handler))
         .with_state(AppState { sender: tx });
     info!("Goval server listening on: {}", addr);
 
@@ -78,8 +89,8 @@ pub async fn start_server() -> Result<(), AnyError> {
     Ok(())
 }
 
-async fn default_handler() -> String {
-    "(づ ◕‿◕ )づ Hello there".to_string()
+async fn default_handler() -> Response {
+    DEFAULT_REPLY.into_response()
 }
 
 async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr: SocketAddr) {
