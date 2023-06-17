@@ -1,3 +1,8 @@
+use axum::extract::{State, Path, ConnectInfo};
+use axum::extract::ws::WebSocket;
+use axum::response::Response;
+use axum::routing::get;
+use axum::{Router, extract::ws::{WebSocketUpgrade, Message as WsMessage}};
 #[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 
@@ -5,14 +10,13 @@ use deno_core::error::AnyError;
 use homeval::goval;
 use homeval::goval::Command;
 use prost::Message;
-use std::{env, io::Error, sync::Arc};
-use tokio_tungstenite::tungstenite;
-use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use tokio::sync::mpsc::UnboundedSender;
+use std::net::SocketAddr;
+use std::{env, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
 use log::{error, info, trace, warn};
 use tokio::{
-    net::{TcpListener, TcpStream},
     sync::mpsc,
 };
 
@@ -43,57 +47,90 @@ use crate::{
     services
 };
 
+#[derive(Clone)]
+struct AppState {
+    sender: UnboundedSender<IPCMessage>
+}
+
 pub async fn start_server() -> Result<(), AnyError> {
     let addr = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
-
-    // Create the event loop and TCP listener we'll accept connections on.
-    let try_socket = TcpListener::bind(&addr).await;
-    let listener = try_socket.expect("Failed to bind");
-    info!("Goval server listening on: {}", addr);
-
+    
     let (tx, mut rx) = mpsc::unbounded_channel::<IPCMessage>();
 
-    let session_map_clone = SESSION_MAP.clone();
+    let app = Router::new()
+        .route("/wsv2/:token", get(wsv2))
+        .route("/", get(default_handler))
+        .with_state(AppState { sender: tx });
+    info!("Goval server listening on: {}", addr);
 
     tokio::spawn(async move {
-        while let Ok((stream, _)) = listener.accept().await {
-            println!("Waiting for mutex...");
-            let mut max_session = MAX_SESSION.lock().await;
-
-            println!("Mutex acquired...");
-            *max_session += 1;
-            let session_id = max_session.clone();
-
-            let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
-            session_map_clone
-                .write()
-                .await
-                .insert(session_id, send_to_session);
-
-            let tx_clone = tx.clone();
-            tokio::spawn(async move {
-                match accept_connection(stream, tx_clone, session_recv, session_id).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!("accept_connection errored: {}", err)
-                    }
-                }
-            });
-        }
+        axum::Server::bind(&addr.parse().unwrap())
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+        .await.unwrap()
     });
 
-    let session_map_clone = SESSION_MAP.clone();
     while let Some(message) = rx.recv().await {
-        let cmd: Command;
+        handle_message(message, SESSION_MAP.clone()).await;
+    }
+
+    Ok(())
+}
+
+async fn default_handler() -> String {
+    "(づ ◕‿◕ )づ Hello there".to_string()
+}
+
+async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr: SocketAddr) {
+    println!("Waiting for mutex...");
+    let mut max_session = MAX_SESSION.lock().await;
+
+    println!("Mutex acquired...");
+    *max_session += 1;
+    let session_id = max_session.clone();
+
+    let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
+    SESSION_MAP
+        .write()
+        .await
+        .insert(session_id, send_to_session);
+
+    let tx_clone = state.sender.clone();
+    match accept_connection(
+        socket,
+        tx_clone,
+        session_recv,
+        session_id,
+        parse(&token).unwrap_or(ClientInfo::default()),
+        addr
+    ).await {
+        Ok(_) => {}
+        Err(err) => {
+            error!("accept_connection errored: {}", err)
+        }
+    };
+    
+}
+
+async fn wsv2(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Path(token): Path<String>,
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>
+) -> Response {
+    ws.on_upgrade(move |socket| on_wsv2_upgrade(socket, token, state, addr))
+}
+
+async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>>) {
+    let cmd: Command;
         match message.to_cmd() {
             Err(err) => {
                 error!(
                     "Following error occured when decoding message in main loop: {}",
                     err
                 );
-                continue;
+                return;
             }
             Ok(res) => cmd = res,
         }
@@ -103,7 +140,7 @@ pub async fn start_server() -> Result<(), AnyError> {
         match cmd.body {
             None => {
                 error!("MISSING COMMAND BODY: {:#?}", cmd);
-                continue;
+                return;
             }
             Some(body) => cmd_body = body,
         }
@@ -116,7 +153,7 @@ pub async fn start_server() -> Result<(), AnyError> {
                     pong.r#ref = cmd.r#ref;
                     pong.channel = 0;
 
-                    if let Some(sender) = session_map_clone.read().await.get(&message.session) {
+                    if let Some(sender) = session_map.read().await.get(&message.session) {
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
@@ -301,14 +338,14 @@ pub async fn start_server() -> Result<(), AnyError> {
                             protocol_error.r#ref = cmd.r#ref;
                             protocol_error.channel = 0;
 
-                            session_map_clone
+                            session_map
                                 .read()
                                 .await
                                 .get(&message.session)
                                 .unwrap()
                                 .send(message.replace_cmd(protocol_error))
                                 .unwrap();
-                            continue;
+                            return;
                         }
 
                         let mut open_chan_res = goval::Command::default();
@@ -319,7 +356,7 @@ pub async fn start_server() -> Result<(), AnyError> {
                         open_chan_res.r#ref = cmd.r#ref;
                         open_chan_res.channel = 0;
 
-                        session_map_clone
+                        session_map
                             .read()
                             .await
                             .get(&message.session)
@@ -362,7 +399,7 @@ pub async fn start_server() -> Result<(), AnyError> {
                     }
 
                     if to_continue {
-                        continue;
+                        return;
                     }
                 }
             }
@@ -381,83 +418,31 @@ pub async fn start_server() -> Result<(), AnyError> {
 
             drop(hashmap_lock);
         }
-    }
-
-    Ok(())
 }
 
 async fn send_message(
     message: goval::Command,
     stream: &mut futures_util::stream::SplitSink<
-        tokio_tungstenite::WebSocketStream<TcpStream>,
-        tungstenite::Message,
+        WebSocket,
+        WsMessage,
     >,
 ) -> Result<(), AnyError> {
     let mut buf = Vec::new();
     buf.reserve(message.encoded_len());
     message.encode(&mut buf)?;
 
-    Ok(stream.send(tungstenite::Message::Binary(buf)).await?)
+    Ok(stream.send(WsMessage::Binary(buf)).await?)
 }
 
 async fn accept_connection(
-    stream: TcpStream,
+    ws_stream: WebSocket,
     propagate: mpsc::UnboundedSender<IPCMessage>,
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
     session: i32,
+    client: ClientInfo,
+    addr: SocketAddr
 ) -> Result<(), AnyError> {
-    let addr = stream.peer_addr()?;
-    trace!("New connection with peer address: {}", addr);
-
-    let _uri: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
-
-    let copy_headers_callback = |req: &Request, res: Response| -> Result<Response, ErrorResponse> {
-        let mut ptr = _uri.lock().unwrap();
-        *ptr = Some(req.uri().path().to_string());
-        drop(ptr);
-
-        Ok(res)
-    };
-
-    let ws_stream = tokio_tungstenite::accept_hdr_async(stream, copy_headers_callback).await?;
-
-    // needed due to futures stuff :/
-    let client: ClientInfo;
-    match tokio::task::spawn_blocking(move || -> Result<ClientInfo, AnyError> {
-        let __uri;
-        match _uri.lock() {
-            Ok(res) => __uri = res,
-            Err(_err) => {
-                return Err(Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Header callback paniced when setting uri",
-                )
-                .into())
-            }
-        }
-
-        let uri = __uri.clone().unwrap_or("".to_string());
-
-        let split = uri.split("/").collect::<Vec<&str>>();
-        if split.len() >= 3 {
-            return Ok(parse(split[2])?);
-        } else {
-            warn!("Request path wasnt long enough, using default user")
-        }
-
-        Ok(ClientInfo::default())
-    })
-    .await?
-    {
-        Ok(_client) => client = _client,
-        Err(err) => {
-            warn!(
-                "Error while decoding request path: {}, using default user",
-                err
-            );
-            client = ClientInfo::default();
-        }
-    }
+    info!("New connection with peer address: {}", addr);
 
     info!("New client: {:#?}", client);
 
@@ -465,8 +450,6 @@ async fn accept_connection(
         .write()
         .await
         .insert(session, client.clone());
-
-    trace!("New WebSocket connection: {}", addr);
 
     let (mut write, mut read) = ws_stream.split();
 
@@ -510,7 +493,7 @@ async fn accept_connection(
         while let Some(_msg) = read.next().await {
             match _msg {
                 Ok(msg) => match msg {
-                    tungstenite::Message::Binary(buf) => {
+                    WsMessage::Binary(buf) => {
                         if let Err(err) = propagate.send(IPCMessage {
                             bytes: buf,
                             session,
@@ -518,7 +501,7 @@ async fn accept_connection(
                             error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
                         }
                     }
-                    tungstenite::Message::Close(_) => {
+                    WsMessage::Close(_) => {
                         warn!("CLOSING SESSION {}", session);
                         for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
                         {
@@ -552,7 +535,7 @@ async fn accept_connection(
     });
 
     while let Some(i) = sent.recv().await {
-        match write.send(tungstenite::Message::Binary(i.bytes)).await {
+        match write.send(WsMessage::Binary(i.bytes)).await {
             Ok(_) => {}
             Err(err) => {
                 error!(

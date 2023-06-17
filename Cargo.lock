@@ -128,6 +128,7 @@ checksum = "f8175979259124331c1d7bf6586ee7e0da434155e4b2d48ec2c8386281d8df39"
 dependencies = [
  "async-trait",
  "axum-core",
+ "base64 0.21.2",
  "bitflags",
  "bytes",
  "futures-util",
@@ -145,8 +146,10 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+ "sha1",
  "sync_wrapper",
  "tokio",
+ "tokio-tungstenite",
  "tower",
  "tower-layer",
  "tower-service",
@@ -995,7 +998,6 @@ dependencies = [
  "log",
  "migration",
  "notify-debouncer-full",
- "os_pipe",
  "portable-pty",
  "prost",
  "prost-build",
@@ -1010,7 +1012,6 @@ dependencies = [
  "textnonce",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
  "toml 0.7.4",
 ]
 
@@ -1508,16 +1509,6 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
-
-[[package]]
-name = "os_pipe"
-version = "1.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ae859aa07428ca9a929b936690f8b12dc5f11dd8c6992a18ca93919f28bc177"
-dependencies = [
- "libc",
- "windows-sys 0.48.0",
-]
 
 [[package]]
 name = "os_str_bytes"
