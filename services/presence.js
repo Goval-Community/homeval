@@ -65,7 +65,7 @@ class Service extends ServiceBase {
         const user = this.session_map[session];
         delete this.files[session];
 
-        await this.senc(api.Command.create({
+        await this.send(api.Command.create({
             part: {
                 id: user.id,
                 name: user.username,
