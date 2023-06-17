@@ -15,7 +15,7 @@ use std::net::SocketAddr;
 use std::{env, sync::Arc};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, trace, warn};
+use log::{error, info, trace, warn, debug};
 use tokio::{
     sync::mpsc,
 };
