@@ -5,7 +5,7 @@ use axum::{
     Form, Router,
 };
 use deno_core::error::AnyError;
-use entity::repl_db as repldb;
+use entity::repldb;
 use log::{error, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_query::OnConflict;
