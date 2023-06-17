@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process::Command};
 
-use deno_core::{include_js_files, Extension};
+use deno_core::Extension;
 use prost_build::Config;
 extern crate prost_build;
 
@@ -86,7 +86,23 @@ fn main() {
 
     // TODO: snapshot api.js as well
     let homeval_extension = Extension::builder("homeval")
-        .js(include_js_files!(homeval "src/runtime.js",))
+        .js(
+            vec![
+                deno_core::ExtensionFileSource {
+                    specifier: concat!("ext:homeval", "/", "src/runtime.js"),
+                    code: deno_core::ExtensionFileSourceCode::LoadedFromFsDuringSnapshot(
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/runtime.js"),
+                    ),
+                },
+                deno_core::ExtensionFileSource {
+                    specifier: concat!("ext:homeval", "/", "gen/api.js"),
+                    code: deno_core::ExtensionFileSourceCode::LoadedFromFsDuringSnapshot(
+                        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("api.js"),
+                    ),
+                },
+            ],
+            // include_js_files!(homeval "src/runtime.js",),
+        )
         .build();
 
     // Build the file path to the snapshot.

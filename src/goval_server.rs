@@ -24,7 +24,7 @@ use homeval::goval::Command;
 use prost::Message;
 use tokio::sync::mpsc::UnboundedSender;
 use std::net::SocketAddr;
-use std::{env, sync::Arc};
+use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
 use log::{error, info, trace, warn, debug};
@@ -290,25 +290,6 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                                             .unwrap()
                                                     )
                                                     .into(),
-                                                )
-                                                .unwrap();
-                                            // js_runtime
-                                            //     .execute_script(
-                                            //         "[goval::runtime.js]",
-                                            //         deno_core::FastString::ensure_static_ascii(
-                                            //             include_str!("./runtime.js"),
-                                            //         ),
-                                            //     )
-                                            //     .unwrap();
-                                            js_runtime
-                                                .execute_script(
-                                                    "[goval::api.js]",
-                                                    deno_core::FastString::ensure_static_ascii(
-                                                        include_str!(concat!(
-                                                            env!("OUT_DIR"),
-                                                            "/api.js"
-                                                        )),
-                                                    ),
                                                 )
                                                 .unwrap();
 
