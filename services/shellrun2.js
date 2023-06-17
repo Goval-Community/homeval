@@ -3,6 +3,7 @@ class Service extends ServiceBase {
         super(...args)
         
         this.supported = process.system.os !== "windows"
+        this.config = process.getDotreplitConfig()
 
         if (this.supported) {
             this.running = false
@@ -32,10 +33,17 @@ class Service extends ServiceBase {
                 await this.pty.destroy()
                 this.running = true
 
-                this.pty = new PtyProcess(this.id, "./target/release/homeval", ["127.0.0.1:8081"], {
+                let cmd = "echo";
+                let args = ["No run command set in your `.replit` file"]
+                if (this.config.run) {
+                    cmd = this.config.run.args[0]
+                    args = this.config.run.args.slice(1)
+                }
+
+                this.pty = new PtyProcess(this.id, cmd, args, {
                     "REPLIT_GIT_TOOLS_CHANNEL_FROM": this.id.toString()
                 })
-                await this.send(api.Command.create({output:"[H[2J[3J" + "\u001b[33m\u001b[39m ./target/release/homeval 127.0.0.1:8081\u001b[K\r\n\u001b[0m"}), 0)
+                await this.send(api.Command.create({output:"[H[2J[3J" + `\u001b[33m\u001b[39m ${cmd} ${args.join(" ")}\u001b[K\r\n\u001b[0m`}), 0)
                 await this.pty.init(this.clients)
                 console.debug("Running command now", this.pty.id)
                 await this.send(api.Command.create({state: api.State.Running}), 0)

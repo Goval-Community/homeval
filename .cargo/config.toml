@@ -6,4 +6,4 @@ linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [env]
-RUST_LOG = "DEBUG,sea_orm_migration=WARN,sqlx=WARN"
+RUST_LOG = "DEBUG,sea_orm_migration=WARN,sqlx=WARN,fnm=INFO"

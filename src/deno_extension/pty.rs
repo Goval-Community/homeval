@@ -1,5 +1,5 @@
 use futures_util::{future::abortable, stream::AbortHandle};
-use log::error;
+use log::{error, warn};
 use portable_pty::PtySize;
 use std::{
     collections::{HashMap, VecDeque},
@@ -213,7 +213,12 @@ async fn op_register_pty(
             }
             Err(_) => {
                 let mut child = child_lock.lock().await;
-                child.kill().expect("Failed to kill pty child");
+                match child.kill() {
+                    Ok(_) => {}
+                    Err(err) => {
+                        warn!("Failed to kill pty child: {}", err)
+                    }
+                }
                 drop(child);
             }
         }
