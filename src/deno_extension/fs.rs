@@ -1,4 +1,4 @@
-use std::{io::Error, os::unix::prelude::MetadataExt};
+use std::{io::Error, time::SystemTime};
 
 use deno_core::{error::AnyError, op, OpDecl};
 use log::error;
@@ -50,7 +50,7 @@ pub struct FileStat {
     pub file_type: FileType,
     pub size: u64,
     pub file_mode: String,
-    pub mod_time: i64,
+    pub mod_time: u64,
 }
 
 async fn inner_stat(path: String) -> Result<Option<FileStat>, AnyError> {
@@ -59,9 +59,12 @@ async fn inner_stat(path: String) -> Result<Option<FileStat>, AnyError> {
         Ok(stat_info) => Ok(Some(FileStat {
             exists: true,
             file_type: FileType::from_file_type(stat_info.file_type())?,
-            size: stat_info.size(),
+            size: stat_info.len(),
             file_mode: "".to_string(),
-            mod_time: stat_info.mtime(),
+            mod_time: stat_info
+                .modified()?
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_secs(),
         })),
     }
 }

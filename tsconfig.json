@@ -12,6 +12,10 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "typeRoots": ["types"]
-  }
+    "typeRoots": ["types"],
+  },
+  "exclude": [
+    "target",
+    "node_modules"
+  ]
 }

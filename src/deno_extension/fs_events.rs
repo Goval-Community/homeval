@@ -81,7 +81,7 @@ pub async fn op_make_filewatcher() -> Result<u32, AnyError> {
     // tokio::spawn(async move {
     let queue_debounced = queue_writer.clone();
     tokio::task::spawn_blocking(move || {
-        let debouncer: Debouncer<notify::INotifyWatcher, notify_debouncer_full::FileIdMap> =
+        let debouncer: Debouncer<RecommendedWatcher, notify_debouncer_full::FileIdMap> =
             new_debouncer(
                 Duration::from_secs(1),
                 None,

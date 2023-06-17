@@ -41,10 +41,17 @@ type ReplspaceMessage = {
     openFileRes?: {},
 }
 
+type DatabaseFile = {
+    name: string,
+    crc32: number,
+    contents: string,
+    history: string[],
+}
+
 declare global {
     // [goval::generated::globals] (generated on the fly)
 
-    var serviceInfo: {
+    let serviceInfo: {
         id: number,
         service: string,
         name: string | null,
@@ -52,10 +59,10 @@ declare global {
 
     // [goval::api.js] (api.js)
 
-    var api: typeof replit.goval.api;
-    var Buffer: typeof import("buffer").Buffer;
-    var protobufjs: typeof import("protobufjs");
-    var CRC32: typeof import("crc-32");
+    let api: typeof replit.goval.api;
+    let Buffer: typeof import("buffer").Buffer;
+    let protobufjs: typeof import("protobufjs");
+    let CRC32: typeof import("crc-32");
 
     // [goval::runtime.js] (src/runtime.js)
 
@@ -164,6 +171,15 @@ declare global {
                 total: number,
                 free: number
             }>;
+            let os: string;
+        }
+
+        namespace database {
+            let _supported: boolean;
+            const supported: boolean;
+
+            function getFile(name: string): Promise<DatabaseFile>;
+            function setFile(file_model: DatabaseFile): Promise<null>;
         }
 
         namespace server {
@@ -177,9 +193,9 @@ declare global {
             function uptime(): number;
         }
 
-        var env: { [id: string]: string | null }
+        let env: { [id: string]: string | null }
 
-        function getUserInfo(session: number): { username: string, id: number }
+        function getUserInfo(session: number): Promise<{ username: string, id: number }>
         function getDotreplitConfig(): DotReplit
 
         function quickCommand(args: string[], channel: number, sessions: number[], env: { [id: string]: string }): Promise<number>

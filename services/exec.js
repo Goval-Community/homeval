@@ -77,7 +77,7 @@ class Service extends ServiceBase {
     
     async resource_usage(cmd) {
         const is_cpu_req = cmd === "date '+%s%N' && cat /sys/fs/cgroup/cpu/cpuacct.usage /sys/fs/cgroup/cpu/cpu.cfs_quota_us /sys/fs/cgroup/cpu/cpu.cfs_period_us /sys/fs/cgroup/memory/memory.usage_in_bytes /sys/fs/cgroup/memory/memory.soft_limit_in_bytes /sys/fs/cgroup/memory/memory.limit_in_bytes &&grep '^\\(total_rss\\|total_cache\\) ' /sys/fs/cgroup/memory/memory.stat";
-        const is_storage_req = cmd === "cat /repl/stats/subvolume_usage_bytes /repl/stats/subvolume_total_bytes";
+        const is_storage_req = cmd === "cat /repl/stats/subvolume_usage_bytes /repl/stats/subvolume_total_bytes /repl/stats/scratch_usage_bytes /repl/stats/scratch_total_bytes";
         // if (is_cpu_req) {
         //     return "date '+%s%N' && echo 100000 && echo 200000 && cat /sys/fs/cgroup/cpu/cpu.cfs_period_us /sys/fs/cgroup/memory/memory.usage_in_bytes /sys/fs/cgroup/memory/memory.soft_limit_in_bytes /sys/fs/cgroup/memory/memory.limit_in_bytes &&grep '^\\(total_rss\\|total_cache\\) ' /sys/fs/cgroup/memory/memory.stat";
         // } else 
@@ -87,7 +87,7 @@ class Service extends ServiceBase {
 
             if (is_storage_req) {
                 const disk = await process.system.diskUsage();
-                output = `${disk.free}\n${disk.total}\n`
+                output = `${disk.free}\n${disk.total}\n0\n0\n`
             }
             if (is_cpu_req) {
                 const cpuTime = await process.system.cpuTime();

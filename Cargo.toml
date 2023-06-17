@@ -1,6 +1,6 @@
 [package]
 name = "homeval"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0-only"
 authors = ["PotentialStyx <62217716+PotentialStyx@users.noreply.github.com>"]
@@ -8,13 +8,18 @@ repository = "https://github.com/goval-community/homeval/"
 description = """A custom implementation of replits evaluation protocol.
 See https://govaldocs.pages.dev"""
 
+[workspace]
+members = [".", "migration", "entity"]
+
 [features]
-default = ["replspace"]
-replspace = ["axum"]
-fun-stuff = ["chrono", "chrono-tz"]
+default = ["replspace", "database", "repldb"]
+repldb = ["database"]
+database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
+replspace = []
+fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 
 [dependencies]
-deno_core = "0.174.0"
+deno_core = "0.191.0"
 env_logger = "0.10.0"
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
@@ -25,15 +30,13 @@ prost-types = "0.11.8"
 serde_json = "1.0.96"
 serde = "1.0.162"
 tokio = {version="1.26.0", features = ["full"]}
-tokio-tungstenite = "0.18.0"
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 base64 = "0.21.0"
 portable-pty = "0.8.1"
 
 include_directory = { git = "https://github.com/goval-community/include_directory.git", rev = "bea5083a" }
 futures = "0.3.28"
-os_pipe = "1.1.4"
-axum = { version = "0.6.18", optional = true }
+axum = { version = "0.6.18", features = ["ws"] }
 systemstat = "0.2.3"
 cpu-time = "1.0.0"
 notify-debouncer-full = { version = "0.1.0", default-features = false, features = ["serde"] }
@@ -41,10 +44,18 @@ deadqueue = { version = "0.2.4", default-features = false, features = ["unlimite
 similar = "2.2.1"
 prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt/", rev="15bc0a06"}
 toml = "0.7.4"
+textnonce = "1.0.0"
+
+
 chrono = { version = "0.4.26", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
 chrono-tz =  { version = "0.8.2", optional = true }
-textnonce = "1.0.0"
+
+
+sea-orm = { version = "0.11.3", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
+migration = { path = "migration", optional = true}
+entity = { path = "entity", optional = true}
+sea-query = { version = "0.28.5", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"
-deno_core = { version = "0.174.0", features = ["include_js_files_for_snapshotting"] }
+deno_core = { version = "0.191.0", features = ["include_js_files_for_snapshotting"] }
