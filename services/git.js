@@ -27,7 +27,7 @@ class Service extends ServiceBase {
 
 			await this.replspace_reply(nonce, {openFileRes: {}});
 		} else {
-			console.log("Unknown message:", cmd)
+			console.debug("Unknown message:", cmd)
 		}
 	}
 
