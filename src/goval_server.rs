@@ -40,7 +40,8 @@ use crate::{
     LAST_SESSION_USING_CHANNEL,
     IMPLEMENTED_SERVICES,
     SESSION_MAP,
-    MAX_SESSION, 
+    MAX_SESSION,
+    CHANNEL_SESSIONS, 
 };
 
 use crate::{
@@ -192,14 +193,14 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                             || open_chan.action() == goval::open_channel::Action::Create;
                         if attach {
                             let metadata = CHANNEL_METADATA.read().await;
-                            for channel in metadata.iter() {
+                            for (id, channel) in metadata.iter() {
                                 if channel.name.is_some()
                                     && channel.name.clone().unwrap_or("".to_string())
                                         == open_chan.name
                                     && channel.service.clone() == open_chan.service
                                 {
                                     found = true;
-                                    channel_id_held = channel.id.clone();
+                                    channel_id_held = id.clone();
                                     continue;
                                 }
                             }
@@ -234,8 +235,9 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                 channel_id_held,
                                 Arc::new(deadqueue::unlimited::Queue::new()),
                             );
+
                             let mut metadata = CHANNEL_METADATA.write().await;
-                            metadata.push(service_data.clone());
+                            metadata.insert(channel_id_held, service_data.clone());
                             drop(metadata);
                             trace!(channel = channel_id_held; "Added channel to queue list");
 
@@ -324,6 +326,8 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                                     error!(service = open_chan.service, err = as_error!(err); "Got error in v8 thread for service")
                                                 }
                                             }  
+
+                                            trace!(service = as_debug!(service_data); "Service v8 isolate stopped");
                                         })
                                         .await;
                                 });
@@ -375,6 +379,22 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
 
                         queue.push(JsMessage::Attach(message.session));
 
+                        
+                        let mut guard = CHANNEL_SESSIONS
+                            .write()
+                            .await;
+
+                        match guard.get_mut(&channel_id_held) {
+                            Some(arr) => {
+                                arr.push(message.session);
+                            }
+                            None => {
+                                guard.insert(channel_id_held, vec![message.session]);
+                            }
+                        }
+
+                        drop(guard);
+
                         SESSION_CHANNELS
                             .write()
                             .await
@@ -386,6 +406,10 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                             "Missing service requested by openChan"
                         )
                     }
+                }
+                goval::command::Body::CloseChan(close_chan) => {
+                    // TODO: follow close_chan.action
+                    tokio::spawn(detach_channel(close_chan.id, message.session, false));
                 }
                 _ => {}
             }
@@ -421,6 +445,57 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
 
             drop(hashmap_lock);
         }
+}
+
+async fn detach_channel(channel: i32, session: i32, forced: bool) {
+    trace!(session = session, channel = channel, forced = forced; "Client is closing a channel");
+
+    SESSION_CHANNELS
+        .write()
+        .await
+        .entry(session)
+        .and_modify(|channels| channels.retain(|chan: &i32| { chan.clone() != channel }));
+
+    let msg_lock = CHANNEL_MESSAGES.read().await;
+
+    let queue = msg_lock.get(&channel).unwrap().clone();
+
+    drop(msg_lock);
+
+    if forced {
+        queue.push(JsMessage::Close(session));
+    } else {
+        queue.push(JsMessage::Detach(session));
+    }
+
+    trace!("Waiting for sessions lock");
+    let mut guard = CHANNEL_SESSIONS.write().await;
+    trace!("Done waiting for sessions lock");
+
+    match guard.get_mut(&channel) {
+        Some(arr) => { 
+            arr.retain(|sess| { sess.clone() != session });
+            if arr.len() == 0 {
+                trace!(channel = channel; "Shutting down channel");
+                queue.push(JsMessage::Shutdown(true));
+
+                tokio::spawn(async move {
+                    CHANNEL_METADATA.write().await.remove(&channel);
+                    CHANNEL_SESSIONS.write().await.remove(&channel);
+                    PROCCESS_CHANNEL_TO_ID.write().await.remove(&channel);
+                    LAST_SESSION_USING_CHANNEL.write().await.remove(&channel);
+                });
+            } else {
+                trace!(sessions = as_debug!(arr); "Sessions still remain on channel");
+            }
+        }
+        None => {
+            warn!(channel = channel; "Missing CHANNEL_SESSIONS");
+
+        }
+    }
+
+    drop(guard);
 }
 
 async fn send_message(
@@ -509,15 +584,7 @@ async fn accept_connection(
                         for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
                         {
                             let channel = _channel.clone();
-                            tokio::spawn(async move {
-                                let msg_lock = CHANNEL_MESSAGES.read().await;
-
-                                let queue = msg_lock.get(&channel).unwrap().clone();
-
-                                drop(msg_lock);
-
-                                queue.push(JsMessage::Close(session));
-                            });
+                            tokio::spawn(detach_channel(channel, session, true));
                         }
 
                         SESSION_MAP.write().await.remove(&session);

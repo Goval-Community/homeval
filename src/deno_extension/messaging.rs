@@ -1,5 +1,5 @@
 use deno_core::{error::AnyError, op, OpDecl};
-use log::{as_debug, error};
+use log::{as_debug, error, trace};
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 
@@ -26,6 +26,7 @@ pub enum JsMessage {
     ProcessDead(u32, i32),
     CmdDead(i32),
     Replspace(i32, ReplspaceMessage), // session, message
+    Shutdown(bool), // Shutdown the service, value has to be true so that runtime.js can match it in an if check
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,6 +38,13 @@ pub enum ReplspaceMessage {
 
     GithubTokenRes(String), // token
     OpenFileRes,
+}
+
+#[op]
+async fn op_ack_shutdown(channel: i32) -> Result<(), AnyError> {
+    trace!(channel = channel; "Channel ack'ed shutdown");
+    crate::CHANNEL_MESSAGES.write().await.remove(&channel);
+    Ok(())
 }
 
 #[op]
@@ -90,6 +98,7 @@ async fn op_user_info(session: i32) -> Result<ClientInfo, AnyError> {
 
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
+        op_ack_shutdown::decl(),
         op_recv_info::decl(),
         op_send_msg::decl(),
         op_user_info::decl(),

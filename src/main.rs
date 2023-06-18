@@ -80,7 +80,9 @@ lazy_static! {
     static ref SESSION_CLIENT_INFO: RwLock<HashMap<i32, ClientInfo>> = RwLock::new(HashMap::new());
     static ref CHANNEL_MESSAGES: Arc<RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
         Arc::new(RwLock::new(HashMap::new()));
-    static ref CHANNEL_METADATA: RwLock<Vec<Service>> = RwLock::new(vec![]);
+    static ref CHANNEL_METADATA: RwLock<HashMap<i32, Service>> = RwLock::new(HashMap::new());
+    static ref CHANNEL_SESSIONS: RwLock<HashMap<i32, Vec<i32>>> = RwLock::new(HashMap::new());
+
     static ref SESSION_MAP: Arc<RwLock<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 
@@ -119,6 +121,7 @@ async fn main() -> Result<(), Error> {
     lazy_static::initialize(&SESSION_CLIENT_INFO);
     lazy_static::initialize(&CHANNEL_MESSAGES);
     lazy_static::initialize(&CHANNEL_METADATA);
+    // lazy_static::initialize(&CHANNEL_SESSIONS);
     lazy_static::initialize(&SESSION_MAP);
     lazy_static::initialize(&PROCCESS_WRITE_MESSAGES);
     lazy_static::initialize(&PROCCESS_CHANNEL_TO_ID);

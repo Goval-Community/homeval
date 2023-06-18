@@ -96,9 +96,11 @@ declare global {
         name: string
         service: string
         clients: number[]
+        _online: boolean
 
         constructor(id: number, service: string, name: string | null)
 
+        stop(): null
         start(): Promise<null>
         ipc_recv(): Promise<null>
 

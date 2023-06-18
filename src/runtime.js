@@ -72,10 +72,16 @@ class ServiceBase {
 		this.service = service;
 		this.name = name;
 		this.clients = [];
+
+		this._online = true;
+	}
+
+	stop() {
+		this._online = false
 	}
 
 	async start() {
-		while (true) {
+		while (this._online) {
 			await this.ipc_recv();
 		}
 	}
@@ -97,10 +103,17 @@ class ServiceBase {
 			await this.process_dead(-1, message.cmdDead)
 		} else if (message.replspace) {
 			await this.on_replspace(message.replspace[0], message.replspace[1])
+		} else if (message.shutdown) {
+			// TODO: Deal with fs events. It currently keeps the channel alive forever
+			await this.shutdown()
+			this.stop()
+			await Deno.core.ops.op_ack_shutdown(this.id)
 		} else {
 			console.error("Unknown IPC message", message);
 		}
 	}
+
+	async shutdown() {}
 
 	async process_dead(proc_id, exit_code) {
 		console.warn(`PTY/CMD ${proc_id} died with status ${exit_code} and channel ${this.id} doesn't have a listener`)
