@@ -4,7 +4,7 @@ use homeval::goval;
 use std::time::Instant;
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use log::info;
+use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
 
 mod channels;
@@ -109,7 +109,25 @@ mod goval_server;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    debug!("Initializing lazy statics");
     lazy_static::initialize(&START_TIME);
+    lazy_static::initialize(&IMPLEMENTED_SERVICES);
+    lazy_static::initialize(&DOTREPLIT_CONFIG);
+    lazy_static::initialize(&MAX_SESSION);
+    lazy_static::initialize(&MAX_CHANNEL);
+    lazy_static::initialize(&SESSION_CHANNELS);
+    lazy_static::initialize(&SESSION_CLIENT_INFO);
+    lazy_static::initialize(&CHANNEL_MESSAGES);
+    lazy_static::initialize(&CHANNEL_METADATA);
+    lazy_static::initialize(&SESSION_MAP);
+    lazy_static::initialize(&PROCCESS_WRITE_MESSAGES);
+    lazy_static::initialize(&PROCCESS_CHANNEL_TO_ID);
+    lazy_static::initialize(&CPU_STATS);
+    lazy_static::initialize(&LAST_SESSION_USING_CHANNEL);
+    lazy_static::initialize(&REPLSPACE_CALLBACKS);
+    lazy_static::initialize(&CHILD_PROCS_ENV_BASE);
+    debug!("Lazy statics initialized successfully");
+
     // console_subscriber::init();
     let _ = env_logger::try_init().unwrap();
 
