@@ -67,7 +67,6 @@ Make a new file in `services/` name it with the format `<service name>.js` then 
 
 # TODO:
 
-- [ ] Embedded repldb server
 - [ ] Have windows builds feature complete
 - [ ] Debugger support
 - [ ] Audio channel support
