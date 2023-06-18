@@ -1,7 +1,7 @@
 use std::{io::Error, time::SystemTime};
 
 use deno_core::{error::AnyError, op, OpDecl};
-use log::{as_debug, debug, error};
+use log::error;
 use serde::Serialize;
 use tokio::{fs, io::AsyncWriteExt};
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
@@ -85,7 +85,6 @@ async fn op_stat_file(path: String) -> Result<FileStat, AnyError> {
 
 #[op]
 async fn op_list_dir(path: String) -> Result<Vec<File>, AnyError> {
-    debug!(directory = path; "Reading dir");
     let mut dir = ReadDirStream::new(fs::read_dir(path.clone()).await?);
     let mut ret = Vec::<File>::new();
     let parent = std::path::Path::new(&path);
@@ -102,7 +101,6 @@ async fn op_list_dir(path: String) -> Result<Vec<File>, AnyError> {
             error!("Got none from Path#to_str in op_list_dir")
         }
     }
-    debug!(directory = path, files = as_debug!(ret); "Read dir");
 
     Ok(ret)
 }

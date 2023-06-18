@@ -6,9 +6,7 @@ class Service extends ServiceBase {
 			let files = []
 			
 			try {
-				console.log("fetching")
 				files = await fs.readDir(cmd.readdir.path)
-				console.log("fetched")
 			} catch(err) {
 				return api.Command.create({error: err.toString()})
 			}
