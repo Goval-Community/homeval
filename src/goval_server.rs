@@ -27,7 +27,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, trace, warn, debug};
+use log::{error, info, trace, warn, debug, as_serde, as_display, as_error, as_debug};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -120,7 +120,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
     ).await {
         Ok(_) => {}
         Err(err) => {
-            error!("accept_connection errored: {}", err)
+            error!(error = as_display!(err); "accept_connection errored")
         }
     };
     
@@ -140,8 +140,8 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
         match message.to_cmd() {
             Err(err) => {
                 error!(
-                    "Following error occured when decoding message in main loop: {}",
-                    err
+                    error = as_error!(err);
+                    "An error occured when decoding message in the main loop"
                 );
                 return;
             }
@@ -152,7 +152,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
 
         match cmd.body {
             None => {
-                error!("MISSING COMMAND BODY: {:#?}", cmd);
+                error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
                 return;
             }
             Some(body) => cmd_body = body,
@@ -170,7 +170,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
-                                error!("Error occured while sending Pong {}", err);
+                                error!(error = as_error!(err);"Error occured while sending Pong");
                             }
                         }
                     } else {
@@ -228,7 +228,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                 name: _channel_name,
                             };
 
-                            trace!("Awaiting queue write for channel {}", channel_id);
+                            trace!(channel = channel_id; "Awaiting queue write");
 
                             CHANNEL_MESSAGES.write().await.insert(
                                 channel_id_held,
@@ -237,7 +237,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                             let mut metadata = CHANNEL_METADATA.write().await;
                             metadata.push(service_data.clone());
                             drop(metadata);
-                            trace!("Added channel: {} to queue list", channel_id_held);
+                            trace!(channel = channel_id_held; "Added channel to queue list");
 
                             tokio::task::spawn_blocking(move || {
                                 let local = tokio::task::LocalSet::new();
@@ -249,9 +249,9 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                             let mod_path =
                                                 &format!("services/{}.js", open_chan.service);
                                             trace!(
-                                                "Loading module path: {} for service: {}",
-                                                mod_path,
-                                                open_chan.service
+                                                path = mod_path,
+                                                service = open_chan.service;
+                                                "Loading module path"
                                             );
                                             let main_module: deno_core::url::Url;
                                             let main_module_res = deno_core::resolve_path(
