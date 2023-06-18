@@ -6,14 +6,14 @@ use serde::Serialize;
 use tokio::{fs, io::AsyncWriteExt};
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct File {
     pub path: String,
     pub r#type: FileType,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum FileType {
     File,
@@ -101,6 +101,7 @@ async fn op_list_dir(path: String) -> Result<Vec<File>, AnyError> {
             error!("Got none from Path#to_str in op_list_dir")
         }
     }
+
     Ok(ret)
 }
 

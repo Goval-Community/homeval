@@ -1,5 +1,5 @@
 use deno_core::{op, OpDecl};
-use log::error;
+use log::{as_debug, error};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{self, event::ModifyKind, Event, EventKind, RecommendedWatcher, Watcher},
@@ -92,7 +92,7 @@ pub async fn op_make_filewatcher() -> Result<u32, AnyError> {
                         }
                     }),
                     Err(errors) => errors.iter().for_each(|error| {
-                        error!("Error in debounced: {:#?}", error);
+                        error!(error = as_debug!(error); "Error in debouncer");
                         queue_debounced.push(FinalEvent::Err(error.to_string()))
                     }),
                 },

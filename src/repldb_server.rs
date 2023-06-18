@@ -6,7 +6,7 @@ use axum::{
 };
 use deno_core::error::AnyError;
 use entity::repldb;
-use log::{error, info, warn};
+use log::{as_error, error, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_query::OnConflict;
 use serde::Deserialize;
@@ -71,7 +71,7 @@ async fn set_value(Form(data): Form<HashMap<String, String>>) -> StatusCode {
         match result {
             Ok(_) => {}
             Err(err) => {
-                error!("Encountered error inserting key into database: {}", err);
+                error!(error = as_error!(err); "Encountered error inserting key into database");
                 return StatusCode::INTERNAL_SERVER_ERROR;
             }
         }
@@ -93,7 +93,7 @@ async fn get_value(Path(key): Path<String>) -> (StatusCode, String) {
             Some(data) => (StatusCode::OK, data.value),
         },
         Err(err) => {
-            error!("Encountered error reading key from database: {}", err);
+            error!(error = as_error!(err); "Encountered error reading key from database");
             (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
         }
     }
@@ -115,7 +115,7 @@ async fn delete_value(Path(key): Path<String>) -> StatusCode {
             }
         }
         Err(err) => {
-            error!("Encountered error deleting key from database: {}", err);
+            error!(error = as_error!(err); "Encountered error deleting key from database");
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -156,7 +156,7 @@ async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
             (StatusCode::OK, keys)
         }
         Err(err) => {
-            error!("Encountered error deleting key from database: {}", err);
+            error!(error = as_error!(err); "Encountered error deleting key from database");
             (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
         }
     }

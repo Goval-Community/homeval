@@ -27,7 +27,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, trace, warn, debug};
+use log::{error, info, trace, warn, debug, as_serde, as_display, as_error, as_debug};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -120,7 +120,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
     ).await {
         Ok(_) => {}
         Err(err) => {
-            error!("accept_connection errored: {}", err)
+            error!(error = as_display!(err); "accept_connection errored")
         }
     };
     
@@ -140,8 +140,8 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
         match message.to_cmd() {
             Err(err) => {
                 error!(
-                    "Following error occured when decoding message in main loop: {}",
-                    err
+                    error = as_error!(err);
+                    "An error occured when decoding message in the main loop"
                 );
                 return;
             }
@@ -152,7 +152,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
 
         match cmd.body {
             None => {
-                error!("MISSING COMMAND BODY: {:#?}", cmd);
+                error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
                 return;
             }
             Some(body) => cmd_body = body,
@@ -170,7 +170,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                         match sender.send(message.replace_cmd(pong)) {
                             Ok(_) => {}
                             Err(err) => {
-                                error!("Error occured while sending Pong {}", err);
+                                error!(error = as_error!(err);"Error occured while sending Pong");
                             }
                         }
                     } else {
@@ -228,7 +228,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                 name: _channel_name,
                             };
 
-                            trace!("Awaiting queue write for channel {}", channel_id);
+                            trace!(channel = channel_id; "Awaiting queue write");
 
                             CHANNEL_MESSAGES.write().await.insert(
                                 channel_id_held,
@@ -237,7 +237,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                             let mut metadata = CHANNEL_METADATA.write().await;
                             metadata.push(service_data.clone());
                             drop(metadata);
-                            trace!("Added channel: {} to queue list", channel_id_held);
+                            trace!(channel = channel_id_held; "Added channel to queue list");
 
                             tokio::task::spawn_blocking(move || {
                                 let local = tokio::task::LocalSet::new();
@@ -249,9 +249,9 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                             let mod_path =
                                                 &format!("services/{}.js", open_chan.service);
                                             trace!(
-                                                "Loading module path: {} for service: {}",
-                                                mod_path,
-                                                open_chan.service
+                                                path = mod_path,
+                                                service = open_chan.service;
+                                                "Loading module path"
                                             );
                                             let main_module: deno_core::url::Url;
                                             let main_module_res = deno_core::resolve_path(
@@ -260,7 +260,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                             );
                                             match main_module_res {
                                                 Err(err) => {
-                                                    error!("Error resolving js module {}", err);
+                                                    error!(error = as_error!(err); "Error resolving js module");
                                                     return;
                                                 }
                                                 Ok(result) => {
@@ -301,23 +301,29 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                                                 )
                                                 .await
                                                 .unwrap();
-                                            let result = js_runtime.mod_evaluate(mod_id);
-
-                                            js_runtime.run_event_loop(false).await.unwrap();
                                             
+                                            let result = js_runtime.mod_evaluate(mod_id);
+                                            
+                                            match js_runtime.run_event_loop(false).await {
+                                                Ok(_) => {},
+                                                Err(err) => {
+                                                    error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
+                                                }
+                                            }
+
                                             match result.await {
                                                 Ok(inner) => {
                                                     match inner {
                                                         Ok(_) => {},
                                                         Err(err) => {
-                                                            error!("Got error in v8 thread for service {}:\n{}", open_chan.service, err)
+                                                            error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
                                                         }
                                                     }
                                                 },
                                                 Err(err) => {
-                                                    error!("Got the following canceled error in v8 thread for service {}: {}", open_chan.service, err)
+                                                    error!(service = open_chan.service, err = as_error!(err); "Got error in v8 thread for service")
                                                 }
-                                            }
+                                            }  
                                         })
                                         .await;
                                 });
@@ -376,8 +382,8 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                             .and_modify(|channels| channels.push(channel_id_held));
                     } else {
                         warn!(
-                            "Missing service requested by openChan: {}",
-                            open_chan.service
+                            service = open_chan.service;
+                            "Missing service requested by openChan"
                         )
                     }
                 }
@@ -392,7 +398,7 @@ async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLoc
                         queue.push(input);
                         to_continue = true;
                     } else {
-                        error!("Couldn't find pty {} to write to", pty_id);
+                        error!(pty_id = pty_id; "Couldn't find pty to write to");
                     }
 
                     if to_continue {
@@ -439,9 +445,9 @@ async fn accept_connection(
     client: ClientInfo,
     addr: SocketAddr
 ) -> Result<(), AnyError> {
-    info!("New connection with peer address: {}", addr);
+    info!(peer_address = as_display!(addr); "New connection");
 
-    info!("New client: {:#?}", client);
+    info!(client = as_serde!(client); "New client");
 
     SESSION_CLIENT_INFO
         .write()
@@ -495,11 +501,11 @@ async fn accept_connection(
                             bytes: buf,
                             session,
                         }) {
-                            error!("The following error occured when enqueing message to global messagq queue (session: {}): {}", session, err)
+                            error!(session = session, error = as_error!(err); "An error occured when enqueing message to global message queue")
                         }
                     }
                     WsMessage::Close(_) => {
-                        warn!("CLOSING SESSION {}", session);
+                        warn!(session = session; "CLOSING SESSION");
                         for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
                         {
                             let channel = _channel.clone();
@@ -517,14 +523,14 @@ async fn accept_connection(
                         SESSION_MAP.write().await.remove(&session);
                         SESSION_CLIENT_INFO.write().await.remove(&session);
                         SESSION_CHANNELS.write().await.remove(&session);
-                        warn!("CLOSED SESSION {}", session);
+                        warn!(session = session;  "CLOSED SESSION");
                     }
                     _ => {}
                 },
                 Err(err) => {
                     error!(
-                        "The following error occured while reading messages (session {}): {}",
-                        session, err
+                        session = session, error = as_error!(err);
+                        "An error occured while reading messages"
                     );
                 }
             };
@@ -536,8 +542,8 @@ async fn accept_connection(
             Ok(_) => {}
             Err(err) => {
                 error!(
-                    "The following error occured while sending a message: {}",
-                    err
+                    session = i.session, error = as_error!(err);
+                    "An error occured while sending a message"
                 )
             }
         }
