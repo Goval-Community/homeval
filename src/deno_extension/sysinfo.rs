@@ -54,12 +54,10 @@ async fn op_disk_info() -> Result<DiskInfo, AnyError> {
                     free: 0,
                 };
 
-                // for disk in disks {
-                // info!("{}", disk.fs_mounted_on);
                 info.available += disk.avail.as_u64();
                 info.total += disk.total.as_u64();
                 info.free += disk.free.as_u64();
-                // }
+
                 Ok(info)
             }
             Err(_) => Ok(DiskInfo {

@@ -121,9 +121,11 @@ fn main() {
         })
         .files_loaded_during_snapshot
     {
-        println!(
-            "cargo:rerun-if-changed={}",
-            file.into_os_string().into_string().unwrap()
-        )
+        let path = file.into_os_string().into_string().unwrap();
+        if path.contains("api.js") {
+            continue;
+        }
+
+        println!("cargo:rerun-if-changed={}", path)
     }
 }

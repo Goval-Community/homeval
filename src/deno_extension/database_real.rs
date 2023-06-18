@@ -2,7 +2,7 @@ use std::io::Error;
 
 use deno_core::{error::AnyError, op, OpDecl};
 use entity::files;
-use log::trace;
+use log::{as_debug, trace};
 use sea_orm::entity::EntityTrait;
 use sea_query::OnConflict;
 
@@ -30,7 +30,7 @@ async fn op_database_get_file(file_name: String) -> Result<Option<files::Model>,
 async fn op_database_set_file(model: files::Model) -> Result<(), AnyError> {
     match crate::DATABASE.get() {
         Some(db) => {
-            trace!("Inserting file to db: {:#?}", model);
+            trace!(file = as_debug!(model); "Inserting file to db");
             let active: files::ActiveModel = model.into();
             files::Entity::insert(active)
                 .on_conflict(

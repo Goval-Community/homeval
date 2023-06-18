@@ -1,13 +1,18 @@
 class Service extends ServiceBase {
 	async recv(cmd, session) {
+		console.log(cmd)
 		if (cmd.readdir) {
+			console.log(cmd)
 			let files = []
 			
 			try {
+				console.log("fetching")
 				files = await fs.readDir(cmd.readdir.path)
+				console.log("fetched")
 			} catch(err) {
 				return api.Command.create({error: err.toString()})
 			}
+			console.log(files)
 
 			return api.Command.create({
 				files: { files: files.map(item => {return {path: item.path, type: item.type !== "directory" ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },

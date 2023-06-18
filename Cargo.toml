@@ -20,7 +20,7 @@ fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 
 [dependencies]
 deno_core = "0.191.0"
-env_logger = { git = "https://github.com/tmccombs/env_logger", rev = "a47d1d99" }
+env_logger = { git = "https://github.com/tmccombs/env_logger", rev = "a47d1d99", features=["kv_unstable"] }
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
 lazy_static = "1.4.0"

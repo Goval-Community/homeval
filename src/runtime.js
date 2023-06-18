@@ -38,7 +38,10 @@ globalThis.fs = {
 		}
 	},
 	async readDir(path) {
-		return await Deno.core.ops.op_list_dir(path);
+		console.log(path)
+		info = await Deno.core.ops.op_list_dir(path);
+		console.log(info)
+		return info
 	},
 	async writeFile(path, contents = []) {
 		return await Deno.core.ops.op_write_file(path, contents);
@@ -76,6 +79,7 @@ class ServiceBase {
 
 	async start() {
 		while (true) {
+			console.debug("ipc_recv")
 			await this.ipc_recv();
 		}
 	}

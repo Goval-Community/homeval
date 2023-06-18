@@ -1,5 +1,5 @@
 use futures_util::{future::abortable, stream::AbortHandle, Future};
-use log::error;
+use log::{as_error, error};
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, ErrorKind},
@@ -197,7 +197,7 @@ async fn op_register_cmd(
                         Error::new(ErrorKind::BrokenPipe, "stdin missing")
                     }
                 } => {
-                    error!("Error occurred while passing writes to cmd: {}", res);
+                    error!(error = as_error!(res); "Error occurred while passing writes to cmd");
                 },
                 _ = async move {
                     let stderr_cpy;
@@ -245,7 +245,7 @@ async fn op_register_cmd(
                     }
 
                     if let Err(err) = final_res {
-                        error!("Error occurred copying from cmd to channels: {}", err);
+                        error!(error = as_error!(err); "Error occurred copying from cmd to channels");
                     };
                 } => {},
         }
@@ -284,7 +284,7 @@ async fn op_register_cmd(
         match res {
             Ok(res) => {
                 if let Err(err) = res {
-                    error!("Join Error encountered: {}", err);
+                    error!(error = as_error!(err); "Join Error encountered");
                 }
             }
             Err(_) => {

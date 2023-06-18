@@ -5,7 +5,7 @@ use axum::{
     Json, Router,
 };
 use deno_core::error::AnyError;
-use log::{error, info};
+use log::{as_debug, as_error, debug, error, info};
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::oneshot::channel;
@@ -45,12 +45,12 @@ struct GithubTokenReq {
 async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Json<GithubTokenRes>) {
     let session;
     if let Some(query) = _query {
-        info!("Got git askpass for channel #{}", query.channel);
+        debug!(channel = query.channel; "Got git askpass");
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
         session = last_session.get(&query.channel).unwrap_or(&0).clone();
     } else {
-        info!("Got git askpass without channel id");
+        debug!("Got git askpass without channel id");
         session = 0;
     }
 
@@ -79,8 +79,8 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
         Ok(token) => res = token,
         Err(err) => {
             error!(
-                "Got error awaiting replspace api github token fetcher callback {:#?}",
-                err
+                error = as_error!(err);
+                "Got error awaiting replspace api github token fetcher callback"
             );
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -98,8 +98,8 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
         ReplspaceMessage::GithubTokenRes(_token) => token = _token,
         _ => {
             error!(
-                "Got unexpected result in replspace api github token fetcher {:#?}",
-                res
+                result = as_debug!(res);
+                "Got unexpected result in replspace api github token fetcher"
             );
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -135,20 +135,20 @@ struct OpenFileRes {
 }
 
 async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFileRes>) {
-    info!("Got git open file");
+    debug!("Got git open file");
     let session;
     if let Some(channel) = query.channel {
         if channel != 0 {
-            info!("Got git open file for channel #{}", channel);
+            debug!(channel = channel; "Got git open file");
 
             let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
             session = last_session.get(&channel).unwrap_or(&0).clone();
         } else {
-            info!("Got git open file with channel id set to 0 (unknown)");
+            debug!("Got git open file with channel id set to 0 (unknown)");
             session = 0;
         }
     } else {
-        info!("Got git open file without channel id");
+        debug!("Got git open file without channel id");
         session = 0;
     }
 
@@ -196,8 +196,8 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
         Ok(token) => res = token,
         Err(err) => {
             error!(
-                "Got error awaiting replspace api open file fetcher callback {:#?}",
-                err
+                error = as_error!(err);
+                "Got error awaiting replspace api open file fetcher callback"
             );
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -217,8 +217,8 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
         ),
         _ => {
             error!(
-                "Got unexpected result in replspace api github token fetcher {:#?}",
-                res
+                result = as_debug!(res);
+                "Got unexpected result in replspace api github token fetcher"
             );
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,

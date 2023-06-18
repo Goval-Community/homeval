@@ -1,5 +1,5 @@
 use deno_core::{error::AnyError, op, OpDecl};
-use log::error;
+use log::{as_debug, error};
 use serde::{Deserialize, Serialize};
 use std::io::Error;
 
@@ -66,7 +66,10 @@ async fn op_replspace_reply(nonce: String, reply: ReplspaceMessage) -> Result<()
             // let sender = Arc::try_unwrap(_sender.clone()).unwrap();
             match sender.send(reply) {
                 Ok(_) => {}
-                Err(val) => error!("Failed to send replspace api reply: {:#?}", val),
+                Err(val) => error!(
+                    message = as_debug!(val);
+                    "Failed to send replspace api reply"
+                ),
             };
         });
     Ok(())

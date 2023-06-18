@@ -50,7 +50,7 @@ async fn op_run_cmd(
     // TODO: handle actual stderr
     if output.stderr.len() > 0 {
         status = 1;
-        error!("QUICK CMD STDERR: {}", String::from_utf8(output.stderr)?);
+        error!(logs = String::from_utf8(output.stderr)?; "QUICK CMD STDERR");
     }
 
     let mut output_cmd = goval::Command::default();
@@ -68,8 +68,8 @@ async fn op_run_cmd(
             sender.send(IPCMessage::from_cmd(to_send, *session))?
         } else {
             warn!(
-                "Session {} missing when sending cmd output for channel {}",
-                session, channel
+                session = session, channel = channel;
+                "Session missing when sending cmd output for channel"
             )
         }
     }
