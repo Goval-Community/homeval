@@ -116,7 +116,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
         tx_clone,
         session_recv,
         session_id,
-        parse(&token).unwrap_or(ClientInfo::default()),
+        parse(&token).await.unwrap_or(ClientInfo::default()),
         addr
     ).await {
         Ok(_) => {}
