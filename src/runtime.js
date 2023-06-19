@@ -76,7 +76,8 @@ class ServiceBase {
 		this._online = true;
 	}
 
-	stop() {
+	async stop() {
+		await this.shutdown()
 		this._online = false
 	}
 
@@ -104,9 +105,7 @@ class ServiceBase {
 		} else if (message.replspace) {
 			await this.on_replspace(message.replspace[0], message.replspace[1])
 		} else if (message.shutdown) {
-			// TODO: Deal with fs events. It currently keeps the channel alive forever
-			await this.shutdown()
-			this.stop()
+			await this.stop()
 			await Deno.core.ops.op_ack_shutdown(this.id)
 		} else {
 			console.error("Unknown IPC message", message);
@@ -312,6 +311,8 @@ class FileWatcher {
 	constructor() {
 		this.listeners = []
 		this.watched_files = 0
+
+		this.online = true
 	}
 
 	async init() {
@@ -328,11 +329,20 @@ class FileWatcher {
 		this.listeners.push(listener)
 	}
 
+	async stop() {
+		await Deno.core.ops.op_shutdown_filewatcher(this.id)
+		this.online = false;
+	}
+
 	async start() {
 		await this._await_watcher_exists()
 		let attempts = 0;
-		while (true) {
+		while (this.online) {
 			const msg = await Deno.core.ops.op_recv_fsevent(this.id)
+			if (msg.shutdown) {
+				this.online = false
+				break
+			}
 			if (msg.err) {
 				if (attempts === 3) {
 					throw new Error("FileWatcher has had 3 consecutive errors")

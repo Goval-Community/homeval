@@ -9,6 +9,10 @@ class Service extends ServiceBase {
 		});
 	}
 
+	async shutdown() {
+		await this.watcher.stop()
+	}
+
 	async file_event(event) {
 		let op;
 		let file;

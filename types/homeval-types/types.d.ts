@@ -100,7 +100,7 @@ declare global {
 
         constructor(id: number, service: string, name: string | null)
 
-        stop(): null
+        stop(): Promise<null>
         start(): Promise<null>
         ipc_recv(): Promise<null>
 
@@ -148,6 +148,11 @@ declare global {
         err?: string
     };
     class FileWatcher {
+        id: number
+        online: boolean
+        watched_files: number
+        listeners: ((event: FileEvent) => Promise<null>)[]
+
         constructor()
 
         init(): Promise<null>
@@ -156,6 +161,7 @@ declare global {
 
         add_listener(listener: (event: FileEvent) => Promise<null>): null
 
+        stop(): Promise<null>
         start(): Promise<null>
 
         _await_watcher_exists(): Promise<null>

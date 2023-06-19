@@ -1,5 +1,5 @@
 use deno_core::{op, OpDecl};
-use log::{as_debug, error};
+use log::{as_debug, debug, error, trace};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{self, event::ModifyKind, Event, EventKind, RecommendedWatcher, Watcher},
@@ -29,6 +29,7 @@ pub enum FinalEvent {
     Modify(String),
     Rename(String, String),
     Err(String),
+    Shutdown(bool),
 }
 
 fn notify_event_to_final(event: &Event) -> Result<Option<FinalEvent>, AnyError> {
@@ -63,7 +64,48 @@ fn notify_event_to_final(event: &Event) -> Result<Option<FinalEvent>, AnyError> 
 }
 
 #[op]
-pub async fn op_make_filewatcher() -> Result<u32, AnyError> {
+async fn op_shutdown_filewatcher(watcher: u32) -> Result<(), AnyError> {
+    let mut _read = FILE_WATCHER_MAP.write().await;
+    if !_read.contains_key(&watcher) {
+        return Err(AnyError::new(Error::new(
+            std::io::ErrorKind::NotFound,
+            "Watcher not found",
+        )));
+    }
+
+    let debouncer_lock = _read.get(&watcher).unwrap().clone();
+    _read.remove(&watcher);
+    drop(_read);
+
+    match Arc::try_unwrap(debouncer_lock) {
+        Ok(inner) => {
+            inner.into_inner().stop_nonblocking();
+        }
+        Err(_) => {
+            debug!(watcher = watcher; "Could not steal Debouncer from Arc<Debouncer>");
+        }
+    }
+
+    let mut _read = FILE_WATCHER_MESSAGES.write().await;
+    if !_read.contains_key(&watcher) {
+        return Err(AnyError::new(Error::new(
+            std::io::ErrorKind::NotFound,
+            "Watcher not found",
+        )));
+    }
+
+    let queue = _read.get(&watcher).unwrap().clone();
+    queue.push(FinalEvent::Shutdown(true));
+    _read.remove(&watcher);
+    drop(_read);
+
+    trace!(watcher = watcher; "Shutdown watcher");
+
+    Ok(())
+}
+
+#[op]
+async fn op_make_filewatcher() -> Result<u32, AnyError> {
     let mut max_watcher = MAX_WATCHER.lock().await;
     *max_watcher += 1;
     let watcher_id = max_watcher.clone();
@@ -154,6 +196,7 @@ async fn op_watch_files(watcher: u32, files: Vec<String>) -> Result<(), AnyError
 
 pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
+        op_shutdown_filewatcher::decl(),
         op_make_filewatcher::decl(),
         op_recv_fsevent::decl(),
         op_watch_files::decl(),

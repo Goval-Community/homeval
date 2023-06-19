@@ -16,6 +16,10 @@ class Service extends ServiceBase {
 		});
 	}
 
+	async shutdown() {
+		await this.watcher.stop()
+	}
+
 	async recv(cmd, session) {
 		if (!this.path && !cmd.otLinkFile) {
 			console.error("Command sent before otLinkFile", cmd)
