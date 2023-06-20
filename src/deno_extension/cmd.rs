@@ -5,7 +5,7 @@ use std::{
     io::{Error, ErrorKind},
     pin::Pin,
     process::Stdio,
-    sync::Arc,
+    sync::{Arc, LazyLock},
     task::{Context, Poll},
 };
 
@@ -19,19 +19,12 @@ use tokio::{
 
 use deno_core::{error::AnyError, op, OpDecl};
 
-use lazy_static::lazy_static;
-
 use crate::JsMessage;
 
-lazy_static! {
-    static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
-}
-
-lazy_static! {
-    static ref CMD_CANCELLATION_MAP: RwLock<HashMap<u32, AbortHandle>> =
-        RwLock::new(HashMap::new());
-    static ref CMD_SESSION_MAP: RwLock<HashMap<u32, Vec<i32>>> = RwLock::new(HashMap::new());
-}
+static CMD_CANCELLATION_MAP: LazyLock<RwLock<HashMap<u32, AbortHandle>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static CMD_SESSION_MAP: LazyLock<RwLock<HashMap<u32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 struct CmdWriter {
     channel: i32,

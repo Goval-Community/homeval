@@ -1,6 +1,9 @@
+#![feature(lazy_cell)]
+
 use deno_extension::messaging::ReplspaceMessage;
 use homeval::goval;
 
+use std::sync::LazyLock;
 use std::time::Instant;
 use std::{collections::HashMap, io::Error, sync::Arc};
 
@@ -35,72 +38,77 @@ mod replspace_server;
 #[cfg(feature = "repldb")]
 mod repldb_server;
 
-use lazy_static::lazy_static;
-lazy_static! {
-    pub static ref START_TIME: Instant = Instant::now();
-    pub static ref IMPLEMENTED_SERVICES: Vec<String> = {
-        let mut services = vec![];
-        for file in services::get_all().expect("Error when looping over `services/`") {
-            if let Some(extension) = file.extension() {
-                if extension == "js" {
-                    let mut service_path = file
-                        .file_name()
-                        .expect("File name missing while extension exists???")
-                        .to_str()
-                        .expect("failed to convert path OsString to String")
-                        .to_string();
+pub static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
+static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
+    LazyLock::new(|| Arc::new(cpu_time::ProcessTime::now()));
 
-                    service_path
-                        .pop()
-                        .expect("Impossible case when removing .js extension from service file");
-                    service_path
-                        .pop()
-                        .expect("Impossible case when removing .js extension from service file");
-                    service_path
-                        .pop()
-                        .expect("Impossible case when removing .js extension from service file");
+pub static IMPLEMENTED_SERVICES: LazyLock<Vec<String>> = LazyLock::new(|| {
+    let mut services = vec![];
+    for file in services::get_all().expect("Error when looping over `services/`") {
+        if let Some(extension) = file.extension() {
+            if extension == "js" {
+                let mut service_path = file
+                    .file_name()
+                    .expect("File name missing while extension exists???")
+                    .to_str()
+                    .expect("failed to convert path OsString to String")
+                    .to_string();
 
-                    services.push(service_path);
-                }
+                service_path
+                    .pop()
+                    .expect("Impossible case when removing .js extension from service file");
+                service_path
+                    .pop()
+                    .expect("Impossible case when removing .js extension from service file");
+                service_path
+                    .pop()
+                    .expect("Impossible case when removing .js extension from service file");
+
+                services.push(service_path);
             }
         }
-        services
-    };
-    pub static ref DOTREPLIT_CONFIG: DotReplit =
-        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap();
-}
+    }
+    services
+});
 
-lazy_static! {
-    static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
-    static ref MAX_CHANNEL: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
-}
+pub static DOTREPLIT_CONFIG: LazyLock<DotReplit> = LazyLock::new(|| {
+    toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap()
+});
 
-lazy_static! {
-    static ref SESSION_CHANNELS: RwLock<HashMap<i32, Vec<i32>>> = RwLock::new(HashMap::new());
-    static ref SESSION_CLIENT_INFO: RwLock<HashMap<i32, ClientInfo>> = RwLock::new(HashMap::new());
-    static ref CHANNEL_MESSAGES: Arc<RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-    static ref CHANNEL_METADATA: RwLock<HashMap<i32, Service>> = RwLock::new(HashMap::new());
-    static ref CHANNEL_SESSIONS: RwLock<HashMap<i32, Vec<i32>>> = RwLock::new(HashMap::new());
+static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+static MAX_CHANNEL: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
-    static ref SESSION_MAP: Arc<RwLock<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
+static SESSION_CHANNELS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<i32, ClientInfo>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHANNEL_MESSAGES: LazyLock<
+    RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, Service>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_MAP: LazyLock<RwLock<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
-    // pty and cmd's
-    static ref PROCCESS_WRITE_MESSAGES: RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>>> =
-    RwLock::new(HashMap::new());
-    static ref PROCCESS_CHANNEL_TO_ID: RwLock<HashMap<i32, u32>> = RwLock::new(HashMap::new());
+// pty and cmd's
+static PROCCESS_WRITE_MESSAGES: LazyLock<
+    RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<String>>>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
+static PROCCESS_CHANNEL_TO_ID: LazyLock<RwLock<HashMap<i32, u32>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
-    static ref CPU_STATS: Arc<cpu_time::ProcessTime> = Arc::new(cpu_time::ProcessTime::now());
+// Hashmap for channel id -> last session that sent it a message
+static LAST_SESSION_USING_CHANNEL: LazyLock<RwLock<HashMap<i32, i32>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
-    // Hashmap for channel id -> last session that sent it a message
-    static ref LAST_SESSION_USING_CHANNEL: Arc<RwLock<HashMap<i32, i32>>> = Arc::new(RwLock::new(HashMap::new()));
+static REPLSPACE_CALLBACKS: LazyLock<
+    RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
-    static ref REPLSPACE_CALLBACKS: Arc<RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-
-    static ref CHILD_PROCS_ENV_BASE: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
-}
+static CHILD_PROCS_ENV_BASE: LazyLock<RwLock<HashMap<String, String>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[cfg(feature = "database")]
 mod database;
@@ -112,23 +120,9 @@ mod goval_server;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     debug!("Initializing lazy statics");
-    lazy_static::initialize(&START_TIME);
-    lazy_static::initialize(&IMPLEMENTED_SERVICES);
-    lazy_static::initialize(&DOTREPLIT_CONFIG);
-    lazy_static::initialize(&MAX_SESSION);
-    lazy_static::initialize(&MAX_CHANNEL);
-    lazy_static::initialize(&SESSION_CHANNELS);
-    lazy_static::initialize(&SESSION_CLIENT_INFO);
-    lazy_static::initialize(&CHANNEL_MESSAGES);
-    lazy_static::initialize(&CHANNEL_METADATA);
-    // lazy_static::initialize(&CHANNEL_SESSIONS);
-    lazy_static::initialize(&SESSION_MAP);
-    lazy_static::initialize(&PROCCESS_WRITE_MESSAGES);
-    lazy_static::initialize(&PROCCESS_CHANNEL_TO_ID);
-    lazy_static::initialize(&CPU_STATS);
-    lazy_static::initialize(&LAST_SESSION_USING_CHANNEL);
-    lazy_static::initialize(&REPLSPACE_CALLBACKS);
-    lazy_static::initialize(&CHILD_PROCS_ENV_BASE);
+    LazyLock::force(&START_TIME);
+    LazyLock::force(&CPU_STATS);
+
     debug!("Lazy statics initialized successfully");
 
     // console_subscriber::init();

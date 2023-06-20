@@ -9,17 +9,22 @@ use serde::Serialize;
 
 use deno_core::error::AnyError;
 
-use lazy_static::lazy_static;
-use std::{collections::HashMap, io::Error, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    io::Error,
+    path::Path,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 use tokio::sync::{Mutex, RwLock};
 
-lazy_static! {
-    static ref FILE_WATCHER_MAP: Arc<RwLock<HashMap<u32, Arc<Mutex<Debouncer<RecommendedWatcher, FileIdMap>>>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-    static ref FILE_WATCHER_MESSAGES: Arc<RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<FinalEvent>>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-    static ref MAX_WATCHER: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
-}
+static FILE_WATCHER_MAP: LazyLock<
+    RwLock<HashMap<u32, Arc<Mutex<Debouncer<RecommendedWatcher, FileIdMap>>>>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
+static FILE_WATCHER_MESSAGES: LazyLock<
+    RwLock<HashMap<u32, Arc<deadqueue::unlimited::Queue<FinalEvent>>>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
+static MAX_WATCHER: LazyLock<Mutex<u32>> = LazyLock::new(|| Mutex::new(0));
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
