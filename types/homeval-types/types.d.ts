@@ -78,6 +78,7 @@ declare global {
             path: string,
             type: "file" | "directory" | "symlink"
         }[]>;
+        function makeDir(path: string): Promise<null>;
         function writeFile(path: string, contents: number[]): Promise<null>;
         function writeFileString(path: string, contents: string): Promise<null>;
         function readFile(path: string): Promise<number[]>;

@@ -106,6 +106,12 @@ async fn op_list_dir(path: String) -> Result<Vec<File>, AnyError> {
 }
 
 #[op]
+async fn op_make_dir(path: String) -> Result<(), AnyError> {
+    fs::create_dir_all(path).await?;
+    Ok(())
+}
+
+#[op]
 async fn op_write_file(path: String, contents: Vec<u8>) -> Result<(), AnyError> {
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -164,6 +170,7 @@ pub fn get_op_decls() -> Vec<OpDecl> {
     vec![
         op_stat_file::decl(),
         op_list_dir::decl(),
+        op_make_dir::decl(),
         op_write_file::decl(),
         op_read_file::decl(),
         op_remove_file::decl(),

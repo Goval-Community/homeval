@@ -40,6 +40,9 @@ globalThis.fs = {
 	async readDir(path) {
 		return await Deno.core.ops.op_list_dir(path);
 	},
+	async makeDir(path) {
+		return await Deno.core.ops.op_make_dir(path)
+	},
 	async writeFile(path, contents = []) {
 		return await Deno.core.ops.op_write_file(path, contents);
 	},

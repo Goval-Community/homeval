@@ -12,6 +12,9 @@ class Service extends ServiceBase {
 			return api.Command.create({
 				files: { files: files.map(item => {return {path: item.path, type: item.type !== "directory" ? api.File.Type.FILE : api.File.Type.DIRECTORY}}) },
 			});
+		} else if (cmd.mkdir) {
+			await fs.makeDir(cmd.mkdir.path)
+			return api.Command.create({ok: {}})
 		} else if (cmd.write) {
 			let contents = cmd.write.content
 			if (contents.length === 0) {
