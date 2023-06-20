@@ -156,7 +156,7 @@ async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
             (StatusCode::OK, keys)
         }
         Err(err) => {
-            error!(error = as_error!(err); "Encountered error deleting key from database");
+            error!(error = as_error!(err); "Encountered error listing keys in database");
             (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
         }
     }
