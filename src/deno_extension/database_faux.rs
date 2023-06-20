@@ -1,26 +1,47 @@
+use std::collections::HashMap;
+
 use deno_core::{error::AnyError, op, OpDecl};
-use std::io::Error;
+use serde::{Deserialize, Serialize};
+use tokio::sync::{OnceCell, RwLock};
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct File {
+    pub name: String,
+    pub crc32: i32,
+    pub contents: String,
+    pub history: Vec<String>,
+}
+
+static FILES: OnceCell<RwLock<HashMap<String, File>>> = OnceCell::const_new();
 
 #[op]
 fn op_database_exists() -> Result<bool, AnyError> {
-    Ok(false)
-}
-
-// Any function using this should never be called ever, since op_database_exists() returns false
-macro_rules! db_disabled {
-    () => {
-        Err(Error::new(std::io::ErrorKind::NotConnected, "database is disabled").into())
-    };
+    Ok(true)
 }
 
 #[op]
-async fn op_database_get_file() -> Result<Option<()>, AnyError> {
-    db_disabled!()
+async fn op_database_get_file(file_name: String) -> Result<Option<File>, AnyError> {
+    match FILES
+        .get_or_init(|| async { RwLock::new(HashMap::new()) })
+        .await
+        .read()
+        .await
+        .get(&file_name)
+    {
+        Some(file) => Ok(Some(file.clone())),
+        None => Ok(None),
+    }
 }
 
 #[op]
-async fn op_database_set_file(_model: ()) -> Result<(), AnyError> {
-    db_disabled!()
+async fn op_database_set_file(file: File) -> Result<(), AnyError> {
+    FILES
+        .get_or_init(|| async { RwLock::new(HashMap::new()) })
+        .await
+        .write()
+        .await
+        .insert(file.name.clone(), file);
+    Ok(())
 }
 
 pub fn get_op_decls() -> Vec<OpDecl> {
