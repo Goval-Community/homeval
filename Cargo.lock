@@ -1011,7 +1011,6 @@ dependencies = [
  "hyper",
  "hyper-tls",
  "include_directory",
- "lazy_static",
  "log",
  "migration",
  "notify-debouncer-full",
