@@ -27,6 +27,24 @@ This is due to <a href="https://docs.replit.com/legal-and-security-info/licensin
     * [Rustup](https://rustup.rs/)
     * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
 
+## Setup
+
+### Database
+Setup a [PostgreSQL](https://www.postgresql.org/) database and set the env var `$HOMEVAL_DB` to it's connection url.
+
+If the database isn't setup repldb won't work, and file history won't persist through server restarts.
+
+### Proper Authentication
+
+> ⚠️ If you use someone elses key server it could let them authenticate as any user on your homeval instance
+
+Run [repl-key-server](https://github.com/Goval-Community/repl-key-server) on a repl and set the env var `$HOMEVAL_PASETO_KEY_URL` to `<your repl url>/keys`.  
+
+### Replspace api
+> ⚠️ Likely won't work on windows
+
+To make use of this feature make sure that all files in `extras/` are placed in a directory contained in your `$PATH` on the machine running homeval.
+
 ## ⚠️ Notice for windows users
 On windows `cargo run` as well as invoking the built binary must happen inside the [Git Bash](https://gitforwindows.org/) shell.
 
@@ -35,6 +53,16 @@ Console and shell will not work, this will be fixed later. You should submit a b
 ## Building
 
 Homeval can be built into a binary with `cargo build --release` the binary will then end up in `target/release/homeval` (make sure to set `RUST_LOG=INFO` when running this binary or you won't get any logs). 
+
+### Minimal Build
+To build a minimal build run `cargo build --release --no-default-features`, this will compile out the following features:
+
+- replspace api
+- database support
+- repldb
+- connection authentication
+
+It will however produce a smaller binary, and compile faster.
 
 ## Running
 To compile and run a debug build use `cargo run`.
