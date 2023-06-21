@@ -1,5 +1,5 @@
+use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
-use deno_core::error::AnyError;
 use homeval::goval;
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -37,20 +37,14 @@ impl ClientInfo {
     }
 }
 
-fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool), AnyError> {
+fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool)> {
     let token_parts = token.split(".").collect::<Vec<_>>();
     if token_parts.len() < 3 {
-        return Err(AnyError::new(Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid Token",
-        )));
+        return Err(Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
     }
 
     if token_parts[0] != "v2" || token_parts[1] != "public" {
-        return Err(AnyError::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid Token",
-        )));
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
     }
 
     let decoded = general_purpose::URL_SAFE_NO_PAD.decode(token_parts[2].as_bytes())?;
@@ -61,7 +55,7 @@ fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool), AnyError> {
 }
 
 #[cfg(feature = "verify_connections")]
-async fn init_keys() -> Result<std::collections::HashMap<String, String>, AnyError> {
+async fn init_keys() -> Result<std::collections::HashMap<String, String>> {
     let key_get = std::env::var("HOMEVAL_PASETO_KEY_URL")?;
 
     let https = hyper_tls::HttpsConnector::new();
@@ -74,7 +68,7 @@ async fn init_keys() -> Result<std::collections::HashMap<String, String>, AnyErr
 }
 
 #[cfg(feature = "verify_connections")]
-async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool), AnyError> {
+async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
     let keys = KEYS.get_or_try_init(init_keys).await?;
     let token: pasetors::token::UntrustedToken<pasetors::token::Public, pasetors::version2::V2>;
 
@@ -141,7 +135,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool), AnyError> {
     Ok((result.payload().as_bytes().to_vec(), true))
 }
 
-pub async fn parse(token: &str) -> Result<ClientInfo, AnyError> {
+pub async fn parse(token: &str) -> Result<ClientInfo> {
     let msg;
     let is_secure;
 
