@@ -62,8 +62,7 @@ fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool), AnyError> {
 
 #[cfg(feature = "verify_connections")]
 async fn init_keys() -> Result<std::collections::HashMap<String, String>, AnyError> {
-    let key_get = std::env::var("HOMEVAL_PASETO_KEY_URL")
-        .unwrap_or("https://paseto-keys.homeval.repl.co/keys".to_string());
+    let key_get = std::env::var("HOMEVAL_PASETO_KEY_URL")?;
 
     let https = hyper_tls::HttpsConnector::new();
     let client = hyper::Client::builder().build::<_, hyper::Body>(https);
