@@ -3,10 +3,13 @@
     <br>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
-    <img alt="Services implemented: 14" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
+    <img alt="Services implemented: 15" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>
 </div>
+
+# ⚠️ Stability
+**⚠️ Homeval is still in early alpha and can be unstable so do not trust it with data you have not backed up. ⚠️**
 
 # License
 Homeval is licensed under GNU AGPL-3.0-only  
