@@ -1,18 +1,18 @@
+use anyhow::Result;
 use axum::{
     extract::Query,
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use deno_core::error::AnyError;
 use log::{as_debug, as_error, debug, error, info};
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::oneshot::channel;
 
-use crate::deno_extension::{messaging::ReplspaceMessage, JsMessage};
+use crate::{JsMessage, ReplspaceMessage};
 
-pub async fn start_server() -> Result<(), AnyError> {
+pub async fn start_server() -> Result<()> {
     info!("Replspace api server listening on: 127.0.0.1:8283");
     let app = Router::new()
         .route("/files/open", post(open_file))

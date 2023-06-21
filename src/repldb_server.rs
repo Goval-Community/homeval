@@ -1,10 +1,10 @@
+use anyhow::Result;
 use axum::{
     extract::{Path, Query},
     http::StatusCode,
     routing::{delete, get, post},
     Form, Router,
 };
-use deno_core::error::AnyError;
 use entity::repldb;
 use log::{as_error, error, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -12,7 +12,7 @@ use sea_query::OnConflict;
 use serde::Deserialize;
 use std::{collections::HashMap, net::TcpListener};
 
-pub async fn start_server() -> Result<(), AnyError> {
+pub async fn start_server() -> Result<()> {
     if let None = crate::DATABASE.get() {
         warn!("Database missing, disabling repldb server.");
         return Ok(());

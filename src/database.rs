@@ -1,4 +1,4 @@
-use deno_core::error::AnyError;
+use anyhow::Result;
 use log::{debug, warn};
 use migration::MigratorTrait;
 use sea_orm::{ConnectOptions, Database};
@@ -8,7 +8,7 @@ use tokio::sync::OnceCell;
 pub static DATABASE: OnceCell<sea_orm::DatabaseConnection> = OnceCell::const_new();
 
 // TODO: allow disabling of db at runtime as well as compile time
-pub async fn setup() -> Result<(), AnyError> {
+pub async fn setup() -> Result<()> {
     let db_url;
 
     match std::env::var("HOMEVAL_DB") {
