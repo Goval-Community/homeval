@@ -4,7 +4,7 @@ use portable_pty::PtySize;
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, ErrorKind, Write},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use crate::channels::IPCMessage;
@@ -13,19 +13,12 @@ use tokio::sync::{Mutex, RwLock};
 
 use deno_core::{error::AnyError, op, OpDecl};
 
-use lazy_static::lazy_static;
-
 use crate::JsMessage;
 
-lazy_static! {
-    static ref MAX_SESSION: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
-}
-
-lazy_static! {
-    static ref PTY_CANCELLATION_MAP: RwLock<HashMap<u32, AbortHandle>> =
-        RwLock::new(HashMap::new());
-    static ref PTY_SESSION_MAP: RwLock<HashMap<u32, Vec<i32>>> = RwLock::new(HashMap::new());
-}
+static PTY_CANCELLATION_MAP: LazyLock<RwLock<HashMap<u32, AbortHandle>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static PTY_SESSION_MAP: LazyLock<RwLock<HashMap<u32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 struct PtyWriter {
     channel: i32,

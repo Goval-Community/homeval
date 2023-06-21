@@ -23,7 +23,7 @@ use homeval::goval;
 use homeval::goval::Command;
 use prost::Message;
 use tokio::sync::mpsc::UnboundedSender;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::LazyLock};
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
@@ -85,7 +85,7 @@ pub async fn start_server() -> Result<(), AnyError> {
     });
 
     while let Some(message) = rx.recv().await {
-        handle_message(message, SESSION_MAP.clone()).await;
+        handle_message(message, &SESSION_MAP).await;
     }
 
     Ok(())
@@ -136,7 +136,7 @@ async fn wsv2(
     ws.on_upgrade(move |socket| on_wsv2_upgrade(socket, token, state, addr))
 }
 
-async fn handle_message(message: IPCMessage, session_map: Arc<tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>>) {
+async fn handle_message(message: IPCMessage, session_map: &LazyLock<tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>>) {
     let cmd: Command;
         match message.to_cmd() {
             Err(err) => {
