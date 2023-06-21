@@ -1,0 +1,26 @@
+version: 2
+updates:
+    - package-ecosystem: "cargo"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      assignees:
+          - "PotentialStyx"
+      commit-message:
+          prefix: "build(deps):"
+          include: "scope"
+      labels:
+          - "cargo"
+          - "dependencies"
+    - package-ecosystem: "npm"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      assignees:
+          - "PotentialStyx"
+      commit-message:
+          prefix: "build(deps):"
+          include: "scope"
+      labels:
+          - "npm"
+          - "dependencies"
