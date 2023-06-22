@@ -1,75 +1,49 @@
 use axum::{
     extract::{
-        State, 
-        Path,
-        ConnectInfo,
-        ws::{
-            WebSocket,
-            WebSocketUpgrade,
-            Message as WsMessage,
-        }
+        ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
+        ConnectInfo, Path, State,
     },
-    response::{Response, IntoResponse},
+    response::{IntoResponse, Response},
     routing::get,
-    Router
+    Router,
 };
 
 #[cfg(feature = "fun-stuff")]
 use chrono::Datelike;
 
-use deno_core::Snapshot;
-use deno_core::error::AnyError;
-use homeval::goval;
-use homeval::goval::Command;
+use anyhow::Result;
+use goval::Command;
+use homeval_services::ServiceMetadata;
 use prost::Message;
-use tokio::sync::mpsc::UnboundedSender;
 use std::{net::SocketAddr, sync::LazyLock};
-use std::sync::Arc;
+use tokio::sync::{mpsc::UnboundedSender, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, trace, warn, debug, as_serde, as_display, as_error, as_debug};
+use log::{as_debug, as_display, as_error, as_serde, debug, error, info, trace, warn};
 use tokio::sync::mpsc;
 
 use crate::{
-    MAX_CHANNEL,
-    CHANNEL_METADATA,
-    CHANNEL_MESSAGES,
-    PROCCESS_CHANNEL_TO_ID,
-    SESSION_CHANNELS,
-    SESSION_CLIENT_INFO,
-    LAST_SESSION_USING_CHANNEL,
-    IMPLEMENTED_SERVICES,
-    SESSION_MAP,
-    MAX_SESSION,
-    CHANNEL_SESSIONS, 
+    CHANNEL_MESSAGES, CHANNEL_METADATA, CHANNEL_SESSIONS, LAST_SESSION_USING_CHANNEL, MAX_SESSION,
+    PROCCESS_CHANNEL_TO_ID, SESSION_CHANNELS, SESSION_CLIENT_INFO, SESSION_MAP,
 };
 
 use crate::{
-    channels::IPCMessage,
-    deno_extension::{
-        make_extension,
-        JsMessage,
-        Service
-    },
-    parse_paseto::{
-        parse,
-        ClientInfo
-    },
-    services
+    parse_paseto::{parse, ClientInfo},
+    IPCMessage, JsMessage,
 };
 
 #[derive(Clone)]
 struct AppState {
-    sender: UnboundedSender<IPCMessage>
+    sender: UnboundedSender<IPCMessage>,
 }
 
 static DEFAULT_REPLY: &str = "(づ ◕‿◕ )づ Hello there";
 
-pub async fn start_server() -> Result<(), AnyError> {
+pub async fn start_server() -> Result<()> {
     let addr = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
-    
+
     let (tx, mut rx) = mpsc::unbounded_channel::<IPCMessage>();
 
     let app = Router::new()
@@ -80,12 +54,15 @@ pub async fn start_server() -> Result<(), AnyError> {
 
     tokio::spawn(async move {
         axum::Server::bind(&addr.parse().unwrap())
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-        .await.unwrap()
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await
+            .unwrap()
     });
 
+    let max_channel = Mutex::new(0);
+
     while let Some(message) = rx.recv().await {
-        handle_message(message, &SESSION_MAP).await;
+        handle_message(message, &SESSION_MAP, &max_channel).await;
     }
 
     Ok(())
@@ -117,334 +94,339 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
         session_recv,
         session_id,
         parse(&token).await.unwrap_or(ClientInfo::default()),
-        addr
-    ).await {
+        addr,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(err) => {
             error!(error = as_display!(err); "accept_connection errored")
         }
     };
-    
 }
 
 async fn wsv2(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Path(token): Path<String>,
     ws: WebSocketUpgrade,
-    State(state): State<AppState>
+    State(state): State<AppState>,
 ) -> Response {
     ws.on_upgrade(move |socket| on_wsv2_upgrade(socket, token, state, addr))
 }
 
-async fn handle_message(message: IPCMessage, session_map: &LazyLock<tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>>) {
+async fn handle_message(
+    message: IPCMessage,
+    session_map: &LazyLock<
+        tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>,
+    >,
+    max_channel: &Mutex<i32>,
+) {
     let cmd: Command;
-        match message.to_cmd() {
-            Err(err) => {
-                error!(
-                    error = as_error!(err);
-                    "An error occured when decoding message in the main loop"
-                );
-                return;
-            }
-            Ok(res) => cmd = res,
+    match message.to_cmd() {
+        Err(err) => {
+            error!(
+                error = as_error!(err);
+                "An error occured when decoding message in the main loop"
+            );
+            return;
         }
+        Ok(res) => cmd = res,
+    }
 
-        let cmd_body: goval::command::Body;
+    let cmd_body: goval::command::Body;
 
-        match cmd.body {
-            None => {
-                error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
-                return;
-            }
-            Some(body) => cmd_body = body,
+    match cmd.body {
+        None => {
+            error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
+            return;
         }
+        Some(body) => cmd_body = body,
+    }
 
-        if cmd.channel == 0 {
-            match cmd_body {
-                goval::command::Body::Ping(_) => {
-                    let mut pong = goval::Command::default();
-                    pong.body = Some(goval::command::Body::Pong(goval::Pong::default()));
-                    pong.r#ref = cmd.r#ref;
-                    pong.channel = 0;
+    if cmd.channel == 0 {
+        match cmd_body {
+            goval::command::Body::Ping(_) => {
+                let mut pong = goval::Command::default();
+                pong.body = Some(goval::command::Body::Pong(goval::Pong::default()));
+                pong.r#ref = cmd.r#ref;
+                pong.channel = 0;
 
-                    if let Some(sender) = session_map.read().await.get(&message.session) {
-                        match sender.send(message.replace_cmd(pong)) {
-                            Ok(_) => {}
-                            Err(err) => {
-                                error!(error = as_error!(err);"Error occured while sending Pong");
-                            }
+                if let Some(sender) = session_map.read().await.get(&message.session) {
+                    match sender.send(message.replace_cmd(pong)) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            error!(error = as_error!(err);"Error occured while sending Pong");
                         }
-                    } else {
-                        error!("Missing session queue when sending Pong")
                     }
+                } else {
+                    error!("Missing session queue when sending Pong")
                 }
-                goval::command::Body::OpenChan(open_chan) => {
-                    if IMPLEMENTED_SERVICES.contains(&open_chan.service) {
-                        let mut found = false;
-                        let mut channel_id_held = 0;
+            }
+            goval::command::Body::OpenChan(open_chan) => {
+                let searcher: &str = &open_chan.service;
+                if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
+                    let mut found = false;
+                    let mut channel_id_held = 0;
 
-                        let attach = open_chan.action()
-                            == goval::open_channel::Action::AttachOrCreate
-                            || open_chan.action() == goval::open_channel::Action::Attach
-                            || open_chan.service == "git"; // git is just use for replspace api stuff
-                                                           // from what I can tell, so its just easier to have it as one instance.
-                        let create = open_chan.action()
-                            == goval::open_channel::Action::AttachOrCreate
-                            || open_chan.action() == goval::open_channel::Action::Create;
-                        if attach {
-                            let metadata = CHANNEL_METADATA.read().await;
-                            for (id, channel) in metadata.iter() {
-                                if channel.name.is_some()
-                                    && channel.name.clone().unwrap_or("".to_string())
-                                        == open_chan.name
-                                    && channel.service.clone() == open_chan.service
-                                {
-                                    found = true;
-                                    channel_id_held = id.clone();
-                                    continue;
-                                }
+                    let attach = open_chan.action() == goval::open_channel::Action::AttachOrCreate
+                        || open_chan.action() == goval::open_channel::Action::Attach
+                        || open_chan.service == "git"; // git is just use for replspace api stuff
+                                                       // from what I can tell, so its just easier to have it as one instance.
+                    let create = open_chan.action() == goval::open_channel::Action::AttachOrCreate
+                        || open_chan.action() == goval::open_channel::Action::Create;
+                    if attach {
+                        let metadata = CHANNEL_METADATA.read().await;
+                        for (id, channel) in metadata.iter() {
+                            if channel.name.is_some()
+                                && channel.name.clone().unwrap_or("".to_string()) == open_chan.name
+                                && channel.service.clone() == open_chan.service
+                            {
+                                found = true;
+                                channel_id_held = id.clone();
+                                continue;
                             }
                         }
+                    }
 
-                        if !found && create {
-                            trace!("executing openchan main block");
-                            let service = open_chan.service.clone();
-                            let mut max_channel = MAX_CHANNEL.lock().await;
-                            *max_channel += 1;
-                            let channel_id = max_channel.clone();
-                            channel_id_held = channel_id.clone();
-                            drop(max_channel);
+                    if !found && create {
+                        trace!("executing openchan main block");
+                        let service = open_chan.service.clone();
+                        let mut max_channel = max_channel.lock().await;
+                        *max_channel += 1;
+                        let channel_id = max_channel.clone();
+                        channel_id_held = channel_id.clone();
+                        drop(max_channel);
 
-                            let _channel_name: Option<String>;
+                        let _channel_name: Option<String>;
 
-                            if open_chan.name.len() > 0 {
-                                _channel_name = Some(open_chan.name);
-                            } else {
-                                _channel_name = None;
-                            }
+                        if open_chan.name.len() > 0 {
+                            _channel_name = Some(open_chan.name);
+                        } else {
+                            _channel_name = None;
+                        }
 
-                            let service_data = Service {
-                                service: service.clone(),
-                                id: channel_id,
-                                name: _channel_name,
-                            };
+                        let service_data = ServiceMetadata {
+                            service: service.clone(),
+                            id: channel_id,
+                            name: _channel_name,
+                        };
 
-                            trace!(channel = channel_id; "Awaiting queue write");
+                        trace!(channel = channel_id; "Awaiting queue write");
 
-                            CHANNEL_MESSAGES.write().await.insert(
-                                channel_id_held,
-                                Arc::new(deadqueue::unlimited::Queue::new()),
-                            );
+                        CHANNEL_MESSAGES.write().await.insert(
+                            channel_id_held,
+                            std::sync::Arc::new(deadqueue::unlimited::Queue::new()),
+                        );
 
-                            let mut metadata = CHANNEL_METADATA.write().await;
-                            metadata.insert(channel_id_held, service_data.clone());
-                            drop(metadata);
-                            trace!(channel = channel_id_held; "Added channel to queue list");
+                        let mut metadata = CHANNEL_METADATA.write().await;
+                        metadata.insert(channel_id_held, service_data.clone());
+                        drop(metadata);
+                        trace!(channel = channel_id_held; "Added channel to queue list");
 
-                            tokio::task::spawn_blocking(move || {
-                                let local = tokio::task::LocalSet::new();
+                        /*
+                        tokio::task::spawn_blocking(move || {
+                            let local = tokio::task::LocalSet::new();
 
-                                let rt = tokio::runtime::Handle::current();
-                                rt.block_on(async {
-                                    local
-                                        .run_until(async {
-                                            let mod_path =
-                                                &format!("services/{}.js", open_chan.service);
-                                            trace!(
-                                                path = mod_path,
-                                                service = open_chan.service;
-                                                "Loading module path"
-                                            );
-                                            let main_module: deno_core::url::Url;
-                                            let main_module_res = deno_core::resolve_path(
-                                                mod_path,
-                                                std::env::current_dir().unwrap().as_path(),
-                                            );
-                                            match main_module_res {
-                                                Err(err) => {
-                                                    error!(error = as_error!(err); "Error resolving js module");
-                                                    return;
-                                                }
-                                                Ok(result) => {
-                                                    main_module = result;
-                                                }
+                            let rt = tokio::runtime::Handle::current();
+                            rt.block_on(async {
+                                local
+                                    .run_until(async {
+                                        let mod_path =
+                                            &format!("services/{}.js", open_chan.service);
+                                        trace!(
+                                            path = mod_path,
+                                            service = open_chan.service;
+                                            "Loading module path"
+                                        );
+                                        let main_module: deno_core::url::Url;
+                                        let main_module_res = deno_core::resolve_path(
+                                            mod_path,
+                                            std::env::current_dir().unwrap().as_path(),
+                                        );
+                                        match main_module_res {
+                                            Err(err) => {
+                                                error!(error = as_error!(err); "Error resolving js module");
+                                                return;
                                             }
-
-                                            let mut js_runtime = deno_core::JsRuntime::new(
-                                                deno_core::RuntimeOptions {
-                                                    startup_snapshot: Some(Snapshot::Static(
-                                                        homeval::HOMEVAL_JS_SNAPSHOT,
-                                                    )),
-                                                    module_loader: Some(std::rc::Rc::new(
-                                                        deno_core::FsModuleLoader,
-                                                    )),
-                                                    extensions: vec![make_extension()],
-                                                    ..Default::default()
-                                                },
-                                            );
-
-                                            js_runtime
-                                                .execute_script(
-                                                    "[goval::generated::globals]",
-                                                    format!(
-                                                        "globalThis.serviceInfo = {};",
-                                                        serde_json::to_string(&service_data)
-                                                            .unwrap()
-                                                    )
-                                                    .into(),
-                                                )
-                                                .unwrap();
-
-                                            let mod_id = js_runtime
-                                                .load_main_module(
-                                                    &main_module,
-                                                    services::get_module_core(open_chan.service.clone())
-                                                        .expect("Error fetching module code"),
-                                                )
-                                                .await
-                                                .unwrap();
-                                            
-                                            let result = js_runtime.mod_evaluate(mod_id);
-                                            
-                                            match js_runtime.run_event_loop(false).await {
-                                                Ok(_) => {},
-                                                Err(err) => {
-                                                    error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
-                                                }
+                                            Ok(result) => {
+                                                main_module = result;
                                             }
+                                        }
 
-                                            match result.await {
-                                                Ok(inner) => {
-                                                    match inner {
-                                                        Ok(_) => {},
-                                                        Err(err) => {
-                                                            error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
-                                                        }
+                                        let mut js_runtime = deno_core::JsRuntime::new(
+                                            deno_core::RuntimeOptions {
+                                                startup_snapshot: Some(Snapshot::Static(
+                                                    homeval::HOMEVAL_JS_SNAPSHOT,
+                                                )),
+                                                module_loader: Some(std::rc::Rc::new(
+                                                    deno_core::FsModuleLoader,
+                                                )),
+                                                extensions: vec![make_extension()],
+                                                ..Default::default()
+                                            },
+                                        );
+
+                                        js_runtime
+                                            .execute_script(
+                                                "[goval::generated::globals]",
+                                                format!(
+                                                    "globalThis.serviceInfo = {};",
+                                                    serde_json::to_string(&service_data)
+                                                        .unwrap()
+                                                )
+                                                .into(),
+                                            )
+                                            .unwrap();
+
+                                        let mod_id = js_runtime
+                                            .load_main_module(
+                                                &main_module,
+                                                services::get_module_core(open_chan.service.clone())
+                                                    .expect("Error fetching module code"),
+                                            )
+                                            .await
+                                            .unwrap();
+
+                                        let result = js_runtime.mod_evaluate(mod_id);
+
+                                        match js_runtime.run_event_loop(false).await {
+                                            Ok(_) => {},
+                                            Err(err) => {
+                                                error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
+                                            }
+                                        }
+
+                                        match result.await {
+                                            Ok(inner) => {
+                                                match inner {
+                                                    Ok(_) => {},
+                                                    Err(err) => {
+                                                        error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
                                                     }
-                                                },
-                                                Err(err) => {
-                                                    error!(service = open_chan.service, err = as_error!(err); "Got error in v8 thread for service")
                                                 }
-                                            }  
+                                            },
+                                            Err(err) => {
+                                                error!(service = open_chan.service, err = as_error!(err); "Got error in v8 thread for service")
+                                            }
+                                        }
 
-                                            trace!(service = as_debug!(service_data); "Service v8 isolate stopped");
-                                        })
-                                        .await;
-                                });
+                                        trace!(service = as_debug!(service_data); "Service v8 isolate stopped");
+                                    })
+                                    .await;
                             });
-                            found = true;
-                        }
+                        });
+                        */
+                        found = true;
+                    }
 
-                        if !found {
-                            error!("Couldnt make channel");
-                            let mut protocol_error = goval::Command::default();
-                            let mut _inner = goval::ProtocolError::default();
-                            _inner.text = "Could not create / attach channel".to_string();
+                    if !found {
+                        error!("Couldnt make channel");
+                        let mut protocol_error = goval::Command::default();
+                        let mut _inner = goval::ProtocolError::default();
+                        _inner.text = "Could not create / attach channel".to_string();
 
-                            protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
-                            protocol_error.r#ref = cmd.r#ref;
-                            protocol_error.channel = 0;
-
-                            session_map
-                                .read()
-                                .await
-                                .get(&message.session)
-                                .unwrap()
-                                .send(message.replace_cmd(protocol_error))
-                                .unwrap();
-                            return;
-                        }
-
-                        let mut open_chan_res = goval::Command::default();
-                        let mut _open_res = goval::OpenChannelRes::default();
-                        _open_res.state = goval::open_channel_res::State::Created.into();
-                        _open_res.id = channel_id_held;
-                        open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
-                        open_chan_res.r#ref = cmd.r#ref;
-                        open_chan_res.channel = 0;
+                        protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
+                        protocol_error.r#ref = cmd.r#ref;
+                        protocol_error.channel = 0;
 
                         session_map
                             .read()
                             .await
                             .get(&message.session)
                             .unwrap()
-                            .send(message.replace_cmd(open_chan_res))
+                            .send(message.replace_cmd(protocol_error))
                             .unwrap();
-
-                        let msg_read = CHANNEL_MESSAGES.read().await;
-
-                        let queue = msg_read.get(&channel_id_held).unwrap().clone();
-
-                        drop(msg_read);
-
-                        queue.push(JsMessage::Attach(message.session));
-
-                        
-                        let mut guard = CHANNEL_SESSIONS
-                            .write()
-                            .await;
-
-                        match guard.get_mut(&channel_id_held) {
-                            Some(arr) => {
-                                arr.push(message.session);
-                            }
-                            None => {
-                                guard.insert(channel_id_held, vec![message.session]);
-                            }
-                        }
-
-                        drop(guard);
-
-                        SESSION_CHANNELS
-                            .write()
-                            .await
-                            .entry(message.session)
-                            .and_modify(|channels| channels.push(channel_id_held));
-                    } else {
-                        warn!(
-                            service = open_chan.service;
-                            "Missing service requested by openChan"
-                        )
-                    }
-                }
-                goval::command::Body::CloseChan(close_chan) => {
-                    // TODO: follow close_chan.action
-                    tokio::spawn(detach_channel(close_chan.id, message.session, false));
-                }
-                _ => {}
-            }
-        } else {
-            // Directly deal with Command::Input, should be faster
-            if let goval::command::Body::Input(input) = cmd_body {
-                if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
-                    let mut to_continue = false;
-                    if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(&pty_id) {
-                        queue.push(input);
-                        to_continue = true;
-                    } else {
-                        error!(pty_id = pty_id; "Couldn't find pty to write to");
-                    }
-
-                    if to_continue {
                         return;
                     }
+
+                    let mut open_chan_res = goval::Command::default();
+                    let mut _open_res = goval::OpenChannelRes::default();
+                    _open_res.state = goval::open_channel_res::State::Created.into();
+                    _open_res.id = channel_id_held;
+                    open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
+                    open_chan_res.r#ref = cmd.r#ref;
+                    open_chan_res.channel = 0;
+
+                    session_map
+                        .read()
+                        .await
+                        .get(&message.session)
+                        .unwrap()
+                        .send(message.replace_cmd(open_chan_res))
+                        .unwrap();
+
+                    let msg_read = CHANNEL_MESSAGES.read().await;
+
+                    let queue = msg_read.get(&channel_id_held).unwrap().clone();
+
+                    drop(msg_read);
+
+                    queue.push(JsMessage::Attach(message.session));
+
+                    let mut guard = CHANNEL_SESSIONS.write().await;
+
+                    match guard.get_mut(&channel_id_held) {
+                        Some(arr) => {
+                            arr.push(message.session);
+                        }
+                        None => {
+                            guard.insert(channel_id_held, vec![message.session]);
+                        }
+                    }
+
+                    drop(guard);
+
+                    SESSION_CHANNELS
+                        .write()
+                        .await
+                        .entry(message.session)
+                        .and_modify(|channels| channels.push(channel_id_held));
+                } else {
+                    warn!(
+                        service = open_chan.service;
+                        "Missing service requested by openChan"
+                    )
                 }
             }
 
-            let msg_lock = CHANNEL_MESSAGES.read().await;
-
-            let queue = msg_lock.get(&cmd.channel).unwrap().clone();
-
-            drop(msg_lock);
-
-            queue.push(JsMessage::IPC(message.clone()));
-
-            let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
-
-            hashmap_lock.insert(cmd.channel, message.session);
-
-            drop(hashmap_lock);
+            goval::command::Body::CloseChan(close_chan) => {
+                // TODO: follow close_chan.action
+                tokio::spawn(detach_channel(close_chan.id, message.session, false));
+            }
+            _ => {}
         }
+    } else {
+        // Directly deal with Command::Input, should be faster
+        if let goval::command::Body::Input(input) = cmd_body {
+            if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
+                let mut to_continue = false;
+                if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(&pty_id) {
+                    queue.push(input);
+                    to_continue = true;
+                } else {
+                    error!(pty_id = pty_id; "Couldn't find pty to write to");
+                }
+
+                if to_continue {
+                    return;
+                }
+            }
+        }
+
+        let msg_lock = CHANNEL_MESSAGES.read().await;
+
+        let queue = msg_lock.get(&cmd.channel).unwrap().clone();
+
+        drop(msg_lock);
+
+        queue.push(JsMessage::IPC(message.clone()));
+
+        let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
+
+        hashmap_lock.insert(cmd.channel, message.session);
+
+        drop(hashmap_lock);
+    }
 }
 
 async fn detach_channel(channel: i32, session: i32, forced: bool) {
@@ -454,7 +436,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
         .write()
         .await
         .entry(session)
-        .and_modify(|channels| channels.retain(|chan: &i32| { chan.clone() != channel }));
+        .and_modify(|channels| channels.retain(|chan: &i32| chan.clone() != channel));
 
     let msg_lock = CHANNEL_MESSAGES.read().await;
 
@@ -473,8 +455,8 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
     trace!("Done waiting for sessions lock");
 
     match guard.get_mut(&channel) {
-        Some(arr) => { 
-            arr.retain(|sess| { sess.clone() != session });
+        Some(arr) => {
+            arr.retain(|sess| sess.clone() != session);
             if arr.len() == 0 {
                 trace!(channel = channel; "Shutting down channel");
                 queue.push(JsMessage::Shutdown(true));
@@ -491,7 +473,6 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
         }
         None => {
             warn!(channel = channel; "Missing CHANNEL_SESSIONS");
-
         }
     }
 
@@ -500,11 +481,8 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
 
 async fn send_message(
     message: goval::Command,
-    stream: &mut futures_util::stream::SplitSink<
-        WebSocket,
-        WsMessage,
-    >,
-) -> Result<(), AnyError> {
+    stream: &mut futures_util::stream::SplitSink<WebSocket, WsMessage>,
+) -> Result<()> {
     let mut buf = Vec::new();
     buf.reserve(message.encoded_len());
     message.encode(&mut buf)?;
@@ -518,8 +496,8 @@ async fn accept_connection(
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
     session: i32,
     client: ClientInfo,
-    addr: SocketAddr
-) -> Result<(), AnyError> {
+    addr: SocketAddr,
+) -> Result<()> {
     info!(peer_address = as_display!(addr); "New connection");
 
     info!(client = as_serde!(client); "New client");

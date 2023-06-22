@@ -1,9 +1,5 @@
 #![feature(lazy_cell)]
 
-use deno_extension::messaging::ReplspaceMessage;
-use homeval::goval;
-use serde::{Deserialize, Serialize};
-
 use std::sync::LazyLock;
 use std::time::Instant;
 use std::{collections::HashMap, io::Error, sync::Arc};
@@ -11,37 +7,7 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
 
-mod channels;
-use channels::IPCMessage;
-
-// mod deno_extension;
-// use deno_extension::{JsMessage, Service};
-
-struct Service {}
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum JsMessage {
-    #[serde(rename = "ipc")]
-    IPC(IPCMessage),
-    Attach(i32),
-    Detach(i32),
-    Close(i32),
-    ProcessDead(u32, i32),
-    CmdDead(i32),
-    Replspace(i32, ReplspaceMessage), // session, message
-    Shutdown(bool), // Shutdown the service, value has to be true so that runtime.js can match it in an if check
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum ReplspaceMessage {
-    GithubTokenReq(String),                 // nonce
-    OpenFileReq(String, bool, String),      // file, wait for close, nonce
-    OpenMultipleFiles(Vec<String>, String), // files, nonce
-
-    GithubTokenRes(String), // token
-    OpenFileRes,
-}
+use homeval_services::{IPCMessage, JsMessage, ReplspaceMessage, ServiceMetadata};
 
 mod parse_paseto;
 use parse_paseto::ClientInfo;
@@ -66,7 +32,6 @@ pub static DOTREPLIT_CONFIG: LazyLock<DotReplit> = LazyLock::new(|| {
 });
 
 static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
-static MAX_CHANNEL: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
 static SESSION_CHANNELS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -75,7 +40,7 @@ static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<i32, ClientInfo>>> =
 static CHANNEL_MESSAGES: LazyLock<
     RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>,
 > = LazyLock::new(|| RwLock::new(HashMap::new()));
-static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, Service>>> =
+static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, ServiceMetadata>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -105,7 +70,7 @@ mod database;
 #[cfg(feature = "database")]
 pub use database::DATABASE;
 
-// mod goval_server;
+mod goval_server;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -129,7 +94,7 @@ async fn main() -> Result<(), Error> {
     #[cfg(feature = "repldb")]
     tokio::spawn(repldb_server::start_server());
 
-    // goval_server::start_server().await.unwrap();
+    goval_server::start_server().await.unwrap();
 
     Ok(())
 }

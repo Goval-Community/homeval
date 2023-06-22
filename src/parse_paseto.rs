@@ -1,6 +1,6 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
-use homeval::goval;
+use goval;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::io::Error;

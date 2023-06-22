@@ -10,7 +10,7 @@ message ToolchainConfigs {
 
 use std::collections::HashMap;
 
-use homeval::goval;
+use goval;
 pub use serde::{Deserialize, Serialize};
 
 pub mod toolchain {

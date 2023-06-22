@@ -7,3 +7,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
+deadqueue = { version = "0.2.4", default-features = false, features = ["unlimited"] }
+goval = { package = "protobuf", path = "../protobuf"}
+prost = "0.11.9"
+serde = "1.0.164"
+
+[lib]
+name = "services"
+path = "src/lib.rs"
