@@ -1,5 +1,6 @@
 mod chat;
 mod gcsfiles;
+mod presence;
 mod traits;
 mod types;
 
@@ -26,6 +27,7 @@ impl Channel {
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
             "chat" => Box::new(chat::Chat {}),
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
+            "presence" => Box::new(presence::Presence::new()),
             _ => return Err(format_err!("Unknown service: {}", service)),
         };
 
@@ -35,6 +37,7 @@ impl Channel {
                 name,
                 service,
                 clients: HashMap::new(),
+                sessions: HashMap::new(),
             },
             _inner: channel,
         })
@@ -59,7 +62,9 @@ impl Channel {
 impl Channel {
     async fn msg(&mut self, message: ChannelMessage) -> Result<LoopControl> {
         match message {
-            ChannelMessage::Attach(session, sender) => self.attach(session, sender).await,
+            ChannelMessage::Attach(session, client, sender) => {
+                self.attach(session, client, sender).await
+            }
             ChannelMessage::Detach(session) => self.detach(session).await,
             ChannelMessage::IPC(ipc) => self.message(ipc.command, ipc.session).await,
             ChannelMessage::ProcessDead(_, _) => todo!(),
@@ -79,7 +84,6 @@ impl Channel {
             .await?
         {
             Some(mut msg) => {
-                msg.channel = self.info.id;
                 msg.r#ref = message.r#ref;
                 self.info.send(msg, SendSessions::Only(session)).await?
             }
@@ -91,18 +95,26 @@ impl Channel {
     async fn attach(
         &mut self,
         session: i32,
+        client: ClientInfo,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<LoopControl> {
+        self.info.sessions.insert(session, client.clone());
         self.info.clients.insert(session, sender);
-        self._inner.attach(&self.info, session).await?;
+        match self._inner.attach(&self.info, client, session).await? {
+            None => {}
+            Some(msg) => {
+                self.info.send(msg, SendSessions::Only(session)).await?;
+            }
+        }
         Ok(LoopControl::Cont)
     }
 
     async fn detach(&mut self, session: i32) -> Result<LoopControl> {
+        self.info.sessions.retain(|sess, _| sess != &session);
         self.info.clients.retain(|sess, _| sess != &session);
         self._inner.detach(&self.info, session).await?;
         Ok(LoopControl::Cont)
     }
 }
 
-pub static IMPLEMENTED_SERVICES: &[&str] = &["chat", "gcsfiles"];
+pub static IMPLEMENTED_SERVICES: &[&str] = &["chat", "gcsfiles", "presence"];

@@ -19,13 +19,16 @@ pub struct ChannelInfo {
     pub clients: HashMap<i32, mpsc::UnboundedSender<IPCMessage>>,
     pub service: String,
     pub name: Option<String>,
+    pub sessions: HashMap<i32, ClientInfo>,
 }
 
 impl ChannelInfo {
-    pub async fn send(&self, message: goval::Command, sessions: SendSessions) -> Result<()> {
+    pub async fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
         let clients: Vec<i32>;
+        message.channel = self.id;
         match sessions {
             SendSessions::Everyone => {
+                message.session = 0;
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
                     _clients.push(client.clone())
@@ -34,6 +37,7 @@ impl ChannelInfo {
                 clients = _clients;
             }
             SendSessions::EveryoneExcept(excluded) => {
+                message.session = -excluded;
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
                     if client != &excluded {
@@ -43,7 +47,10 @@ impl ChannelInfo {
 
                 clients = _clients;
             }
-            SendSessions::Only(session) => clients = vec![session],
+            SendSessions::Only(session) => {
+                message.session = session;
+                clients = vec![session]
+            }
         }
 
         for client in clients {
@@ -81,7 +88,7 @@ pub enum ReplspaceMessage {
 #[derive(Clone, Debug)]
 pub enum ChannelMessage {
     IPC(IPCMessage),
-    Attach(i32, mpsc::UnboundedSender<IPCMessage>),
+    Attach(i32, ClientInfo, mpsc::UnboundedSender<IPCMessage>),
     Detach(i32),
     ProcessDead(u32, i32),
     CmdDead(i32),
@@ -116,5 +123,24 @@ impl TryFrom<Vec<u8>> for IPCMessage {
             command: goval::Command::decode(value.as_slice())?,
             session: 0,
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ClientInfo {
+    pub is_secure: bool,
+
+    pub username: String,
+    pub id: u32,
+}
+
+impl Default for ClientInfo {
+    fn default() -> Self {
+        Self {
+            is_secure: false,
+
+            username: "homeval-user".to_owned(),
+            id: 23054564,
+        }
     }
 }

@@ -1,5 +1,5 @@
 pub struct Chat {}
-use crate::SendSessions;
+use crate::{ClientInfo, SendSessions};
 
 use super::traits;
 use anyhow::Result;
@@ -25,6 +25,7 @@ impl traits::Service for Chat {
     async fn attach(
         &mut self,
         _info: &super::types::ChannelInfo,
+        _client: ClientInfo,
         _session: i32,
     ) -> Result<Option<goval::Command>> {
         Ok(None)

@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "homeval"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2526,6 +2526,7 @@ dependencies = [
  "deadqueue",
  "log",
  "prost",
+ "prost-types",
  "protobuf",
  "serde",
  "serde_json",

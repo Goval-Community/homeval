@@ -1,8 +1,8 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use goval;
+use homeval_services::ClientInfo;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use std::io::Error;
 
 #[cfg(feature = "verify_connections")]
@@ -14,28 +14,6 @@ static KEYS: tokio::sync::OnceCell<std::collections::HashMap<String, String>> =
 
 #[cfg(feature = "verify_connections")]
 use log::{as_display, warn};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ClientInfo {
-    // In the future this will indicate if the jwt signature was legit or not
-    // For now it'll always be false
-    pub is_secure: bool,
-
-    pub username: String,
-    pub id: u32,
-}
-
-impl ClientInfo {
-    pub fn default() -> ClientInfo {
-        ClientInfo {
-            is_secure: false,
-
-            username: "homeval-user".to_owned(),
-            id: 23054564,
-        }
-    }
-}
 
 fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool)> {
     let token_parts = token.split(".").collect::<Vec<_>>();

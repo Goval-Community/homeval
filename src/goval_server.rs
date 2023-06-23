@@ -13,13 +13,13 @@ use chrono::Datelike;
 
 use anyhow::Result;
 use goval::{Command, OpenChannel};
-use homeval_services::ServiceMetadata;
+use homeval_services::{ClientInfo, ServiceMetadata};
 use prost::Message;
 use std::{net::SocketAddr, sync::LazyLock};
 use tokio::sync::{mpsc::UnboundedSender, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{as_debug, as_display, as_error, as_serde, debug, error, info, trace, warn};
+use log::{as_debug, as_display, as_error, debug, error, info, trace, warn};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -27,10 +27,7 @@ use crate::{
     PROCCESS_CHANNEL_TO_ID, SESSION_CHANNELS, SESSION_CLIENT_INFO, SESSION_MAP,
 };
 
-use crate::{
-    parse_paseto::{parse, ClientInfo},
-    ChannelMessage, IPCMessage,
-};
+use crate::{parse_paseto::parse, ChannelMessage, IPCMessage};
 
 #[derive(Clone)]
 struct AppState {
@@ -330,6 +327,12 @@ async fn open_channel(
 
         queue.send(ChannelMessage::Attach(
             message.session,
+            SESSION_CLIENT_INFO
+                .read()
+                .await
+                .get(&message.session)
+                .unwrap()
+                .clone(),
             SESSION_MAP
                 .read()
                 .await
@@ -433,7 +436,7 @@ async fn accept_connection(
 ) -> Result<()> {
     info!(peer_address = as_display!(addr); "New connection");
 
-    info!(client = as_serde!(client); "New client");
+    info!(client = as_debug!(client); "New client");
 
     SESSION_CLIENT_INFO
         .write()

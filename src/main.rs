@@ -7,10 +7,9 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
 
-use homeval_services::{ChannelMessage, IPCMessage, ReplspaceMessage, ServiceMetadata};
+use homeval_services::{ChannelMessage, ClientInfo, IPCMessage, ReplspaceMessage, ServiceMetadata};
 
 mod parse_paseto;
-use parse_paseto::ClientInfo;
 
 mod config;
 use config::dotreplit::DotReplit;
