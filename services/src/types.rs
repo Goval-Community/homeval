@@ -1,7 +1,64 @@
+use std::collections::HashMap;
+
+use anyhow::Result;
 use goval;
+use log::error;
 use prost::Message;
 use serde;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+
+pub enum SendSessions {
+    Only(i32),
+    EveryoneExcept(i32),
+    Everyone,
+}
+
+pub struct ChannelInfo {
+    pub id: i32,
+    pub clients: HashMap<i32, mpsc::UnboundedSender<IPCMessage>>,
+    pub service: String,
+    pub name: Option<String>,
+}
+
+impl ChannelInfo {
+    pub async fn send(&self, message: goval::Command, sessions: SendSessions) -> Result<()> {
+        let clients: Vec<i32>;
+        match sessions {
+            SendSessions::Everyone => {
+                let mut _clients = vec![];
+                for client in self.clients.keys() {
+                    _clients.push(client.clone())
+                }
+
+                clients = _clients;
+            }
+            SendSessions::EveryoneExcept(excluded) => {
+                let mut _clients = vec![];
+                for client in self.clients.keys() {
+                    if client != &excluded {
+                        _clients.push(client.clone())
+                    }
+                }
+
+                clients = _clients;
+            }
+            SendSessions::Only(session) => clients = vec![session],
+        }
+
+        for client in clients {
+            if let Some(sender) = self.clients.get(&client) {
+                sender.send(IPCMessage {
+                    command: message.clone(),
+                    session: client,
+                })?;
+            } else {
+                error!("Missing session outbound message queue in op_send_msg")
+            }
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct ServiceMetadata {
@@ -21,41 +78,43 @@ pub enum ReplspaceMessage {
     OpenFileRes,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum JsMessage {
-    #[serde(rename = "ipc")]
+#[derive(Clone, Debug)]
+pub enum ChannelMessage {
     IPC(IPCMessage),
-    Attach(i32),
+    Attach(i32, mpsc::UnboundedSender<IPCMessage>),
     Detach(i32),
-    Close(i32),
     ProcessDead(u32, i32),
     CmdDead(i32),
     Replspace(i32, ReplspaceMessage), // session, message
-    Shutdown(bool), // Shutdown the service, value has to be true so that runtime.js can match it in an if check
+    Shutdown, // Shutdown the service, value has to be true so that runtime.js can match it in an if check
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct IPCMessage {
-    pub bytes: Vec<u8>,
+    pub command: goval::Command,
     pub session: i32,
 }
 
 impl IPCMessage {
-    pub fn from_cmd(cmd: goval::Command, session: i32) -> IPCMessage {
-        let mut bytes = Vec::new();
-        bytes.reserve(cmd.encoded_len());
-        cmd.encode(&mut bytes).unwrap();
-
-        IPCMessage { bytes, session }
-    }
-
-    pub fn to_cmd(&self) -> Result<goval::Command, prost::DecodeError> {
-        Ok(goval::Command::decode(&*self.bytes)?)
-    }
-
     pub fn replace_cmd(&self, cmd: goval::Command) -> IPCMessage {
-        IPCMessage::from_cmd(cmd, self.session)
+        IPCMessage {
+            command: cmd,
+            session: self.session,
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.command.encode_to_vec()
+    }
+}
+
+impl TryFrom<Vec<u8>> for IPCMessage {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            command: goval::Command::decode(value.as_slice())?,
+            session: 0,
+        })
     }
 }

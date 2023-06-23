@@ -7,7 +7,7 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
 
-use homeval_services::{IPCMessage, JsMessage, ReplspaceMessage, ServiceMetadata};
+use homeval_services::{ChannelMessage, IPCMessage, ReplspaceMessage, ServiceMetadata};
 
 mod parse_paseto;
 use parse_paseto::ClientInfo;
@@ -38,7 +38,7 @@ static SESSION_CHANNELS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
 static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<i32, ClientInfo>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static CHANNEL_MESSAGES: LazyLock<
-    RwLock<HashMap<i32, Arc<deadqueue::unlimited::Queue<JsMessage>>>>,
+    RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<ChannelMessage>>>,
 > = LazyLock::new(|| RwLock::new(HashMap::new()));
 static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, ServiceMetadata>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));

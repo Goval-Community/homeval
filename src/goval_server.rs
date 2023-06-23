@@ -12,7 +12,7 @@ use axum::{
 use chrono::Datelike;
 
 use anyhow::Result;
-use goval::Command;
+use goval::{Command, OpenChannel};
 use homeval_services::ServiceMetadata;
 use prost::Message;
 use std::{net::SocketAddr, sync::LazyLock};
@@ -29,7 +29,7 @@ use crate::{
 
 use crate::{
     parse_paseto::{parse, ClientInfo},
-    IPCMessage, JsMessage,
+    ChannelMessage, IPCMessage,
 };
 
 #[derive(Clone)]
@@ -121,17 +121,7 @@ async fn handle_message(
     >,
     max_channel: &Mutex<i32>,
 ) {
-    let cmd: Command;
-    match message.to_cmd() {
-        Err(err) => {
-            error!(
-                error = as_error!(err);
-                "An error occured when decoding message in the main loop"
-            );
-            return;
-        }
-        Ok(res) => cmd = res,
-    }
+    let cmd: Command = message.clone().command;
 
     let cmd_body: goval::command::Body;
 
@@ -163,235 +153,22 @@ async fn handle_message(
                 }
             }
             goval::command::Body::OpenChan(open_chan) => {
-                let searcher: &str = &open_chan.service;
-                if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
-                    let mut found = false;
-                    let mut channel_id_held = 0;
-
-                    let attach = open_chan.action() == goval::open_channel::Action::AttachOrCreate
-                        || open_chan.action() == goval::open_channel::Action::Attach
-                        || open_chan.service == "git"; // git is just use for replspace api stuff
-                                                       // from what I can tell, so its just easier to have it as one instance.
-                    let create = open_chan.action() == goval::open_channel::Action::AttachOrCreate
-                        || open_chan.action() == goval::open_channel::Action::Create;
-                    if attach {
-                        let metadata = CHANNEL_METADATA.read().await;
-                        for (id, channel) in metadata.iter() {
-                            if channel.name.is_some()
-                                && channel.name.clone().unwrap_or("".to_string()) == open_chan.name
-                                && channel.service.clone() == open_chan.service
-                            {
-                                found = true;
-                                channel_id_held = id.clone();
-                                continue;
-                            }
-                        }
-                    }
-
-                    if !found && create {
-                        trace!("executing openchan main block");
-                        let service = open_chan.service.clone();
-                        let mut max_channel = max_channel.lock().await;
-                        *max_channel += 1;
-                        let channel_id = max_channel.clone();
-                        channel_id_held = channel_id.clone();
-                        drop(max_channel);
-
-                        let _channel_name: Option<String>;
-
-                        if open_chan.name.len() > 0 {
-                            _channel_name = Some(open_chan.name);
-                        } else {
-                            _channel_name = None;
-                        }
-
-                        let service_data = ServiceMetadata {
-                            service: service.clone(),
-                            id: channel_id,
-                            name: _channel_name,
-                        };
-
-                        trace!(channel = channel_id; "Awaiting queue write");
-
-                        CHANNEL_MESSAGES.write().await.insert(
-                            channel_id_held,
-                            std::sync::Arc::new(deadqueue::unlimited::Queue::new()),
-                        );
-
-                        let mut metadata = CHANNEL_METADATA.write().await;
-                        metadata.insert(channel_id_held, service_data.clone());
-                        drop(metadata);
-                        trace!(channel = channel_id_held; "Added channel to queue list");
-
-                        /*
-                        tokio::task::spawn_blocking(move || {
-                            let local = tokio::task::LocalSet::new();
-
-                            let rt = tokio::runtime::Handle::current();
-                            rt.block_on(async {
-                                local
-                                    .run_until(async {
-                                        let mod_path =
-                                            &format!("services/{}.js", open_chan.service);
-                                        trace!(
-                                            path = mod_path,
-                                            service = open_chan.service;
-                                            "Loading module path"
-                                        );
-                                        let main_module: deno_core::url::Url;
-                                        let main_module_res = deno_core::resolve_path(
-                                            mod_path,
-                                            std::env::current_dir().unwrap().as_path(),
-                                        );
-                                        match main_module_res {
-                                            Err(err) => {
-                                                error!(error = as_error!(err); "Error resolving js module");
-                                                return;
-                                            }
-                                            Ok(result) => {
-                                                main_module = result;
-                                            }
-                                        }
-
-                                        let mut js_runtime = deno_core::JsRuntime::new(
-                                            deno_core::RuntimeOptions {
-                                                startup_snapshot: Some(Snapshot::Static(
-                                                    homeval::HOMEVAL_JS_SNAPSHOT,
-                                                )),
-                                                module_loader: Some(std::rc::Rc::new(
-                                                    deno_core::FsModuleLoader,
-                                                )),
-                                                extensions: vec![make_extension()],
-                                                ..Default::default()
-                                            },
-                                        );
-
-                                        js_runtime
-                                            .execute_script(
-                                                "[goval::generated::globals]",
-                                                format!(
-                                                    "globalThis.serviceInfo = {};",
-                                                    serde_json::to_string(&service_data)
-                                                        .unwrap()
-                                                )
-                                                .into(),
-                                            )
-                                            .unwrap();
-
-                                        let mod_id = js_runtime
-                                            .load_main_module(
-                                                &main_module,
-                                                services::get_module_core(open_chan.service.clone())
-                                                    .expect("Error fetching module code"),
-                                            )
-                                            .await
-                                            .unwrap();
-
-                                        let result = js_runtime.mod_evaluate(mod_id);
-
-                                        match js_runtime.run_event_loop(false).await {
-                                            Ok(_) => {},
-                                            Err(err) => {
-                                                error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
-                                            }
-                                        }
-
-                                        match result.await {
-                                            Ok(inner) => {
-                                                match inner {
-                                                    Ok(_) => {},
-                                                    Err(err) => {
-                                                        error!(service = open_chan.service, err = as_display!(err); "Got error in v8 thread for service")
-                                                    }
-                                                }
-                                            },
-                                            Err(err) => {
-                                                error!(service = open_chan.service, err = as_error!(err); "Got error in v8 thread for service")
-                                            }
-                                        }
-
-                                        trace!(service = as_debug!(service_data); "Service v8 isolate stopped");
-                                    })
-                                    .await;
-                            });
-                        });
-                        */
-                        found = true;
-                    }
-
-                    if !found {
-                        error!("Couldnt make channel");
-                        let mut protocol_error = goval::Command::default();
-                        let mut _inner = goval::ProtocolError::default();
-                        _inner.text = "Could not create / attach channel".to_string();
-
-                        protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
-                        protocol_error.r#ref = cmd.r#ref;
-                        protocol_error.channel = 0;
-
-                        session_map
-                            .read()
-                            .await
-                            .get(&message.session)
-                            .unwrap()
-                            .send(message.replace_cmd(protocol_error))
-                            .unwrap();
-                        return;
-                    }
-
-                    let mut open_chan_res = goval::Command::default();
-                    let mut _open_res = goval::OpenChannelRes::default();
-                    _open_res.state = goval::open_channel_res::State::Created.into();
-                    _open_res.id = channel_id_held;
-                    open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
-                    open_chan_res.r#ref = cmd.r#ref;
-                    open_chan_res.channel = 0;
-
-                    session_map
-                        .read()
-                        .await
-                        .get(&message.session)
-                        .unwrap()
-                        .send(message.replace_cmd(open_chan_res))
-                        .unwrap();
-
-                    let msg_read = CHANNEL_MESSAGES.read().await;
-
-                    let queue = msg_read.get(&channel_id_held).unwrap().clone();
-
-                    drop(msg_read);
-
-                    queue.push(JsMessage::Attach(message.session));
-
-                    let mut guard = CHANNEL_SESSIONS.write().await;
-
-                    match guard.get_mut(&channel_id_held) {
-                        Some(arr) => {
-                            arr.push(message.session);
-                        }
-                        None => {
-                            guard.insert(channel_id_held, vec![message.session]);
-                        }
-                    }
-
-                    drop(guard);
-
-                    SESSION_CHANNELS
-                        .write()
-                        .await
-                        .entry(message.session)
-                        .and_modify(|channels| channels.push(channel_id_held));
-                } else {
-                    warn!(
-                        service = open_chan.service;
-                        "Missing service requested by openChan"
-                    )
+                if let Err(err) = open_channel(open_chan, message, max_channel, session_map).await {
+                    error!(error = as_display!(err); "Error in open chan handler")
                 }
             }
 
             goval::command::Body::CloseChan(close_chan) => {
                 // TODO: follow close_chan.action
-                tokio::spawn(detach_channel(close_chan.id, message.session, false));
+                tokio::spawn(async move {
+                    match detach_channel(close_chan.id, message.session, true).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            error!(error = as_display!(err), session = message.session, channel = close_chan.id;
+                            "Error occured while detaching from channel")
+                        }
+                    }
+                });
             }
             _ => {}
         }
@@ -419,7 +196,9 @@ async fn handle_message(
 
         drop(msg_lock);
 
-        queue.push(JsMessage::IPC(message.clone()));
+        queue
+            .send(ChannelMessage::IPC(message.clone()))
+            .expect("TODO: deal with this");
 
         let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
 
@@ -429,7 +208,164 @@ async fn handle_message(
     }
 }
 
-async fn detach_channel(channel: i32, session: i32, forced: bool) {
+async fn open_channel(
+    open_chan: OpenChannel,
+    message: IPCMessage,
+    max_channel: &Mutex<i32>,
+    session_map: &LazyLock<
+        tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>,
+    >,
+) -> Result<()> {
+    let searcher: &str = &open_chan.service;
+    if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
+        let mut found = false;
+        let mut channel_id_held = 0;
+
+        let attach = open_chan.action() == goval::open_channel::Action::AttachOrCreate
+            || open_chan.action() == goval::open_channel::Action::Attach
+            || open_chan.service == "git"; // git is just use for replspace api stuff
+                                           // from what I can tell, so its just easier to have it as one instance.
+        let create = open_chan.action() == goval::open_channel::Action::AttachOrCreate
+            || open_chan.action() == goval::open_channel::Action::Create;
+        if attach {
+            let metadata = CHANNEL_METADATA.read().await;
+            for (id, channel) in metadata.iter() {
+                if channel.name.is_some()
+                    && channel.name.clone().unwrap_or("".to_string()) == open_chan.name
+                    && channel.service.clone() == open_chan.service
+                {
+                    found = true;
+                    channel_id_held = id.clone();
+                    continue;
+                }
+            }
+        }
+
+        if !found && create {
+            trace!("executing openchan main block");
+            let service = open_chan.service.clone();
+            let mut max_channel = max_channel.lock().await;
+            *max_channel += 1;
+            let channel_id = max_channel.clone();
+            channel_id_held = channel_id.clone();
+            drop(max_channel);
+
+            let _channel_name: Option<String>;
+
+            if open_chan.name.len() > 0 {
+                _channel_name = Some(open_chan.name);
+            } else {
+                _channel_name = None;
+            }
+
+            let service_data = ServiceMetadata {
+                service: service.clone(),
+                id: channel_id,
+                name: _channel_name.clone(),
+            };
+
+            trace!(channel = channel_id; "Awaiting queue write");
+
+            let (writer, reader) = mpsc::unbounded_channel();
+
+            CHANNEL_MESSAGES
+                .write()
+                .await
+                .insert(channel_id_held, writer);
+
+            let mut metadata = CHANNEL_METADATA.write().await;
+            metadata.insert(channel_id_held, service_data.clone());
+            drop(metadata);
+            trace!(channel = channel_id_held; "Added channel to queue list");
+
+            tokio::spawn(async move {
+                let mut channel =
+                    homeval_services::Channel::new(channel_id, service, _channel_name).unwrap();
+                channel.start(reader).await;
+            });
+            found = true;
+        }
+
+        if !found {
+            error!("Couldnt make channel");
+            let mut protocol_error = goval::Command::default();
+            let mut _inner = goval::ProtocolError::default();
+            _inner.text = "Could not create / attach channel".to_string();
+
+            protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
+            protocol_error.r#ref = message.command.r#ref.clone();
+            protocol_error.channel = 0;
+
+            session_map
+                .read()
+                .await
+                .get(&message.session)
+                .unwrap()
+                .send(message.replace_cmd(protocol_error))
+                .unwrap();
+            return Ok(());
+        }
+
+        let mut open_chan_res = goval::Command::default();
+        let mut _open_res = goval::OpenChannelRes::default();
+        _open_res.state = goval::open_channel_res::State::Created.into();
+        _open_res.id = channel_id_held;
+        open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
+        open_chan_res.r#ref = message.command.r#ref.clone();
+        open_chan_res.channel = 0;
+
+        session_map
+            .read()
+            .await
+            .get(&message.session)
+            .unwrap()
+            .send(message.replace_cmd(open_chan_res))
+            .unwrap();
+
+        let msg_read = CHANNEL_MESSAGES.read().await;
+
+        let queue = msg_read.get(&channel_id_held).unwrap().clone();
+
+        drop(msg_read);
+
+        queue.send(ChannelMessage::Attach(
+            message.session,
+            SESSION_MAP
+                .read()
+                .await
+                .get(&message.session)
+                .expect("TODO: deal with this")
+                .clone(),
+        ))?;
+
+        let mut guard = CHANNEL_SESSIONS.write().await;
+
+        match guard.get_mut(&channel_id_held) {
+            Some(arr) => {
+                arr.push(message.session);
+            }
+            None => {
+                guard.insert(channel_id_held, vec![message.session]);
+            }
+        }
+
+        drop(guard);
+
+        SESSION_CHANNELS
+            .write()
+            .await
+            .entry(message.session)
+            .and_modify(|channels| channels.push(channel_id_held));
+    } else {
+        warn!(
+            service = open_chan.service;
+            "Missing service requested by openChan"
+        )
+    }
+    Ok(())
+}
+
+async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> {
     trace!(session = session, channel = channel, forced = forced; "Client is closing a channel");
 
     SESSION_CHANNELS
@@ -444,11 +380,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
 
     drop(msg_lock);
 
-    if forced {
-        queue.push(JsMessage::Close(session));
-    } else {
-        queue.push(JsMessage::Detach(session));
-    }
+    queue.send(ChannelMessage::Detach(session))?;
 
     trace!("Waiting for sessions lock");
     let mut guard = CHANNEL_SESSIONS.write().await;
@@ -459,7 +391,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
             arr.retain(|sess| sess.clone() != session);
             if arr.len() == 0 {
                 trace!(channel = channel; "Shutting down channel");
-                queue.push(JsMessage::Shutdown(true));
+                queue.send(ChannelMessage::Shutdown)?;
 
                 tokio::spawn(async move {
                     CHANNEL_METADATA.write().await.remove(&channel);
@@ -477,6 +409,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) {
     }
 
     drop(guard);
+    Ok(())
 }
 
 async fn send_message(
@@ -550,10 +483,20 @@ async fn accept_connection(
             match _msg {
                 Ok(msg) => match msg {
                     WsMessage::Binary(buf) => {
-                        if let Err(err) = propagate.send(IPCMessage {
-                            bytes: buf,
-                            session,
-                        }) {
+                        let _message: anyhow::Result<IPCMessage> = buf.try_into();
+                        let message: IPCMessage;
+                        match _message {
+                            Ok(mut msg) => {
+                                msg.session = session;
+                                message = msg
+                            }
+                            Err(err) => {
+                                error!(error = as_display!(err), session = session; "Error decoding message from client");
+                                continue;
+                            }
+                        }
+
+                        if let Err(err) = propagate.send(message) {
                             error!(session = session, error = as_error!(err); "An error occured when enqueing message to global message queue")
                         }
                     }
@@ -562,7 +505,14 @@ async fn accept_connection(
                         for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
                         {
                             let channel = _channel.clone();
-                            tokio::spawn(detach_channel(channel, session, true));
+                            tokio::spawn(async move {
+                                match detach_channel(channel, session, true).await {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        error!(error = as_display!(err), session = session, channel = channel; "Error occured while detaching from channel")
+                                    }
+                                }
+                            });
                         }
 
                         SESSION_MAP.write().await.remove(&session);
@@ -583,7 +533,7 @@ async fn accept_connection(
     });
 
     while let Some(i) = sent.recv().await {
-        match write.send(WsMessage::Binary(i.bytes)).await {
+        match write.send(WsMessage::Binary(i.to_bytes())).await {
             Ok(_) => {}
             Err(err) => {
                 error!(

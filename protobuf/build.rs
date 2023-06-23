@@ -2,7 +2,7 @@ use prost_build::Config;
 extern crate prost_build;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/goval.protobufs");
+    println!("cargo:rerun-if-changed=src/goval.proto");
 
     // Compile protobufs
     let mut config = Config::new();

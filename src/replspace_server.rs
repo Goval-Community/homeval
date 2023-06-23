@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::oneshot::channel;
 
-use crate::{JsMessage, ReplspaceMessage};
+use crate::{ChannelMessage, ReplspaceMessage};
 
 pub async fn start_server() -> Result<()> {
     info!("Replspace api server listening on: 127.0.0.1:8283");
@@ -63,12 +63,12 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
 
     drop(callback_table);
 
-    let to_send = JsMessage::Replspace(session, ReplspaceMessage::GithubTokenReq(nonce));
+    let to_send = ChannelMessage::Replspace(session, ReplspaceMessage::GithubTokenReq(nonce));
 
     let msg_lock = crate::CHANNEL_MESSAGES.read().await;
 
     for channel in msg_lock.values() {
-        channel.push(to_send.clone());
+        channel.send(to_send.clone()).expect("TODO: deal with this");
     }
     // let queue = msg_lock.get(&cmd.channel).unwrap().clone();
 
@@ -169,7 +169,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
         rx = None
     }
 
-    let to_send = JsMessage::Replspace(
+    let to_send = ChannelMessage::Replspace(
         session,
         ReplspaceMessage::OpenFileReq(query.filename, query.wait_for_close, nonce),
     );
@@ -177,7 +177,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
     let msg_lock = crate::CHANNEL_MESSAGES.read().await;
 
     for channel in msg_lock.values() {
-        channel.push(to_send.clone());
+        channel.send(to_send.clone()).expect("TODO: deal with this");
     }
 
     drop(msg_lock);
