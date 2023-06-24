@@ -1,5 +1,6 @@
 mod chat;
 mod gcsfiles;
+mod ot;
 mod presence;
 mod traits;
 mod types;
@@ -28,6 +29,7 @@ impl Channel {
             "chat" => Box::new(chat::Chat {}),
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
+            "ot" => Box::new(ot::OT::new()),
             _ => return Err(format_err!("Unknown service: {}", service)),
         };
 
@@ -117,4 +119,4 @@ impl Channel {
     }
 }
 
-pub static IMPLEMENTED_SERVICES: &[&str] = &["chat", "gcsfiles", "presence"];
+pub static IMPLEMENTED_SERVICES: &[&str] = &["chat", "gcsfiles", "presence", "ot"];
