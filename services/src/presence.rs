@@ -2,7 +2,7 @@ pub struct Presence {
     users: Vec<goval::User>,
     files: HashMap<i32, goval::FileOpened>,
 }
-use crate::{ClientInfo, SendSessions};
+use crate::{ClientInfo, IPCMessage, SendSessions};
 use log::{as_debug, info, warn};
 use std::{
     collections::HashMap,
@@ -102,6 +102,7 @@ impl traits::Service for Presence {
         info: &super::types::ChannelInfo,
         client: ClientInfo,
         session: i32,
+        _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         let mut roster = goval::Command::default();
         let mut _inner = goval::Roster::default();

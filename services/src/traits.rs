@@ -1,14 +1,14 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::ClientInfo;
+use crate::{ClientInfo, IPCMessage};
 
 #[async_trait]
 pub(crate) trait Service {
     async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
         Ok(())
     }
-    async fn shutdown(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
+    async fn shutdown(self: Box<Self>, _info: &super::types::ChannelInfo) -> Result<()> {
         Ok(())
     }
 
@@ -26,6 +26,7 @@ pub(crate) trait Service {
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
         _session: i32,
+        _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         Ok(None)
     }

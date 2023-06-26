@@ -276,8 +276,9 @@ async fn open_channel(
             trace!(channel = channel_id_held; "Added channel to queue list");
 
             tokio::spawn(async move {
-                let mut channel =
-                    homeval_services::Channel::new(channel_id, service, _channel_name).unwrap();
+                let channel = homeval_services::Channel::new(channel_id, service, _channel_name)
+                    .await
+                    .expect("TODO: Deal with this");
                 channel.start(reader).await;
             });
             found = true;

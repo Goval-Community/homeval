@@ -21,13 +21,4 @@ impl traits::Service for Chat {
             .await?;
         Ok(None)
     }
-
-    async fn attach(
-        &mut self,
-        _info: &super::types::ChannelInfo,
-        _client: ClientInfo,
-        _session: i32,
-    ) -> Result<Option<goval::Command>> {
-        Ok(None)
-    }
 }
