@@ -28,7 +28,7 @@ lazy_static = "1.4.0"
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_serde"] }
 prost = "0.11.8"
 prost-types = "0.11.8"
-serde_json = "1.0.97"
+serde_json = "1.0.99"
 serde = "1.0.162"
 tokio = {version="1.26.0", features = ["full"]}
 tokio-stream = { version = "0.1.14", features = ["fs"] }
