@@ -2,6 +2,7 @@ mod chat;
 mod gcsfiles;
 mod ot;
 mod presence;
+mod snapshot;
 mod stub;
 mod traits;
 mod types;
@@ -26,6 +27,7 @@ impl Channel {
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
             "ot" => Box::new(ot::OT::new().await?),
+            "snapshot" => Box::new(snapshot::Snapshot {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
             "git" => Box::new(stub::Stub {}),  // Stub until replspace api is fixed
@@ -122,5 +124,6 @@ impl Channel {
     }
 }
 
-pub static IMPLEMENTED_SERVICES: &[&str] =
-    &["chat", "gcsfiles", "presence", "ot", "null", "git", "open"];
+pub static IMPLEMENTED_SERVICES: &[&str] = &[
+    "chat", "gcsfiles", "presence", "ot", "snapshot", "null", "git", "open",
+];
