@@ -91,8 +91,10 @@ impl traits::Service for OT {
                 *_crc32 = crc32;
                 drop(_crc32);
 
+                let file_contents = String::from_utf8(byte_contents.clone())?;
+
                 let mut contents = self.contents.write().await;
-                *contents = String::from_utf8(byte_contents.clone())?.into();
+                *contents = file_contents.clone().into();
                 drop(contents);
 
                 let timestamp = Some(prost_types::Timestamp {
@@ -108,7 +110,13 @@ impl traits::Service for OT {
                 let hist_item = goval::OtPacket {
                     spooky_version: version,
                     version,
-                    op: vec![],
+                    op: vec![
+                        goval::OtOpComponent {
+                            op_component: Some(
+                                goval::ot_op_component::OpComponent::Insert(file_contents)
+                            )
+                        }
+                    ],
                     crc32,
                     committed: timestamp,
                     author: goval::ot_packet::Author::User.into(),
@@ -185,11 +193,19 @@ impl traits::Service for OT {
 
                                                 *old_contents = new_contents.into();
 
+                                                let committed = Some(prost_types::Timestamp {
+                                                    seconds: SystemTime::now()
+                                                        .duration_since(UNIX_EPOCH)
+                                                        .unwrap()
+                                                        .as_secs() as i64,
+                                                    nanos: 0,
+                                                });
+
                                                 let packet = goval::OtPacket {
                                                     spooky_version: new_version,
                                                     version: new_version,
                                                     op: ops,
-                                                    committed: None,
+                                                    committed,
                                                     crc32: new_crc32,
                                                     nonce: 0,
                                                     user_id: 0,
@@ -303,15 +319,36 @@ impl traits::Service for OT {
                 let mut version = self.version.write().await;
                 *version += 1;
                 let saved_version = version.clone();
-                drop(version);
-                let user_id = 22261053;
+                // drop(version);
+
+                let user_id;
+                if ot.author == goval::ot_packet::Author::Ghostwriter as i32 {
+                    user_id = 22261053 // https://replit.com/@ghostwriterai
+                } else {
+                    if let Some(user) = info.sessions.get(&session) {
+                        user_id = user.id.clone()
+                    } else {
+                        user_id = 23054564 // https://replit.com/@homeval-user
+                    }
+                }
+                
                 let crc32 = crc32fast::hash(to_write.as_bytes());
+                let mut _crc32 = self.crc32.write().await;
+                *_crc32 = crc32;
+
+                let committed = Some(prost_types::Timestamp {
+                    seconds: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64,
+                    nanos: 0,
+                });
 
                 let packet = goval::OtPacket {
                     spooky_version: saved_version,
                     version: saved_version,
                     op: ot.op,
-                    committed: None,
+                    committed,
                     crc32,
                     nonce: 0,
                     user_id,
@@ -320,7 +357,7 @@ impl traits::Service for OT {
 
                 let mut history = self.history.write().await;
                 history.push(packet.clone());
-                drop(history);
+                // drop(history);
 
                 let mut ot_notif = goval::Command::default();
                 ot_notif.body = Some(goval::command::Body::Ot(packet));
@@ -358,6 +395,25 @@ impl traits::Service for OT {
                 .await?;
 
                 Ok(None)
+            }
+            goval::command::Body::OtFetchRequest(request) => {
+                let mut packets: Vec<goval::OtPacket> = vec![];
+                let from = (request.version_from - 1) as usize;
+                let to = request.version_to as usize;
+                let history = self.history.read().await;
+                for (index, item) in history.iter().enumerate() {
+                    if index >= from && index <= to {
+                        packets.push(item.clone())
+                    }
+                }
+
+                let mut history_result = goval::Command::default();
+                let _inner = goval::OtFetchResponse {
+                    packets
+                };
+                history_result.body = Some(goval::command::Body::OtFetchResponse(_inner));
+
+                Ok(Some(history_result))
             }
             goval::command::Body::Flush(_) => {
                 let mut ok = goval::Command::default();
