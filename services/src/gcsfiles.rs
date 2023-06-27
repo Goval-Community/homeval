@@ -3,7 +3,7 @@ pub struct GCSFiles {}
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, as_error, warn};
+use log::{as_debug, as_error, debug, warn};
 use tokio::{fs, io::AsyncWriteExt};
 
 #[async_trait]
@@ -57,22 +57,25 @@ impl traits::Service for GCSFiles {
                 Ok(Some(ret))
             }
             goval::command::Body::Read(file) => {
-                let contents;
-                if file.path == ".config/goval/info" {
-                    let val = serde_json::json!({
-                        "server": "homeval",
-                        "version": env!("CARGO_PKG_VERSION").to_string(),
-                        "license": "AGPL",
-                        "authors": vec!["PotentialStyx <62217716+PotentialStyx@users.noreply.github.com>"],
-                        "repository": "https://github.com/goval-community/homeval",
-                        "description": "", // TODO: do dis
-                        "uptime": 0, // TODO: impl fo realz
-                        "services": super::IMPLEMENTED_SERVICES.clone()
-                    });
+                debug!(path = file.path; "File path");
+                let contents = match file.path.as_str() {
+                    // TODO: Read this from in the db
+                    ".env" => vec![],
+                    ".config/goval/info" => {
+                        let val = serde_json::json!({
+                            "server": "homeval",
+                            "version": env!("CARGO_PKG_VERSION").to_string(),
+                            "license": "AGPL",
+                            "authors": vec!["PotentialStyx <62217716+PotentialStyx@users.noreply.github.com>"],
+                            "repository": "https://github.com/goval-community/homeval",
+                            "description": "", // TODO: do dis
+                            "uptime": 0, // TODO: impl fo realz
+                            "services": super::IMPLEMENTED_SERVICES.clone()
+                        });
 
-                    contents = val.to_string().as_bytes().to_vec();
-                } else {
-                    contents = match fs::read(&file.path).await {
+                        val.to_string().as_bytes().to_vec()
+                    }
+                    _ => match fs::read(&file.path).await {
                         Err(err) => {
                             warn!(error = as_error!(err); "Error reading file in gcsfiles");
                             let mut ret = goval::Command::default();
@@ -84,8 +87,9 @@ impl traits::Service for GCSFiles {
                             return Ok(Some(ret));
                         }
                         Ok(contents) => contents,
-                    }
-                }
+                    },
+                };
+
                 let mut ret = goval::Command::default();
                 let mut _inner = goval::File::default();
                 _inner.content = contents;
@@ -112,6 +116,13 @@ impl traits::Service for GCSFiles {
                 Ok(Some(ret))
             }
             goval::command::Body::Write(_file) => {
+                // TODO: Store this in the db
+                if &_file.path == ".env" {
+                    let mut ret = goval::Command::default();
+                    ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                    return Ok(Some(ret));
+                }
+
                 let mut file = fs::OpenOptions::new()
                     .write(true)
                     .create(true)
