@@ -23,7 +23,7 @@ pub struct Channel {
 impl Channel {
     pub async fn new(id: i32, service: String, name: Option<String>) -> Result<Channel> {
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
-            "chat" => Box::new(chat::Chat {}),
+            "chat" => Box::new(chat::Chat::new()),
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
             "ot" => Box::new(ot::OT::new().await?),
