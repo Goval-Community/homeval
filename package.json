@@ -10,6 +10,6 @@
     "buffer": "^6.0.3",
     "crc-32": "^1.2.2",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
-    "protobufjs": "^7.2.3"
+    "protobufjs": "^7.2.4"
   }
 }
