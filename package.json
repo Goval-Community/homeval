@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@replit/protocol": "^0.3.12",
+    "@replit/protocol": "^0.3.13",
     "buffer": "^6.0.3",
     "crc-32": "^1.2.2",
     "fastestsmallesttextencoderdecoder": "^1.0.22",
