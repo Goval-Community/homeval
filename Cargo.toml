@@ -20,7 +20,7 @@ fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 verify_connections = ["dep:pasetors", "dep:hyper", "dep:hyper-tls"]
 
 [dependencies]
-deno_core = "0.191.0"
+deno_core = "0.202.0"
 env_logger = { git = "https://github.com/tmccombs/env_logger", rev = "a47d1d99", features=["kv_unstable"] }
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
@@ -62,4 +62,4 @@ hyper-tls = { version = "0.5.0", optional = true }
 
 [build-dependencies]
 prost-build = "0.11.8"
-deno_core = { version = "0.191.0", features = ["include_js_files_for_snapshotting"] }
+deno_core = { version = "0.202.0", features = ["include_js_files_for_snapshotting"] }
