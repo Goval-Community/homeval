@@ -268,7 +268,7 @@ async fn open_channel(
             CHANNEL_MESSAGES
                 .write()
                 .await
-                .insert(channel_id_held, writer);
+                .insert(channel_id_held, writer.clone());
 
             let mut metadata = CHANNEL_METADATA.write().await;
             metadata.insert(channel_id_held, service_data.clone());
@@ -276,9 +276,10 @@ async fn open_channel(
             trace!(channel = channel_id_held; "Added channel to queue list");
 
             tokio::spawn(async move {
-                let channel = homeval_services::Channel::new(channel_id, service, _channel_name)
-                    .await
-                    .expect("TODO: Deal with this");
+                let channel =
+                    homeval_services::Channel::new(channel_id, service, _channel_name, writer)
+                        .await
+                        .expect("TODO: Deal with this");
                 channel.start(reader).await;
             });
             found = true;

@@ -19,6 +19,7 @@ pub struct ChannelInfo {
     pub service: String,
     pub name: Option<String>,
     pub sessions: HashMap<i32, ClientInfo>,
+    pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
 }
 
 impl ChannelInfo {

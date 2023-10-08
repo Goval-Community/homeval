@@ -21,12 +21,17 @@ pub struct Channel {
 
 // Public functions
 impl Channel {
-    pub async fn new(id: i32, service: String, name: Option<String>) -> Result<Channel> {
+    pub async fn new(
+        id: i32,
+        service: String,
+        name: Option<String>,
+        sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
+    ) -> Result<Channel> {
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
             "chat" => Box::new(chat::Chat::new()),
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
-            "ot" => Box::new(ot::OT::new().await?),
+            "ot" => Box::new(ot::OT::new(sender.clone()).await?),
             "snapshot" => Box::new(snapshot::Snapshot {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
@@ -40,6 +45,7 @@ impl Channel {
             service,
             clients: HashMap::new(),
             sessions: HashMap::new(),
+            sender,
         };
 
         Ok(Channel {
@@ -66,6 +72,7 @@ impl Channel {
                         break;
                     }
                 },
+                ChannelMessage::FSEvent(event) => self._inner.fsevent(&self.info, event).await,
             };
 
             match result {

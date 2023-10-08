@@ -1,17 +1,15 @@
 pub struct OT {
-    crc32: Arc<RwLock<u32>>,
-    version: Arc<RwLock<u32>>,
-    contents: Arc<RwLock<ropey::Rope>>,
+    crc32: u32,
+    version: u32,
+    contents: ropey::Rope,
     path: String,
     cursors: HashMap<String, goval::OtCursor>,
-    history: Arc<RwLock<Vec<goval::OtPacket>>>,
+    history: Vec<goval::OtPacket>,
     watcher: FSWatcher,
-    _sending_map: Arc<RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
 }
 
 use std::{
     collections::HashMap,
-    sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -20,12 +18,9 @@ use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage};
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, debug, error, warn, trace};
+use log::{as_debug, debug, error, trace, warn};
 use similar::TextDiff;
-use tokio::{
-    fs,
-    sync::{broadcast::error::RecvError, RwLock},
-};
+use tokio::fs;
 
 enum LoopControl {
     Cont(Result<()>),
@@ -33,18 +28,19 @@ enum LoopControl {
 }
 
 impl OT {
-    pub async fn new() -> Result<OT> {
-        let watcher = FSWatcher::new().await?;
+    pub async fn new(
+        sender: tokio::sync::mpsc::UnboundedSender<crate::ChannelMessage>,
+    ) -> Result<OT> {
+        let watcher = FSWatcher::new(sender).await?;
 
         let chan = OT {
-            crc32: Arc::new(RwLock::new(0)),
-            version: Arc::new(RwLock::new(1)),
-            contents: Arc::new(RwLock::new("".into())),
+            crc32: 0,
+            version: 1,
+            contents: "".into(),
             path: "".to_string(),
             cursors: HashMap::new(),
-            history: Arc::new(RwLock::new(vec![])),
+            history: vec![],
             watcher,
-            _sending_map: Arc::new(RwLock::new(HashMap::new())),
         };
 
         Ok(chan)
@@ -87,15 +83,11 @@ impl traits::Service for OT {
                 let byte_contents = fs::read(path.clone()).await?;
                 let crc32 = crc32fast::hash(byte_contents.as_slice());
 
-                let mut _crc32 = self.crc32.write().await;
-                *_crc32 = crc32;
-                drop(_crc32);
+                self.crc32 = crc32;
 
                 let file_contents = String::from_utf8(byte_contents.clone())?;
 
-                let mut contents = self.contents.write().await;
-                *contents = file_contents.clone().into();
-                drop(contents);
+                self.contents = file_contents.clone().into();
 
                 let timestamp = Some(prost_types::Timestamp {
                     seconds: SystemTime::now()
@@ -105,18 +97,14 @@ impl traits::Service for OT {
                     nanos: 0,
                 });
 
-                let version = self.version.read().await.clone();
-
                 let hist_item = goval::OtPacket {
-                    spooky_version: version,
-                    version,
-                    op: vec![
-                        goval::OtOpComponent {
-                            op_component: Some(
-                                goval::ot_op_component::OpComponent::Insert(file_contents)
-                            )
-                        }
-                    ],
+                    spooky_version: self.version,
+                    version: self.version,
+                    op: vec![goval::OtOpComponent {
+                        op_component: Some(goval::ot_op_component::OpComponent::Insert(
+                            file_contents,
+                        )),
+                    }],
                     crc32,
                     committed: timestamp,
                     author: goval::ot_packet::Author::User.into(),
@@ -124,9 +112,7 @@ impl traits::Service for OT {
                     nonce: 0,
                 };
 
-                let mut history = self.history.write().await;
-                history.push(hist_item);
-                drop(history);
+                self.history.push(hist_item);
 
                 let mut link_response = goval::Command::default();
 
@@ -135,142 +121,46 @@ impl traits::Service for OT {
                 file.content = byte_contents;
 
                 let _inner = goval::OtLinkFileResponse {
-                    version,
+                    version: self.version,
                     linked_file: Some(file),
                 };
                 link_response.body = Some(goval::command::Body::OtLinkFileResponse(_inner));
 
                 self.watcher.watch(vec![path]).await?;
 
-                let mut reader = self.watcher.get_event_reader().await;
-                let sending_map = self._sending_map.clone();
-                let file_path = self.path.clone();
-                let crc32 = self.crc32.clone();
-                let contents = self.contents.clone();
-                let version = self.version.clone();
-                let history = self.history.clone();
-                let channel_id = info.id.clone();
-                tokio::spawn(async move {
-                    loop {
-                        let res = async {
-                            match reader.recv().await {
-                                Ok(res) => {
-                                    trace!(event = as_debug!(res.clone()), file_path = file_path; "oooh event");
-                                    match res {
-                                        FSEvent::Modify(path) => {
-                                            trace!(condition = (path == file_path), path = path, file_path = file_path; "Conditional time");
-                                            if path == file_path {
-                                                let new_contents = match fs::read(&path).await {
-                                                    Ok(contents) => contents,
-                                                    Err(err) => {
-                                                        return LoopControl::Cont(Err(err.into()))
-                                                    }
-                                                };
+                // let mut reader = self.watcher.get_event_reader().await;
+                // let sending_map = self._sending_map.clone();
+                // let file_path = self.path.clone();
+                // let crc32 = self.crc32.clone();
+                // let contents = self.contents.clone();
+                // let version = self.version.clone();
+                // let history = self.history.clone();
+                // let channel_id = info.id.clone();
+                // tokio::spawn(async move {
+                //     loop {
+                //         let res = async {
+                //             match reader.recv().await {
+                //                 Ok(res) => {
 
-                                                let new_crc32 = crc32fast::hash(&new_contents);
-                                                trace!("Awaiting crc32 lock");
-                                                let old_crc32 = crc32.read().await;
-                                                if new_crc32 == old_crc32.clone() {
-                                                    return LoopControl::Cont(Ok(()));
-                                                }
+                //                     LoopControl::Cont(Ok(()))
+                //                 }
+                //                 Err(err) => match err {
+                //                     RecvError::Closed => LoopControl::Break,
+                //                     RecvError::Lagged(ammount) => {
+                //                         warn!(messages = ammount; "FSEvents lagged");
+                //                         LoopControl::Cont(Ok(()))
+                //                     }
+                //                 },
+                //             }
+                //         }
+                //         .await;
 
-                                                drop(old_crc32);
-                                                
-                                                trace!("Awaiting contents lock");
-                                                let mut old_contents = contents.write().await;
-                                                trace!("Awaiting version lock");
-                                                let mut version = version.write().await;
-                                                *version += 1;
-
-                                                let new_version = version.clone();
-                                                let new_contents = String::from_utf8(new_contents)
-                                                    .expect("TODO: Deal with this");
-
-                                                let ops = diff(
-                                                    old_contents.to_string(),
-                                                    new_contents.clone(),
-                                                );
-
-                                                *old_contents = new_contents.into();
-
-                                                let committed = Some(prost_types::Timestamp {
-                                                    seconds: SystemTime::now()
-                                                        .duration_since(UNIX_EPOCH)
-                                                        .unwrap()
-                                                        .as_secs() as i64,
-                                                    nanos: 0,
-                                                });
-
-                                                let packet = goval::OtPacket {
-                                                    spooky_version: new_version,
-                                                    version: new_version,
-                                                    op: ops,
-                                                    committed,
-                                                    crc32: new_crc32,
-                                                    nonce: 0,
-                                                    user_id: 0,
-                                                    author: goval::ot_packet::Author::User.into(),
-                                                };
-
-                                                trace!("Awaiting history lock");
-                                                let mut history = history.write().await;
-                                                history.push(packet.clone());
-
-                                                let mut ot_notif = goval::Command::default();
-                                                ot_notif.channel = channel_id;
-                                                ot_notif.body =
-                                                    Some(goval::command::Body::Ot(packet));
-
-                                                // info.send(ot_notif, crate::SendSessions::Everyone)
-                                                //     .await
-                                                //     .expect("TODO: Deal with this");
-
-                                                trace!("Awaiting sending lock");
-                                                let to_send = sending_map.read().await;
-
-                                                trace!("Sending...");
-                                                for (session, sender) in to_send.iter() {
-                                                    trace!(session = session; "Awaiting send");
-                                                    let mut msg = ot_notif.clone();
-                                                    msg.session = session.clone();
-
-                                                    sender
-                                                        .send(IPCMessage {
-                                                            command: msg,
-                                                            session: session.clone(),
-                                                        })
-                                                        .expect("TODO: deal with this");
-                                                    trace!(session = session; "Sent");
-                                                }
-                                            }
-                                        }
-                                        FSEvent::Err(err) => {
-                                            error!(error = err; "Error in FS event listener")
-                                        }
-                                        _ => {
-                                            debug!(message = as_debug!(res); "Ignoing FS event")
-                                        }
-                                    }
-
-                                    LoopControl::Cont(Ok(()))
-                                }
-                                Err(err) => match err {
-                                    RecvError::Closed => LoopControl::Break,
-                                    RecvError::Lagged(ammount) => {
-                                        warn!(messages = ammount; "FSEvents lagged");
-                                        LoopControl::Cont(Ok(()))
-                                    }
-                                },
-                            }
-                        }
-                        .await;
-
-                        match res {
-                            LoopControl::Break => break,
-                            LoopControl::Cont(result) => result.expect("TODO: deal with this"),
-                        }
-                    }
-                });
+                //         match res {
+                //             LoopControl::Break => break,
+                //             LoopControl::Cont(result) => result.expect("TODO: deal with this"),
+                //         }
+                //     }
+                // });
 
                 return Ok(Some(link_response));
             } else {
@@ -282,12 +172,11 @@ impl traits::Service for OT {
             goval::command::Body::Ot(ot) => {
                 let mut cursor: usize = 0;
 
-                let mut contents = self.contents.write().await;
                 for op in ot.op.clone() {
                     match op.op_component.unwrap() {
                         goval::ot_op_component::OpComponent::Skip(_skip) => {
                             let skip: usize = _skip.try_into()?;
-                            if skip + cursor > contents.len_chars() {
+                            if skip + cursor > self.contents.len_chars() {
                                 let mut err = goval::Command::default();
                                 err.body = Some(goval::command::Body::Error(
                                     "Invalid skip past bounds".to_string(),
@@ -299,7 +188,7 @@ impl traits::Service for OT {
                         }
                         goval::ot_op_component::OpComponent::Delete(_delete) => {
                             let delete: usize = _delete.try_into()?;
-                            if delete + cursor > contents.len_chars() {
+                            if delete + cursor > self.contents.len_chars() {
                                 let mut err = goval::Command::default();
                                 err.body = Some(goval::command::Body::Error(
                                     "Invalid delete past bounds".to_string(),
@@ -307,18 +196,16 @@ impl traits::Service for OT {
                                 return Ok(Some(err));
                             }
 
-                            contents.remove(cursor..(cursor + delete))
+                            self.contents.remove(cursor..(cursor + delete))
                         }
                         goval::ot_op_component::OpComponent::Insert(insert) => {
-                            contents.insert(cursor, &insert)
+                            self.contents.insert(cursor, &insert)
                         }
                     }
                 }
 
-                let to_write = contents.to_string();
-                let mut version = self.version.write().await;
-                *version += 1;
-                let saved_version = version.clone();
+                let to_write = self.contents.to_string();
+                self.version += 1;
                 // drop(version);
 
                 let user_id;
@@ -331,10 +218,9 @@ impl traits::Service for OT {
                         user_id = 23054564 // https://replit.com/@homeval-user
                     }
                 }
-                
+
                 let crc32 = crc32fast::hash(to_write.as_bytes());
-                let mut _crc32 = self.crc32.write().await;
-                *_crc32 = crc32;
+                self.crc32 = crc32;
 
                 let committed = Some(prost_types::Timestamp {
                     seconds: SystemTime::now()
@@ -345,8 +231,8 @@ impl traits::Service for OT {
                 });
 
                 let packet = goval::OtPacket {
-                    spooky_version: saved_version,
-                    version: saved_version,
+                    spooky_version: self.version,
+                    version: self.version,
                     op: ot.op,
                     committed,
                     crc32,
@@ -355,9 +241,7 @@ impl traits::Service for OT {
                     author: ot.author,
                 };
 
-                let mut history = self.history.write().await;
-                history.push(packet.clone());
-                // drop(history);
+                self.history.push(packet.clone());
 
                 let mut ot_notif = goval::Command::default();
                 ot_notif.body = Some(goval::command::Body::Ot(packet));
@@ -400,17 +284,14 @@ impl traits::Service for OT {
                 let mut packets: Vec<goval::OtPacket> = vec![];
                 let from = (request.version_from - 1) as usize;
                 let to = request.version_to as usize;
-                let history = self.history.read().await;
-                for (index, item) in history.iter().enumerate() {
+                for (index, item) in self.history.iter().enumerate() {
                     if index >= from && index <= to {
                         packets.push(item.clone())
                     }
                 }
 
                 let mut history_result = goval::Command::default();
-                let _inner = goval::OtFetchResponse {
-                    packets
-                };
+                let _inner = goval::OtFetchResponse { packets };
                 history_result.body = Some(goval::command::Body::OtFetchResponse(_inner));
 
                 Ok(Some(history_result))
@@ -427,6 +308,67 @@ impl traits::Service for OT {
         }
     }
 
+    async fn fsevent(&mut self, info: &super::types::ChannelInfo, event: FSEvent) -> Result<()> {
+        trace!(event = as_debug!(event), file_path = self.path; "oooh event");
+        match event {
+            FSEvent::Modify(path) => {
+                trace!(condition = (path == self.path), path = path, file_path = self.path; "Conditional time");
+                if path == self.path {
+                    let new_contents = fs::read(&path).await?;
+
+                    let new_crc32 = crc32fast::hash(&new_contents);
+                    if new_crc32 == self.crc32 {
+                        return Ok(());
+                    }
+
+                    self.version += 1;
+
+                    let new_contents =
+                        String::from_utf8(new_contents).expect("TODO: Deal with this");
+
+                    let ops = diff(self.contents.to_string(), new_contents.clone());
+
+                    self.contents = new_contents.into();
+
+                    let committed = Some(prost_types::Timestamp {
+                        seconds: SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs() as i64,
+                        nanos: 0,
+                    });
+
+                    let packet = goval::OtPacket {
+                        spooky_version: self.version,
+                        version: self.version,
+                        op: ops,
+                        committed,
+                        crc32: new_crc32,
+                        nonce: 0,
+                        user_id: 0,
+                        author: goval::ot_packet::Author::User.into(),
+                    };
+
+                    self.history.push(packet.clone());
+
+                    let mut ot_notif = goval::Command::default();
+                    ot_notif.body = Some(goval::command::Body::Ot(packet));
+
+                    info.send(ot_notif, crate::SendSessions::Everyone).await?;
+                }
+                Ok(())
+            }
+            FSEvent::Err(err) => {
+                error!(error = err; "Error in FS event listener");
+                Ok(())
+            }
+            _ => {
+                debug!(message = as_debug!(event); "Ignoing FS event");
+                Ok(())
+            }
+        }
+    }
+
     async fn attach(
         &mut self,
         _info: &super::types::ChannelInfo,
@@ -434,10 +376,6 @@ impl traits::Service for OT {
         session: i32,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
-        let mut sending_map = self._sending_map.write().await;
-        sending_map.insert(session, sender);
-        drop(sending_map);
-
         if &self.path == "" {
             let mut cmd = goval::Command::default();
             cmd.body = Some(goval::command::Body::Otstatus(goval::OtStatus::default()));
@@ -455,11 +393,12 @@ impl traits::Service for OT {
         }
 
         let _inner = goval::OtStatus {
-            contents: self.contents.read().await.to_string(),
-            version: self.version.read().await.clone(),
+            contents: self.contents.to_string(),
+            version: self.version,
             linked_file: Some(file),
-            cursors: cursors,
+            cursors,
         };
+
         status.body = Some(goval::command::Body::Otstatus(_inner));
 
         Ok(Some(status))

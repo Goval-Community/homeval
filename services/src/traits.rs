@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{ClientInfo, IPCMessage};
+use crate::{ClientInfo, FSEvent, IPCMessage};
 
 #[async_trait]
 pub(crate) trait Service {
@@ -19,6 +19,10 @@ pub(crate) trait Service {
         _session: i32,
     ) -> Result<Option<goval::Command>> {
         Ok(None)
+    }
+
+    async fn fsevent(&mut self, _info: &super::types::ChannelInfo, _event: FSEvent) -> Result<()> {
+        Ok(())
     }
 
     async fn attach(

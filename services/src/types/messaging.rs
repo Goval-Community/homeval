@@ -28,6 +28,7 @@ pub enum ChannelMessage {
     Detach(i32),
     ProcessDead(u32, i32),
     CmdDead(i32),
+    FSEvent(super::FSEvent),
     Replspace(i32, ReplspaceMessage), // session, message
     Shutdown, // Shutdown the service, value has to be true so that runtime.js can match it in an if check
 }

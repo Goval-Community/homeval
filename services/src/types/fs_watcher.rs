@@ -11,6 +11,8 @@ use anyhow::Result;
 use std::{path::Path, time::Duration};
 use tokio::sync::broadcast;
 
+use crate::ChannelMessage;
+
 // static FILE_WATCHER_MAP: LazyLock<
 //     RwLock<HashMap<u32, Arc<Mutex<Debouncer<RecommendedWatcher, FileIdMap>>>>>,
 // > = LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -31,13 +33,14 @@ pub enum FSEvent {
 
 pub struct FSWatcher {
     debouncer: Debouncer<RecommendedWatcher, notify_debouncer_full::FileIdMap>,
-    writer: broadcast::Sender<FSEvent>,
-    reader: broadcast::Receiver<FSEvent>,
+    writer: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
 }
 
 impl FSWatcher {
-    pub async fn new() -> Result<FSWatcher> {
-        let (writer, reader) = broadcast::channel::<FSEvent>(5);
+    pub async fn new(
+        writer: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
+    ) -> Result<FSWatcher> {
+        // let (writer, reader) = broadcast::channel::<FSEvent>(5);
 
         // FILE_WATCHER_MESSAGES
         //     .write()
@@ -54,14 +57,14 @@ impl FSWatcher {
                     Ok(events) => events.iter().for_each(|event| {
                         if let Some(final_event) = notify_event_to_final(event).unwrap() {
                             debounce_writer
-                                .send(final_event)
+                                .send(ChannelMessage::FSEvent(final_event))
                                 .expect("TODO: handle this");
                         }
                     }),
                     Err(errors) => errors.iter().for_each(|error| {
                         error!(error = as_debug!(error); "Error in debouncer");
                         debounce_writer
-                            .send(FSEvent::Err(error.to_string()))
+                            .send(ChannelMessage::FSEvent(FSEvent::Err(error.to_string())))
                             .expect("TODO: handle this");
                     }),
                 },
@@ -73,11 +76,7 @@ impl FSWatcher {
         .await??;
         // });
 
-        Ok(FSWatcher {
-            debouncer,
-            reader,
-            writer,
-        })
+        Ok(FSWatcher { debouncer, writer })
     }
 
     pub async fn watch(&mut self, files: Vec<String>) -> Result<()> {
@@ -97,10 +96,6 @@ impl FSWatcher {
     pub async fn shutdown(self) {
         self.debouncer.stop_nonblocking();
         drop(self.writer)
-    }
-
-    pub async fn get_event_reader(&mut self) -> broadcast::Receiver<FSEvent> {
-        self.reader.resubscribe()
     }
 }
 
