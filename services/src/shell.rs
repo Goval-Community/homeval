@@ -65,10 +65,15 @@ impl traits::Service for Shell {
     }
 }
 
+#[cfg(target_family = "unix")]
+static DEFAULT_SHELL: &'static str = "sh";
+#[cfg(target_family = "windows")]
+static DEFAULT_SHELL: &'static str = "pwsh";
+
 impl Shell {
     async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
         Ok(Pty::start(
-            vec![std::env::var("SHELL").unwrap_or("bash".to_string())],
+            vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,
             Arc::new(RwLock::new(info.clients.clone())),
             info.sender.clone(),
