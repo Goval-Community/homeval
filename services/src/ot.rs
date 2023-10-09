@@ -22,11 +22,6 @@ use log::{as_debug, debug, error, trace, warn};
 use similar::TextDiff;
 use tokio::fs;
 
-enum LoopControl {
-    Cont(Result<()>),
-    Break,
-}
-
 impl OT {
     pub async fn new(
         sender: tokio::sync::mpsc::UnboundedSender<crate::ChannelMessage>,
@@ -309,7 +304,7 @@ impl traits::Service for OT {
     }
 
     async fn fsevent(&mut self, info: &super::types::ChannelInfo, event: FSEvent) -> Result<()> {
-        trace!(event = as_debug!(event), file_path = self.path; "oooh event");
+        trace!(event = as_debug!(event), file_path = self.path; "fs event");
         match event {
             FSEvent::Modify(path) => {
                 trace!(condition = (path == self.path), path = path, file_path = self.path; "Conditional time");
@@ -329,6 +324,7 @@ impl traits::Service for OT {
                     let ops = diff(self.contents.to_string(), new_contents.clone());
 
                     self.contents = new_contents.into();
+                    self.crc32 = new_crc32;
 
                     let committed = Some(prost_types::Timestamp {
                         seconds: SystemTime::now()
@@ -373,8 +369,8 @@ impl traits::Service for OT {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        session: i32,
-        sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
+        _session: i32,
+        _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         if &self.path == "" {
             let mut cmd = goval::Command::default();

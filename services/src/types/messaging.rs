@@ -26,7 +26,7 @@ pub enum ChannelMessage {
         tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ),
     Detach(i32),
-    ProcessDead(u32, i32),
+    ProcessDead(i32),
     CmdDead(i32),
     FSEvent(super::FSEvent),
     Replspace(i32, ReplspaceMessage), // session, message

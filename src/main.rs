@@ -7,12 +7,16 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
 
-use homeval_services::{ChannelMessage, ClientInfo, IPCMessage, ReplspaceMessage, ServiceMetadata};
+use homeval_services::{
+    config::dotreplit::DotReplit,
+    ChannelMessage,
+    ClientInfo,
+    IPCMessage,
+    ServiceMetadata,
+    // ReplspaceMessage,
+};
 
 mod parse_paseto;
-
-mod config;
-use config::dotreplit::DotReplit;
 
 #[cfg(feature = "replspace")]
 mod replspace_server;
@@ -26,8 +30,10 @@ static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
 
 pub static IMPLEMENTED_SERVICES: LazyLock<Vec<String>> = LazyLock::new(|| vec![]);
 
-pub static DOTREPLIT_CONFIG: LazyLock<DotReplit> = LazyLock::new(|| {
-    toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap()
+pub static DOTREPLIT_CONFIG: LazyLock<Arc<RwLock<DotReplit>>> = LazyLock::new(|| {
+    Arc::new(RwLock::const_new(
+        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap(),
+    ))
 });
 
 static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
@@ -57,12 +63,12 @@ static PROCCESS_CHANNEL_TO_ID: LazyLock<RwLock<HashMap<i32, u32>>> =
 static LAST_SESSION_USING_CHANNEL: LazyLock<RwLock<HashMap<i32, i32>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-static REPLSPACE_CALLBACKS: LazyLock<
-    RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>,
-> = LazyLock::new(|| RwLock::new(HashMap::new()));
+// static REPLSPACE_CALLBACKS: LazyLock<
+//     RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>,
+// > = LazyLock::new(|| RwLock::new(HashMap::new()));
 
-static CHILD_PROCS_ENV_BASE: LazyLock<RwLock<HashMap<String, String>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+// static CHILD_PROCS_ENV_BASE: LazyLock<RwLock<HashMap<String, String>>> =
+//     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[cfg(feature = "database")]
 mod database;

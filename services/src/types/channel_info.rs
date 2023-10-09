@@ -1,8 +1,12 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use anyhow::Result;
 use goval;
 use log::error;
+use tokio::sync::RwLock;
+
+use crate::config::dotreplit::DotReplit;
 
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
@@ -20,6 +24,7 @@ pub struct ChannelInfo {
     pub name: Option<String>,
     pub sessions: HashMap<i32, ClientInfo>,
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
+    pub dotreplit: Arc<RwLock<DotReplit>>,
 }
 
 impl ChannelInfo {

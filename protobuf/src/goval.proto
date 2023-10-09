@@ -1,4 +1,4 @@
-// @replit/protocol 0.3.12
+// @replit/protocol 0.3.31
 syntax = "proto3";
 
 package goval;
@@ -6,1743 +6,1660 @@ package goval;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/empty.proto";
 
 message Command {
-	int32 channel = 1;
-	int32 session = 2;
-	string ref = 1000;
-	map<string,string> traceInfo = 1001;
-	oneof body {
-		OpenChannel openChan = 3;
-		OpenChannelRes openChanRes = 4;
-		CloseChannel closeChan = 5;
-		CloseChannelRes closeChanRes = 6;
-		ContainerState containerState = 9;
-		PortOpen portOpen = 10;
-		PortClose portClose = 48;
-		Toast toast = 11;
-		ProtocolError protocolError = 45;
-		Redirect redirect = 12;
-		AlwaysOn alwaysOn = 13;
-		RunMain runMain = 16;
-		Clear clear = 17;
-		string eval = 20;
-		string result = 21;
-		string input = 22;
-		string output = 23;
-		string error = 24;
-		string stderr = 46;
-		string log = 47;
-		string record = 422;
-		SaneTerm saneTerm = 26;
-		ResizeTerm resizeTerm = 27;
-		State state = 28;
-		OK ok = 30;
-		File persist = 31;
-		File persistMirror = 41;
-		File write = 32;
-		File remove = 33;
-		Move move = 34;
-		File tryRemove = 36;
-		File mkdir = 39;
-		File stat = 368;
-		StatResult statRes = 369;
-		TransferStart transferStart = 320;
-		TransferChunk transferChunk = 321;
-		TransferComplete transferComplete = 322;
-		Transfer transferCancel = 323;
-		Transfer transfer = 324;
-		File read = 35;
-		File readdir = 37;
-		Files files = 38;
-		File file = 40;
-		CheckChanges checkChanges = 42;
-		Files changedFiles = 43;
-		LintResults lintResults = 44;
-		ContainedTest runContainedTest = 70;
-		TestResult testResult = 71;
-		string debuggerStart = 90;
-		RunMain debuggerStep = 91;
-		DebugStatus debuggerStatus = 92;
-		EnsurePackages ensurePackages = 100;
-		Ping ping = 120;
-		Pong pong = 121;
-		Hello hello = 122;
-		Goodbye goodbye = 123;
-		ProxyGoingAway proxyGoingAway = 124;
-		Hint hint = 130;
-		Connect connect = 150;
-		Send send = 151;
-		Recv recv = 152;
-		Disconnect disconnect = 153;
-		FileAuthReq fileAuthReq = 200;
-		FileAuthRes fileAuthRes = 201;
-		MultiFileAuthRes mutliFileAuthRes = 202;
-		ListObjects listObjects = 205;
-		ListObjectsResp listObjectsResp = 206;
-		OTPacket ot = 220;
-		OTStatus otstatus = 221;
-		OTLinkFile otLinkFile = 222;
-		OTLinkFileResponse otLinkFileResponse = 229;
-		OTCursor otNewCursor = 223;
-		OTCursor otDeleteCursor = 224;
-		OTFetchRequest otFetchRequest = 225;
-		OTFetchResponse otFetchResponse = 226;
-		OTTransformSelectionRequest otTransformSelectionRequest = 227;
-		OTTransformSelectionResponse otTransformSelectionResponse = 228;
-		Flush flush = 251;
-		Debug debug = 230;
-		StartVCR startVCR = 231;
-		ReadVCR readVCR = 232;
-		VCRLog VCRLog = 233;
-		Auth auth = 235;
-		ExecInfo execInfo = 240;
-		SubscribeFile subscribeFile = 256;
-		FileEvent fileEvent = 257;
-		Roster roster = 260;
-		User join = 261;
-		User part = 262;
-		OpenFile openFile = 263;
-		FileOpened fileOpened = 264;
-		FollowUser followUser = 265;
-		UnfollowUser unfollowUser = 268;
-		UpdateSessionTimestamp updateSessionTimestamp = 266;
-		SessionTimestampUpdated sessionTimestampUpdated = 267;
-		Exec exec = 270;
-		PackageSearch packageSearch = 280;
-		PackageSearchResp packageSearchResp = 281;
-		PackageInfo packageInfo = 282;
-		PackageInfoResp packageInfoResp = 283;
-		PackageAdd packageAdd = 284;
-		PackageRemove packageRemove = 285;
-		PackageInstall packageInstall = 286;
-		PackageListSpecfile packageListSpecfile = 287;
-		PackageListSpecfileResp packageListSpecfileResp = 288;
-		PackageCacheSave packageCacheSave = 289;
-		ChatMessage chatMessage = 310;
-		ChatTyping chatTyping = 311;
-		ChatScrollback chatScrollback = 312;
-		FSSnapshot fsSnapshot = 330;
-		FSSnapshotEvent fsSnapshotEvent = 388;
-		FSLock fsTakeLock = 331;
-		FSLock fsReleaseLock = 332;
-		bool hasCap = 335;
-		SnapshotEvent snapshotEvent = 389;
-		bool NoninteractiveFSChangeEvent = 392;
-		Pid1Config pid1Config = 340;
-		Metrics metrics = 350;
-		BootStatus bootStatus = 351;
-		ReadMetaRequest readMetaRequest = 360;
-		ReadMetaResponse readMetaResponse = 384;
-		WriteMetaRequest writeMetaRequest = 361;
-		WriteMetaResponse writeMetaResponse = 385;
-		AppendMetaRequest appendMetaRequest = 362;
-		AppendMetaResponse appendMetaResponse = 386;
-		Audio audio = 363;
-		PprofRequest pprofRequest = 364;
-		PprofResponse pprofResponse = 365;
-		Audio2 audio2 = 366;
-		PTYConfig PTYConfig = 367;
-		DebugMain debugMain = 370;
-		DebugState debugState = 371;
-		DebugMainReply debugMainReply = 372;
-		DebugInput debugInput = 373;
-		DebugOutput debugOutput = 374;
-		DebugStop debugStop = 375;
-		DebugLeave debugLeave = 376;
-		DebugSessions debugSessions = 377;
-		DebugAddBreakpointRequest debugAddBreakpointRequest = 380;
-		DebugUpdateBreakpointRequest debugUpdateBreakpointRequest = 387;
-		DebugRemoveBreakpointRequest debugRemoveBreakpointRequest = 381;
-		DebugBreakpointEvent debugBreakpointEvent = 383;
-		DotReplitGetRequest dotReplitGetRequest = 378;
-		DotReplitGetResponse dotReplitGetResponse = 379;
-		RunConfigGetRequest runConfigGetRequest = 390;
-		RunConfigGetResponse runConfigGetResponse = 391;
-		DotReplitUpdateRequest dotReplitUpdateRequest = 395;
-		DotReplitUpdateResponse dotReplitUpdateResponse = 396;
-		StartLSP startLSP = 345;
-		FirewallDenied firewallDenied = 393;
-		NixPackageAddRequest nixPackageAddRequest = 410;
-		NixPackageAddResponse nixPackageAddResponse = 411;
-		NixPackageRemoveRequest nixPackageRemoveRequest = 412;
-		NixPackageRemoveResponse nixPackageRemoveResponse = 413;
-		NixPackageListRequest nixPackageListRequest = 414;
-		NixPackageListResponse nixPackageListResponse = 415;
-		NixChannelsRequest nixChannelsRequest = 416;
-		NixChannelsResponse nixChannelsResponse = 417;
-		NixChannelLatestStableRequest nixChannelLatestStableRequest = 418;
-		NixChannelLatestStableResponse nixChannelLatestStableResponse = 419;
-		NixPackageSearchRequest nixPackageSearchRequest = 420;
-		NixPackageSearchResponse nixPackageSearchResponse = 421;
-		UserEvent userEvent = 423;
-		ReplspaceApiOpenFile replspaceApiOpenFile = 424;
-		ReplspaceApiCloseFile replspaceApiCloseFile = 425;
-		ReplspaceApiGetGitHubToken replspaceApiGetGitHubToken = 426;
-		ReplspaceApiGitHubToken replspaceApiGitHubToken = 427;
-		Focused focused = 428;
-		NixModulesGetRequest nixModulesGetRequest = 429;
-		NixModulesGetResponse nixModulesGetResponse = 430;
-		NixModulesChanged nixModulesChanged = 431;
-		NixModulesBuildRequest nixModulesBuildRequest = 432;
-		PackageSetPackagerRequest packageSetPackagerRequest = 433;
-		PackageSetPackagerResponse packageSetPackagerResp = 434;
-		ToolchainGetRequest toolchainGetRequest = 435;
-		ToolchainGetResponse toolchainGetResponse = 436;
-		ToolchainChanged toolchainChanged = 437;
-		ReplspaceApiOpenMultipleFiles replspaceApiOpenMultipleFiles = 438;
-		NixModulesGetRegistryRequest nixModulesGetRegistryRequest = 439;
-		NixModulesGetRegistryResponse nixModulesGetRegistryResponse = 440;
-	}
+  int32 channel = 1;
+  int32 session = 2;
+  string ref = 1000;
+  map<string, string> traceInfo = 1001;
+  oneof body {
+    OpenChannel openChan = 3;
+    OpenChannelRes openChanRes = 4;
+    CloseChannel closeChan = 5;
+    CloseChannelRes closeChanRes = 6;
+    ContainerState containerState = 9;
+    PortOpen portOpen = 10;
+    PortClose portClose = 48;
+    Toast toast = 11;
+    ProtocolError protocolError = 45;
+    Redirect redirect = 12;
+    AlwaysOn alwaysOn = 13;
+    RunMain runMain = 16;
+    Clear clear = 17;
+    string eval = 20;
+    string result = 21;
+    string input = 22;
+    string output = 23;
+    string error = 24;
+    string stderr = 46;
+    string log = 47;
+    google.protobuf.Empty inputClose = 49;
+    OutputBlockStartEvent outputBlockStartEvent = 443;
+    OutputBlockEndEvent outputBlockEndEvent = 444;
+    sint32 exitCodeEvent = 445;
+    bool splitStderrRequest = 446;
+    SaneTerm saneTerm = 26;
+    ResizeTerm resizeTerm = 27;
+    State state = 28;
+    OK ok = 30;
+    File persist = 31;
+    File persistMirror = 41;
+    File write = 32;
+    File remove = 33;
+    Move move = 34;
+    File tryRemove = 36;
+    File mkdir = 39;
+    File stat = 368;
+    StatResult statRes = 369;
+    TransferStart transferStart = 320;
+    TransferChunk transferChunk = 321;
+    TransferComplete transferComplete = 322;
+    Transfer transferCancel = 323;
+    Transfer transfer = 324;
+    File read = 35;
+    File readdir = 37;
+    Files files = 38;
+    File file = 40;
+    CheckChanges checkChanges = 42;
+    Files changedFiles = 43;
+    LintResults lintResults = 44;
+    ContainedTest runContainedTest = 70;
+    TestResult testResult = 71;
+    string debuggerStart = 90;
+    RunMain debuggerStep = 91;
+    DebugStatus debuggerStatus = 92;
+    EnsurePackages ensurePackages = 100;
+    Ping ping = 120;
+    Pong pong = 121;
+    Hello hello = 122;
+    Goodbye goodbye = 123;
+    ProxyGoingAway proxyGoingAway = 124;
+    Hint hint = 130;
+    Connect connect = 150;
+    Send send = 151;
+    Recv recv = 152;
+    Disconnect disconnect = 153;
+    FileAuthReq fileAuthReq = 200;
+    FileAuthRes fileAuthRes = 201;
+    MultiFileAuthRes mutliFileAuthRes = 202;
+    ListObjects listObjects = 205;
+    ListObjectsResp listObjectsResp = 206;
+    OTPacket ot = 220;
+    OTStatus otstatus = 221;
+    OTLinkFile otLinkFile = 222;
+    OTLinkFileResponse otLinkFileResponse = 229;
+    OTCursor otNewCursor = 223;
+    OTCursor otDeleteCursor = 224;
+    OTFetchRequest otFetchRequest = 225;
+    OTFetchResponse otFetchResponse = 226;
+    OTTransformSelectionRequest otTransformSelectionRequest = 227;
+    OTTransformSelectionResponse otTransformSelectionResponse = 228;
+    Flush flush = 251;
+    Debug debug = 230;
+    StartVCR startVCR = 231;
+    ReadVCR readVCR = 232;
+    VCRLog VCRLog = 233;
+    Auth auth = 235;
+    ExecInfo execInfo = 240;
+    SubscribeFile subscribeFile = 256;
+    FileEvent fileEvent = 257;
+    Roster roster = 260;
+    User join = 261;
+    User part = 262;
+    OpenFile openFile = 263;
+    FileOpened fileOpened = 264;
+    FollowUser followUser = 265;
+    UnfollowUser unfollowUser = 268;
+    UpdateSessionTimestamp updateSessionTimestamp = 266;
+    SessionTimestampUpdated sessionTimestampUpdated = 267;
+    Exec exec = 270;
+    PackageSearch packageSearch = 280;
+    PackageSearchResp packageSearchResp = 281;
+    PackageInfo packageInfo = 282;
+    PackageInfoResp packageInfoResp = 283;
+    PackageAdd packageAdd = 284;
+    PackageRemove packageRemove = 285;
+    PackageInstall packageInstall = 286;
+    PackageInstallResponse packageInstallResponse = 290;
+    PackageListSpecfile packageListSpecfile = 287;
+    PackageListSpecfileResp packageListSpecfileResp = 288;
+    PackageCacheSave packageCacheSave = 289;
+    ChatMessage chatMessage = 310;
+    ChatTyping chatTyping = 311;
+    ChatScrollback chatScrollback = 312;
+    FSSnapshot fsSnapshot = 330;
+    FSSnapshotEvent fsSnapshotEvent = 388;
+    FSLock fsTakeLock = 331;
+    FSLock fsReleaseLock = 332;
+    bool hasCap = 335;
+    SnapshotEvent snapshotEvent = 389;
+    bool NoninteractiveFSChangeEvent = 392;
+    Pid1Config pid1Config = 340;
+    Metrics metrics = 350;
+    BootStatus bootStatus = 351;
+    ReadMetaRequest readMetaRequest = 360;
+    ReadMetaResponse readMetaResponse = 384;
+    WriteMetaRequest writeMetaRequest = 361;
+    WriteMetaResponse writeMetaResponse = 385;
+    AppendMetaRequest appendMetaRequest = 362;
+    AppendMetaResponse appendMetaResponse = 386;
+    Audio audio = 363;
+    PprofRequest pprofRequest = 364;
+    PprofResponse pprofResponse = 365;
+    Audio2 audio2 = 366;
+    PTYConfig PTYConfig = 367;
+    DebugMain debugMain = 370;
+    DebugState debugState = 371;
+    DebugMainReply debugMainReply = 372;
+    DebugInput debugInput = 373;
+    DebugOutput debugOutput = 374;
+    DebugStop debugStop = 375;
+    DebugLeave debugLeave = 376;
+    DebugSessions debugSessions = 377;
+    DebugAddBreakpointRequest debugAddBreakpointRequest = 380;
+    DebugUpdateBreakpointRequest debugUpdateBreakpointRequest = 387;
+    DebugRemoveBreakpointRequest debugRemoveBreakpointRequest = 381;
+    DebugBreakpointEvent debugBreakpointEvent = 383;
+    DotReplitGetRequest dotReplitGetRequest = 378;
+    DotReplitGetResponse dotReplitGetResponse = 379;
+    RunConfigGetRequest runConfigGetRequest = 390;
+    RunConfigGetResponse runConfigGetResponse = 391;
+    DotReplitUpdateRequest dotReplitUpdateRequest = 395;
+    DotReplitUpdateResponse dotReplitUpdateResponse = 396;
+    StartLSP startLSP = 345;
+    FirewallDenied firewallDenied = 393;
+    NixPackageAddRequest nixPackageAddRequest = 410;
+    NixPackageAddResponse nixPackageAddResponse = 411;
+    NixPackageRemoveRequest nixPackageRemoveRequest = 412;
+    NixPackageRemoveResponse nixPackageRemoveResponse = 413;
+    NixPackageListRequest nixPackageListRequest = 414;
+    NixPackageListResponse nixPackageListResponse = 415;
+    NixChannelsRequest nixChannelsRequest = 416;
+    NixChannelsResponse nixChannelsResponse = 417;
+    NixChannelLatestStableRequest nixChannelLatestStableRequest = 418;
+    NixChannelLatestStableResponse nixChannelLatestStableResponse = 419;
+    NixPackageSearchRequest nixPackageSearchRequest = 420;
+    NixPackageSearchResponse nixPackageSearchResponse = 421;
+    UserEvent userEvent = 423;
+    ReplspaceApiOpenFile replspaceApiOpenFile = 424;
+    ReplspaceApiCloseFile replspaceApiCloseFile = 425;
+    ReplspaceApiGetGitHubToken replspaceApiGetGitHubToken = 426;
+    ReplspaceApiGitHubToken replspaceApiGitHubToken = 427;
+    Focused focused = 428;
+    NixModulesGetRequest nixModulesGetRequest = 429;
+    NixModulesGetResponse nixModulesGetResponse = 430;
+    NixModulesChanged nixModulesChanged = 431;
+    NixModulesBuildRequest nixModulesBuildRequest = 432;
+    PackageSetPackagerRequest packageSetPackagerRequest = 433;
+    PackageSetPackagerResponse packageSetPackagerResp = 434;
+    ToolchainGetRequest toolchainGetRequest = 435;
+    ToolchainGetResponse toolchainGetResponse = 436;
+    ToolchainChanged toolchainChanged = 437;
+    ReplspaceApiOpenMultipleFiles replspaceApiOpenMultipleFiles = 438;
+    NixModulesGetRegistryRequest nixModulesGetRegistryRequest = 439;
+    NixModulesGetRegistryResponse nixModulesGetRegistryResponse = 440;
+  }
 }
 
-message NixPackageAddRequest {
-	repeated string packages = 1;
-}
+message NixPackageAddRequest { repeated string packages = 1; }
 
-message NixPackageAddResponse {
-}
+message NixPackageAddResponse {}
 
-message NixPackageRemoveRequest {
-	repeated string packages = 1;
-}
+message NixPackageRemoveRequest { repeated string packages = 1; }
 
-message NixPackageRemoveResponse {
-}
+message NixPackageRemoveResponse {}
 
-message NixPackageListRequest {
-}
+message NixPackageListRequest {}
 
-message NixPackageListResponse {
-	repeated NixPackage packages = 1;
-}
+message NixPackageListResponse { repeated NixPackage packages = 1; }
 
 message NixPackage {
-	string name = 1;
-	string description = 2;
-	string version = 3;
-	repeated string homepageURL = 4;
-	repeated string maintainers = 5;
-	repeated string licenses = 6;
+  string name = 1;
+  string description = 2;
+  string version = 3;
+  repeated string homepageURL = 4;
+  repeated string maintainers = 5;
+  repeated string licenses = 6;
 }
 
-message NixChannelsRequest {
-}
+message NixChannelsRequest {}
 
-message NixChannelsResponse {
-	repeated string channels = 1;
-}
+message NixChannelsResponse { repeated string channels = 1; }
 
-message NixChannelLatestStableRequest {
-}
+message NixChannelLatestStableRequest {}
 
-message NixChannelLatestStableResponse {
-	string channel = 1;
-}
+message NixChannelLatestStableResponse { string channel = 1; }
 
-message NixPackageSearchRequest {
-	string query = 1;
-}
+message NixPackageSearchRequest { string query = 1; }
 
-message NixPackageSearchResponse {
-	repeated NixPackage packages = 1;
-}
+message NixPackageSearchResponse { repeated NixPackage packages = 1; }
 
 message StartLSP {
-	string language = 1;
-	string languageServerId = 2;
+  string language = 1;
+  string languageServerId = 2;
 }
 
-message Audio {
-	repeated int32 data = 1;
-}
+message Audio { repeated int32 data = 1; }
 
 message Audio2 {
-	repeated sint32 data = 1;
-	int64 samples = 2;
+  repeated sint32 data = 1;
+  int64 samples = 2;
 }
 
 message Preconditions {
-	int64 generation = 1;
-	int64 metageneration = 2;
-	bool doesNotExist = 3;
+  int64 generation = 1;
+  int64 metageneration = 2;
+  bool doesNotExist = 3;
 }
 
 message ReadMetaRequest {
-	string key = 1;
-	bool exists = 2;
-	bytes data = 3;
+  string key = 1;
+  bool exists = 2;
+  bytes data = 3;
 }
 
 message ReadMetaResponse {
-	string key = 1;
-	bool exists = 2;
-	bytes data = 3;
-	int64 generation = 4;
-	int64 metageneration = 5;
+  string key = 1;
+  bool exists = 2;
+  bytes data = 3;
+  int64 generation = 4;
+  int64 metageneration = 5;
 }
 
 message WriteMetaRequest {
-	string key = 1;
-	bytes data = 2;
-	Preconditions preconditions = 5;
+  string key = 1;
+  bytes data = 2;
+  Preconditions preconditions = 5;
 }
 
 message WriteMetaResponse {
-	int64 generation = 1;
-	int64 metageneration = 2;
+  int64 generation = 1;
+  int64 metageneration = 2;
 }
 
 message AppendMetaRequest {
-	string key = 1;
-	bytes data = 2;
-	Preconditions preconditions = 5;
+  string key = 1;
+  bytes data = 2;
+  Preconditions preconditions = 5;
 }
 
 message AppendMetaResponse {
-	int64 generation = 1;
-	int64 metageneration = 2;
+  int64 generation = 1;
+  int64 metageneration = 2;
 }
 
 message BootStatus {
-	enum Stage {
-		HANDSHAKE = 0;
-		ACQUIRING = 3;
-		COMPLETE = 4;
-		PROXY = 5;
-		PULL_FILES = 6;
-		LOAD_BLOCK = 7;
-		BLOCK_MIGRATION = 9;
-		RETRY = 8;
-	}
+  enum Stage {
+    HANDSHAKE = 0;
+    ACQUIRING = 3;
+    COMPLETE = 4;
+    PROXY = 5;
+    PULL_FILES = 6;
+    LOAD_BLOCK = 7;
+    BLOCK_MIGRATION = 9;
+    RETRY = 8;
+  }
 
-	BootStatus.Stage stage = 1;
-	uint32 progress = 2;
-	uint32 total = 3;
+  BootStatus.Stage stage = 1;
+  uint32 progress = 2;
+  uint32 total = 3;
 }
 
 message Pid1Config {
-	string cwd = 1;
-	string language = 2;
-	map<string,string> env = 3;
-	bool noStore = 4;
-	bool noninteractiveFSChange = 5;
+  string cwd = 1;
+  string language = 2;
+  map<string, string> env = 3;
+  bool noStore = 4;
+  bool noninteractiveFSChange = 5;
 }
 
-message FSLock {
-	string name = 1;
-}
+message FSLock { string name = 1; }
 
-message FSSnapshot {
-}
+message FSSnapshot {}
 
-message FSSnapshotEvent {
-	repeated string sources = 1;
-}
+message FSSnapshotEvent { repeated string sources = 1; }
 
-message SnapshotEvent {
-	repeated string sources = 1;
-}
+message SnapshotEvent { repeated string sources = 1; }
 
-message SubscribeFile {
-	repeated File files = 1;
-}
+message SubscribeFile { repeated File files = 1; }
 
 message FileEvent {
-	enum Op {
-		Create = 0;
-		Move = 1;
-		Remove = 2;
-		Modify = 3;
-	}
+  enum Op {
+    Create = 0;
+    Move = 1;
+    Remove = 2;
+    Modify = 3;
+  }
 
-	File file = 1;
-	File dest = 3;
-	FileEvent.Op op = 2;
+  File file = 1;
+  File dest = 3;
+  FileEvent.Op op = 2;
 }
 
 message Flush {
-	enum Consistency {
-		PermanentStorage = 0;
-		Disk = 1;
-	}
+  enum Consistency {
+    PermanentStorage = 0;
+    Disk = 1;
+  }
 
-	Flush.Consistency consistency = 1;
+  Flush.Consistency consistency = 1;
 }
 
 message OTLinkFile {
-	File file = 1;
-	bool highConsistency = 2;
-	bool OBSOLETEUseModTime = 3;
+  File file = 1;
+  bool highConsistency = 2;
+  bool OBSOLETEUseModTime = 3;
 }
 
 message OTLinkFileResponse {
-	uint32 version = 1;
-	File linkedFile = 2;
+  uint32 version = 1;
+  File linkedFile = 2;
 }
 
 message Auth {
-	string token = 1;
-	string containerID = 2;
+  string token = 1;
+  string containerID = 2;
 }
 
 message VCREntry {
-	enum Direction {
-		IN = 0;
-		OUT = 1;
-	}
+  enum Direction {
+    IN = 0;
+    OUT = 1;
+  }
 
-	uint64 timestamp = 1;
-	VCREntry.Direction direction = 2;
-	Command command = 3;
-	string uid = 4;
-	string replid = 5;
+  uint64 timestamp = 1;
+  VCREntry.Direction direction = 2;
+  Command command = 3;
+  string uid = 4;
+  string replid = 5;
 }
 
-message StartVCR {
-}
+message StartVCR {}
 
-message ReadVCR {
-}
+message ReadVCR {}
 
 message VCRLog {
-	repeated VCREntry log = 1;
-	File logfile = 2;
+  repeated VCREntry log = 1;
+  File logfile = 2;
 }
 
 message ExecInfo {
-	repeated string command = 1;
-	string reason = 2;
+  repeated string command = 1;
+  string reason = 2;
 }
 
-message Debug {
-	string text = 1;
-}
+message Debug { string text = 1; }
 
 enum FileAuthMethod {
-	GET = 0;
-	HEAD = 1;
-	PUT = 2;
-	DELETE = 3;
+  GET = 0;
+  HEAD = 1;
+  PUT = 2;
+  DELETE = 3;
 }
 
 message FileAuthReq {
-	File file = 1;
-	FileAuthMethod method = 2;
+  File file = 1;
+  FileAuthMethod method = 2;
 }
 
 message MultiFileAuthRes {
-	FileAuthRes put = 1;
-	FileAuthRes del = 2;
-	FileAuthRes get = 3;
+  FileAuthRes put = 1;
+  FileAuthRes del = 2;
+  FileAuthRes get = 3;
 }
 
 message FileAuthRes {
-	File file = 1;
-	string url = 2;
-	FileAuthMethod method = 3;
-	int64 expire = 4;
-	string error = 5;
-	bool replError = 7;
+  File file = 1;
+  string url = 2;
+  FileAuthMethod method = 3;
+  int64 expire = 4;
+  string error = 5;
+  bool replError = 7;
 }
 
-message ListObjects {
-	string prefix = 1;
-}
+message ListObjects { string prefix = 1; }
 
-message ListObjectsResp {
-	repeated string objects = 1;
-}
+message ListObjectsResp { repeated string objects = 1; }
 
-message Disconnect {
-	string error = 1;
-}
+message Disconnect { string error = 1; }
 
-message Send {
-	bytes buff = 1;
-}
+message Send { bytes buff = 1; }
 
-message Recv {
-	bytes buff = 1;
-}
+message Recv { bytes buff = 1; }
 
 message Connect {
-	string proto = 1;
-	string addr = 2;
+  string proto = 1;
+  string addr = 2;
 }
 
-message Hint {
-	string text = 1;
-}
+message Hint { string text = 1; }
 
-message Ping {
-}
+message Ping {}
 
-message Pong {
-}
+message Pong {}
 
 message Hello {
-	uint32 userid = 1;
-	string username = 2;
-	string token = 3;
+  uint32 userid = 1;
+  string username = 2;
+  string token = 3;
 }
 
-message Goodbye {
-}
+message Goodbye {}
 
 enum State {
-	Stopped = 0;
-	Running = 1;
+  Stopped = 0;
+  Running = 1;
 }
 
-message CheckChanges {
-}
+message CheckChanges {}
 
 message EnsurePackages {
-	bool install = 1;
-	File file = 2;
+  bool install = 1;
+  File file = 2;
 }
 
-message Start {
-}
+message Start {}
 
 message DebugStatus {
-	bool done = 1;
-	repeated StackFrame stack = 2;
+  bool done = 1;
+  repeated StackFrame stack = 2;
 }
 
 message StackFrame {
-	string function = 1;
-	uint32 line = 2;
+  string function = 1;
+  uint32 line = 2;
 }
 
 message ContainedTest {
-	File suite = 1;
-	repeated File project = 2;
+  File suite = 1;
+  repeated File project = 2;
 }
 
 message TestResult {
-	bool passed = 1;
-	string stderr = 2;
-	repeated TestFailure fails = 3;
+  bool passed = 1;
+  string stderr = 2;
+  repeated TestFailure fails = 3;
 }
 
 message TestFailure {
-	string name = 1;
-	string trace = 2;
+  string name = 1;
+  string trace = 2;
 }
 
 message ResizeTerm {
-	uint32 rows = 1;
-	uint32 cols = 2;
+  uint32 rows = 1;
+  uint32 cols = 2;
 }
 
-message SaneTerm {
-}
+message SaneTerm {}
 
-message LintResults {
-	repeated LintResult results = 1;
-}
+message LintResults { repeated LintResult results = 1; }
 
 message LintResult {
-	string text = 1;
-	int32 row = 2;
-	int32 column = 3;
-	string type = 4;
+  string text = 1;
+  int32 row = 2;
+  int32 column = 3;
+  string type = 4;
 }
 
-message OK {
-}
+message OK {}
 
 message Move {
-	string oldPath = 1;
-	string newPath = 2;
+  string oldPath = 1;
+  string newPath = 2;
 }
 
-message Files {
-	repeated File files = 1;
-}
+message Files { repeated File files = 1; }
 
 message StatResult {
-	bool exists = 1;
-	File.Type type = 2;
-	int64 size = 3;
-	string fileMode = 4;
-	int64 modTime = 5;
+  bool exists = 1;
+  File.Type type = 2;
+  int64 size = 3;
+  string fileMode = 4;
+  int64 modTime = 5;
 }
 
 message File {
-	enum Type {
-		REGULAR = 0;
-		DIRECTORY = 1;
-	}
+  enum Type {
+    REGULAR = 0;
+    DIRECTORY = 1;
+  }
 
-	string path = 1;
-	File.Type type = 2;
-	bytes content = 3;
+  string path = 1;
+  File.Type type = 2;
+  bytes content = 3;
 }
 
-message Transfer {
-	string id = 1;
-}
+message Transfer { string id = 1; }
 
 message TransferStart {
-	string path = 1;
-	int64 size = 2;
+  string path = 1;
+  int64 size = 2;
 }
 
 message TransferChunk {
-	string id = 1;
-	bytes content = 2;
+  string id = 1;
+  bytes content = 2;
 }
 
 message TransferComplete {
-	string id = 1;
-	uint32 crc32 = 2;
+  string id = 1;
+  uint32 crc32 = 2;
 }
 
-message Clear {
-}
+message Clear {}
 
-message Toast {
-	string text = 1;
-}
+message Toast { string text = 1; }
 
-message ProtocolError {
-	string text = 1;
-}
+message ProtocolError { string text = 1; }
 
-message Redirect {
-	string url = 1;
-}
+message Redirect { string url = 1; }
 
-message AlwaysOn {
-	bool enable = 1;
-}
+message AlwaysOn { bool enable = 1; }
 
 message RunMain {
-	enum RunMode {
-		RUN = 0;
-		RECORD = 1;
-	}
+  enum RunMode {
+    RUN = 0;
+    RECORD = 1;
+  }
 
-	RunMain.RunMode runMode = 1;
-	bool idempotent = 2;
-	string filePath = 3;
-	string runnerId = 4;
+  RunMain.RunMode runMode = 1;
+  bool idempotent = 2;
+  string filePath = 3;
+  string runnerId = 4;
+  bool fromHosting = 5;
 }
 
 message OpenChannel {
-	enum Action {
-		CREATE = 0;
-		ATTACH = 1;
-		ATTACH_OR_CREATE = 2;
-	}
+  enum Action {
+    CREATE = 0;
+    ATTACH = 1;
+    ATTACH_OR_CREATE = 2;
+  }
 
-	string service = 1;
-	string name = 2;
-	OpenChannel.Action action = 3;
-	int32 id = 4;
+  string service = 1;
+  string name = 2;
+  OpenChannel.Action action = 3;
+  int32 id = 4;
 }
 
 message OpenChannelRes {
-	enum State {
-		CREATED = 0;
-		ATTACHED = 1;
-		ERROR = 2;
-	}
+  enum State {
+    CREATED = 0;
+    ATTACHED = 1;
+    ERROR = 2;
+  }
 
-	int32 id = 1;
-	OpenChannelRes.State state = 2;
-	string error = 3;
+  int32 id = 1;
+  OpenChannelRes.State state = 2;
+  string error = 3;
 }
 
 message CloseChannel {
-	enum Action {
-		DISCONNECT = 0;
-		TRY_CLOSE = 1;
-		CLOSE = 2;
-	}
+  enum Action {
+    DISCONNECT = 0;
+    TRY_CLOSE = 1;
+    CLOSE = 2;
+  }
 
-	int32 id = 1;
-	CloseChannel.Action action = 2;
+  int32 id = 1;
+  CloseChannel.Action action = 2;
 }
 
 message CloseChannelRes {
-	enum Status {
-		DISCONNECT = 0;
-		CLOSE = 1;
-		NOTHING = 2;
-	}
+  enum Status {
+    DISCONNECT = 0;
+    CLOSE = 1;
+    NOTHING = 2;
+  }
 
-	int32 id = 1;
-	CloseChannelRes.Status status = 2;
+  int32 id = 1;
+  CloseChannelRes.Status status = 2;
 }
 
 message ContainerState {
-	enum State {
-		SLEEP = 0;
-		READY = 1;
-	}
+  enum State {
+    SLEEP = 0;
+    READY = 1;
+  }
 
-	ContainerState.State state = 1;
+  ContainerState.State state = 1;
 }
 
 message PortOpen {
-	bool forwarded = 1;
-	uint32 port = 2;
-	string address = 3;
-	uint32 externalPort = 4;
+  bool forwarded = 1;
+  uint32 port = 2;
+  string address = 3;
+  uint32 externalPort = 4;
+  string comm = 5;
+  repeated string cmdline = 6;
+  uint32 pid = 7;
 }
 
 message PortClose {
-	uint32 port = 2;
-	string address = 3;
-	uint32 externalPort = 4;
+  uint32 port = 2;
+  string address = 3;
+  uint32 externalPort = 4;
 }
 
 message OTFetchRequest {
-	uint32 versionFrom = 1;
-	uint32 versionTo = 2;
+  uint32 versionFrom = 1;
+  uint32 versionTo = 2;
 }
 
-message OTFetchResponse {
-	repeated OTPacket packets = 1;
-}
+message OTFetchResponse { repeated OTPacket packets = 1; }
 
 message OTTransformSelectionRequest {
-	uint32 indexStart = 1;
-	uint32 indexEnd = 2;
-	uint32 versionFrom = 3;
-	uint32 versionTo = 4;
+  uint32 indexStart = 1;
+  uint32 indexEnd = 2;
+  uint32 versionFrom = 3;
+  uint32 versionTo = 4;
 }
 
 message OTTransformSelectionResponse {
-	uint32 indexStart = 1;
-	uint32 indexEnd = 2;
-	uint32 version = 3;
+  uint32 indexStart = 1;
+  uint32 indexEnd = 2;
+  uint32 version = 3;
 }
 
 message OTPacket {
-	enum Author {
-		USER = 0;
-		GHOSTWRITER = 1;
-	}
+  enum Author {
+    USER = 0;
+    GHOSTWRITER = 1;
+  }
 
-	uint32 spookyVersion = 1;
-	uint32 version = 5;
-	repeated OTOpComponent op = 2;
-	uint32 crc32 = 3;
-	google.protobuf.Timestamp committed = 4;
-	uint32 nonce = 6;
-	uint32 userId = 7;
-	OTPacket.Author author = 8;
+  uint32 spookyVersion = 1;
+  uint32 version = 5;
+  repeated OTOpComponent op = 2;
+  uint32 crc32 = 3;
+  google.protobuf.Timestamp committed = 4;
+  uint32 nonce = 6;
+  uint32 userId = 7;
+  OTPacket.Author author = 8;
 }
 
 message OTOpComponent {
-	oneof opComponent {
-		uint32 skip = 1;
-		uint32 delete = 2;
-		string insert = 3;
-	}
+  oneof opComponent {
+    uint32 skip = 1;
+    uint32 delete = 2;
+    string insert = 3;
+  }
 }
 
 message OTStatus {
-	string contents = 1;
-	uint32 version = 2;
-	File linkedFile = 3;
-	repeated OTCursor cursors = 4;
+  string contents = 1;
+  uint32 version = 2;
+  File linkedFile = 3;
+  repeated OTCursor cursors = 4;
 }
 
 message OTCursor {
-	uint32 position = 1;
-	uint32 selectionStart = 2;
-	uint32 selectionEnd = 3;
-	User user = 4;
-	string id = 5;
+  uint32 position = 1;
+  uint32 selectionStart = 2;
+  uint32 selectionEnd = 3;
+  User user = 4;
+  string id = 5;
 }
 
 message ChatMessage {
-	string username = 1;
-	string text = 2;
+  string username = 1;
+  string text = 2;
 }
 
 message ChatTyping {
-	string username = 1;
-	bool typing = 2;
+  string username = 1;
+  bool typing = 2;
 }
 
 message User {
-	uint32 id = 1;
-	string name = 2;
-	repeated string roles = 3;
-	int32 session = 4;
-	repeated string teams = 5;
-	string bio = 6;
-	string url = 7;
-	string profileImage = 8;
+  uint32 id = 1;
+  string name = 2;
+  repeated string roles = 3;
+  int32 session = 4;
+  repeated string teams = 5;
+  string bio = 6;
+  string url = 7;
+  string profileImage = 8;
 }
 
 message Roster {
-	repeated User user = 1;
-	repeated FileOpened files = 2;
+  repeated User user = 1;
+  repeated FileOpened files = 2;
 }
 
-message OpenFile {
-	string file = 1;
-}
+message OpenFile { string file = 1; }
 
 message FileOpened {
-	uint32 userId = 1;
-	string file = 2;
-	int32 session = 3;
-	google.protobuf.Timestamp timestamp = 4;
+  uint32 userId = 1;
+  string file = 2;
+  int32 session = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
 
 message ReplspaceApiOpenFile {
-	string file = 1;
-	bool waitForClose = 2;
-	string nonce = 3;
+  string file = 1;
+  bool waitForClose = 2;
+  string nonce = 3;
 }
 
 message ReplspaceApiCloseFile {
-	string file = 1;
-	string nonce = 2;
+  string file = 1;
+  string nonce = 2;
 }
 
-message ReplspaceApiGetGitHubToken {
-	string nonce = 1;
-}
+message ReplspaceApiGetGitHubToken { string nonce = 1; }
 
 message ReplspaceApiGitHubToken {
-	string nonce = 1;
-	string token = 2;
+  string nonce = 1;
+  string token = 2;
 }
 
-message ReplspaceApiOpenMultipleFiles {
-	repeated string files = 1;
-}
+message ReplspaceApiOpenMultipleFiles { repeated string files = 1; }
 
-message Focused {
-}
+message Focused {}
 
-message UpdateSessionTimestamp {
-}
+message UpdateSessionTimestamp {}
 
 message SessionTimestampUpdated {
-	int32 session = 1;
-	google.protobuf.Timestamp timestamp = 2;
+  int32 session = 1;
+  google.protobuf.Timestamp timestamp = 2;
 }
 
-message FollowUser {
-	int32 session = 1;
-}
+message FollowUser { int32 session = 1; }
 
-message UnfollowUser {
-	int32 session = 1;
-}
+message UnfollowUser { int32 session = 1; }
 
 message Exec {
-	enum Lifecycle {
-		NON_BLOCKING = 0;
-		BLOCKING = 1;
-		STDIN = 2;
-	}
+  enum Lifecycle {
+    NON_BLOCKING = 0;
+    BLOCKING = 1;
+    STDIN = 2;
+  }
 
-	repeated string args = 1;
-	map<string,string> env = 2;
-	bool blocking = 3;
-	Exec.Lifecycle lifecycle = 6;
-	bool splitStderr = 4;
-	bool splitLogs = 5;
+  repeated string args = 1;
+  map<string, string> env = 2;
+  bool blocking = 3;
+  Exec.Lifecycle lifecycle = 6;
+  bool splitStderr = 4;
+  bool splitLogs = 5;
 }
 
 message Package {
-	string name = 1;
-	string spec = 2;
-	string description = 10;
-	string version = 11;
-	string homepageURL = 12;
-	string documentationURL = 13;
-	string sourceCodeURL = 14;
-	string bugTrackerURL = 15;
-	string author = 16;
-	string license = 17;
-	repeated Package dependencies = 18;
+  string name = 1;
+  string spec = 2;
+  string description = 10;
+  string version = 11;
+  string homepageURL = 12;
+  string documentationURL = 13;
+  string sourceCodeURL = 14;
+  string bugTrackerURL = 15;
+  string author = 16;
+  string license = 17;
+  repeated Package dependencies = 18;
 }
 
-message PackageSetPackagerRequest {
-	string packagerId = 1;
-}
+message PackageSetPackagerRequest { string packagerId = 1; }
 
-message PackageSetPackagerResponse {
-	string packagerId = 1;
-}
+message PackageSetPackagerResponse { string packagerId = 1; }
 
-message PackageSearch {
-	string query = 1;
-}
+message PackageSearch { string query = 1; }
 
-message PackageSearchResp {
-	repeated Package results = 1;
-}
+message PackageSearchResp { repeated Package results = 1; }
 
-message PackageInfo {
-	Package pkg = 1;
-}
+message PackageInfo { Package pkg = 1; }
 
-message PackageInfoResp {
-	Package pkg = 1;
-}
+message PackageInfoResp { Package pkg = 1; }
 
-message PackageAdd {
-	repeated Package pkgs = 1;
-}
+message PackageAdd { repeated Package pkgs = 1; }
 
-message PackageRemove {
-	repeated Package pkgs = 1;
-}
+message PackageRemove { repeated Package pkgs = 1; }
 
 message PackageInstall {
-	bool fromHosting = 1;
+  bool fromHosting = 1;
+  bool disableGuess = 2;
+  bool useNewResponse = 99;
 }
 
-message PackageListSpecfile {
+message PackageInstallResponse {
+  repeated string guessedPkgs = 1;
+  int64 upmGuessDurationMs = 2;
+  int64 upmAddDurationMs = 3;
+  int64 upmLockDurationMs = 4;
+  int64 totalDurationMs = 5;
 }
 
-message PackageListSpecfileResp {
-	repeated Package pkgs = 1;
-}
+message PackageListSpecfile {}
 
-message PackageCacheSave {
-}
+message PackageListSpecfileResp { repeated Package pkgs = 1; }
 
-message ChatScrollback {
-	repeated ChatMessage scrollback = 1;
-}
+message PackageCacheSave {}
 
-message Metrics {
-	repeated bytes prometheusMetricFamilies = 1;
-}
+message ChatScrollback { repeated ChatMessage scrollback = 1; }
+
+message Metrics { repeated bytes prometheusMetricFamilies = 1; }
 
 message PprofRequest {
-	string id = 1;
-	oneof body {
-		PprofCpuProfileRequest pprofCpuProfileRequest = 2;
-		PprofHeapProfileRequest pprofHeapProfileRequest = 3;
-		PprofAllocsProfileRequest pprofAllocsProfileRequest = 4;
-		PprofBlockProfileRequest pprofBlockProfileRequest = 5;
-		PprofMutexProfileRequest pprofMutexProfileRequest = 6;
-	}
+  string id = 1;
+  oneof body {
+    PprofCpuProfileRequest pprofCpuProfileRequest = 2;
+    PprofHeapProfileRequest pprofHeapProfileRequest = 3;
+    PprofAllocsProfileRequest pprofAllocsProfileRequest = 4;
+    PprofBlockProfileRequest pprofBlockProfileRequest = 5;
+    PprofMutexProfileRequest pprofMutexProfileRequest = 6;
+  }
 }
 
-message PprofAllocsProfileRequest {
-	bool debug = 1;
-}
+message PprofAllocsProfileRequest { bool debug = 1; }
 
-message PprofBlockProfileRequest {
-	bool debug = 1;
-}
+message PprofBlockProfileRequest { bool debug = 1; }
 
-message PprofCpuProfileRequest {
-	int64 seconds = 1;
-}
+message PprofCpuProfileRequest { int64 seconds = 1; }
 
 message PprofHeapProfileRequest {
-	bool gc = 1;
-	bool debug = 2;
+  bool gc = 1;
+  bool debug = 2;
 }
 
-message PprofMutexProfileRequest {
-	bool debug = 1;
-}
+message PprofMutexProfileRequest { bool debug = 1; }
 
 message PprofResponse {
-	string id = 1;
-	bytes profile = 2;
+  string id = 1;
+  bytes profile = 2;
 }
 
-message PTYConfig {
-	bool pipeMode = 1;
-}
+message PTYConfig { bool pipeMode = 1; }
 
 message DebugMain {
-	string session = 1;
-	bool readOnly = 2;
-	string filePath = 3;
-	string debuggerId = 4;
+  string session = 1;
+  bool readOnly = 2;
+  string filePath = 3;
+  string debuggerId = 4;
 }
 
 message DebugMainReply {
-	enum Protocol {
-		DAP = 0;
-	}
+  enum Protocol {
+    DAP = 0;
+  }
 
-	bool joined = 1;
-	DebugMainReply.Protocol protocol = 2;
+  bool joined = 1;
+  DebugMainReply.Protocol protocol = 2;
 }
 
 message DebugState {
-	string session = 1;
-	State state = 2;
+  string session = 1;
+  State state = 2;
 }
 
 message DebugInput {
-	string session = 1;
-	oneof stream {
-		string input = 2;
-		string adapterInput = 3;
-	}
+  string session = 1;
+  oneof stream {
+    string input = 2;
+    string adapterInput = 3;
+  }
 }
 
 message DebugOutput {
-	string session = 1;
-	oneof stream {
-		string output = 2;
-		string adapterOutput = 3;
-	}
+  string session = 1;
+  oneof stream {
+    string output = 2;
+    string adapterOutput = 3;
+  }
 }
 
-message DebugStop {
-	string session = 1;
-}
+message DebugStop { string session = 1; }
 
-message DebugLeave {
-	string session = 1;
-}
+message DebugLeave { string session = 1; }
 
-message DebugSessions {
-	map<string,State> sessions = 1;
-}
+message DebugSessions { map<string, State> sessions = 1; }
 
-message DotReplitGetRequest {
-}
+message DotReplitGetRequest {}
 
-message DotReplitGetResponse {
-	DotReplit dotReplit = 1;
-}
+message DotReplitGetResponse { DotReplit dotReplit = 1; }
 
-message RunConfigGetRequest {
-}
+message RunConfigGetRequest {}
 
 message RunConfigGetResponse {
-	message Run {
-		Exec compile = 1;
-		Exec run = 2;
-	}
+  message Run {
+    Exec compile = 1;
+    Exec run = 2;
+  }
 
-	oneof config {
-		DotReplitInterp interp = 1;
-		RunConfigGetResponse.Run run = 2;
-	}
+  oneof config {
+    DotReplitInterp interp = 1;
+    RunConfigGetResponse.Run run = 2;
+  }
 }
 
 message DotReplitUpdateOp {
-	string op = 1;
-	string path = 2;
-	string value = 3;
+  string op = 1;
+  string path = 2;
+  string value = 3;
 }
 
-message DotReplitUpdateRequest {
-	repeated DotReplitUpdateOp ops = 1;
-}
+message DotReplitUpdateRequest { repeated DotReplitUpdateOp ops = 1; }
 
-message DotReplitUpdateResponse {
-}
+message DotReplitUpdateResponse {}
 
 message DebugAddBreakpointRequest {
-	string path = 1;
-	uint32 otVersion = 2;
-	uint32 otIndex = 3;
-	bool sessionLocal = 6;
-	int32 line = 4;
-	string logMessage = 5;
+  string path = 1;
+  uint32 otVersion = 2;
+  uint32 otIndex = 3;
+  bool sessionLocal = 6;
+  int32 line = 4;
+  string logMessage = 5;
 }
 
 message DebugUpdateBreakpointRequest {
-	string breakpointId = 1;
-	string logMessage = 2;
+  string breakpointId = 1;
+  string logMessage = 2;
 }
 
-message DebugRemoveBreakpointRequest {
-	string breakpointId = 2;
-}
+message DebugRemoveBreakpointRequest { string breakpointId = 2; }
 
 message DebugBreakpointEvent {
-	string path = 1;
-	string absolutePath = 3;
-	repeated DebugBreakpoint breakpoints = 2;
+  string path = 1;
+  string absolutePath = 3;
+  repeated DebugBreakpoint breakpoints = 2;
 }
 
 message DebugBreakpoint {
-	string breakpointId = 1;
-	int32 line = 2;
-	uint32 otVersion = 3;
-	uint32 otIndex = 4;
-	bool sessionLocal = 6;
-	string logMessage = 5;
+  string breakpointId = 1;
+  int32 line = 2;
+  uint32 otVersion = 3;
+  uint32 otIndex = 4;
+  bool sessionLocal = 6;
+  string logMessage = 5;
 }
 
 message DotReplit {
-	Exec run = 1;
-	Exec compile = 2;
-	DebuggerConfig debugger = 3;
-	string language = 4;
-	Exec onBoot = 5;
-	DotReplitPackager packager = 6;
-	DotReplitInterp interpreter = 7;
-	string entrypoint = 8;
-	map<string,DotReplitLanguage> languages = 9;
-	DotReplitUnitTest unitTest = 10;
-	repeated string hidden = 11;
-	NixConfig nix = 12;
-	bool audio = 13;
-	HostingConfig hosting = 14;
-	map<string,string> env = 15;
-	GitHubImportConfig gitHubImport = 16;
-	AuthConfig auth = 17;
-	repeated DotReplitHint hintsList = 18;
-	repeated DotReplitPort ports = 19;
-	repeated DotReplitEnvVar orderedEnv = 20;
-	repeated string refreshWebViewOnFileChange = 21;
-	DeploymentConfig deployment = 22;
-	repeated string modules = 23;
-	ExtensionConfig extension = 24;
+  Exec run = 1;
+  Exec compile = 2;
+  DebuggerConfig debugger = 3;
+  string language = 4;
+  Exec onBoot = 5;
+  DotReplitPackager packager = 6;
+  DotReplitInterp interpreter = 7;
+  string entrypoint = 8;
+  map<string, DotReplitLanguage> languages = 9;
+  DotReplitUnitTest unitTest = 10;
+  repeated string hidden = 11;
+  NixConfig nix = 12;
+  bool audio = 13;
+  HostingConfig hosting = 14;
+  map<string, string> env = 15;
+  GitHubImportConfig gitHubImport = 16;
+  AuthConfig auth = 17;
+  repeated DotReplitHint hintsList = 18;
+  repeated DotReplitPort ports = 19;
+  repeated DotReplitEnvVar orderedEnv = 20;
+  repeated string refreshWebViewOnFileChange = 21;
+  DeploymentConfig deployment = 22;
+  repeated string modules = 23;
+  ExtensionConfig extension = 24;
+  RulesConfig rules = 25;
 }
 
 message DotReplitEnvVar {
-	string key = 1;
-	string value = 2;
+  string key = 1;
+  string value = 2;
 }
 
 message DotReplitPort {
-	uint32 localPort = 1;
-	uint32 externalPort = 2;
+  uint32 localPort = 1;
+  uint32 externalPort = 2;
 }
 
 message DotReplitHint {
-	string regex = 1;
-	string message = 2;
+  string regex = 1;
+  string message = 2;
 }
 
-message GitHubImportConfig {
-	repeated string requiredFiles = 1;
-}
+message GitHubImportConfig { repeated string requiredFiles = 1; }
 
 message DeploymentConfig {
-	enum Target {
-		GCE = 0;
-		CLOUDRUN = 1;
-		STATIC = 2;
-	}
+  enum Target {
+    GCE = 0;
+    CLOUDRUN = 1;
+    STATIC = 2;
+  }
 
-	Exec run = 1;
-	Exec build = 2;
-	bool ignorePorts = 3;
-	DeploymentConfig.Target target = 4;
-	string publicDir = 5;
+  Exec run = 1;
+  Exec build = 2;
+  bool ignorePorts = 3;
+  DeploymentConfig.Target target = 4;
+  string publicDir = 5;
 }
 
 message ExtensionConfig {
-	bool isExtension = 1;
-	string extensionID = 2;
-	string buildCommand = 3;
-	string outputDirectory = 4;
+  bool isExtension = 1;
+  string extensionID = 2;
+  string buildCommand = 3;
+  string outputDirectory = 4;
+  string staticDirectory = 5;
 }
 
-message NixConfig {
-	string channel = 1;
-}
+message NixConfig { string channel = 1; }
 
 message HostingConfig {
-	string route = 1;
-	string directory = 2;
+  string route = 1;
+  string directory = 2;
 }
 
 message AuthConfig {
-	bool pageEnabled = 1;
-	string pageTitle = 2;
-	string pageDescription = 3;
-	string pageColor = 4;
-	string pageImage = 5;
-	bool buttonEnabled = 6;
+  bool pageEnabled = 1;
+  string pageTitle = 2;
+  string pageDescription = 3;
+  string pageColor = 4;
+  string pageImage = 5;
+  bool buttonEnabled = 6;
 }
 
 message DotReplitInterp {
-	Exec command = 1;
-	bytes prompt = 2;
+  Exec command = 1;
+  bytes prompt = 2;
 }
 
 message DotReplitLanguage {
-	string pattern = 1;
-	string syntax = 2;
-	LanguageServerConfig languageServer = 3;
+  string pattern = 1;
+  string syntax = 2;
+  LanguageServerConfig languageServer = 3;
 }
 
 message LanguageServerConfig {
-	Exec startCommand = 1;
-	string configurationJson = 2;
-	string initializationOptionsJson = 3;
+  Exec startCommand = 1;
+  string configurationJson = 2;
+  string initializationOptionsJson = 3;
 }
 
 message DotReplitPackager {
-	Exec afterInstall = 1;
-	string language = 4;
-	DotReplitPackagerFeatures features = 5;
-	map<string,string> env = 6;
-	repeated string ignoredPaths = 2;
-	repeated string ignoredPackages = 3;
+  Exec afterInstall = 1;
+  string language = 4;
+  DotReplitPackagerFeatures features = 5;
+  map<string, string> env = 6;
+  repeated string ignoredPaths = 2;
+  repeated string ignoredPackages = 3;
 }
 
 message DotReplitPackagerFeatures {
-	bool packageSearch = 1;
-	bool guessImports = 2;
-	bool enabledForHosting = 3;
+  bool packageSearch = 1;
+  bool guessImports = 2;
+  bool enabledForHosting = 3;
 }
 
-message DotReplitUnitTest {
-	string language = 1;
-}
+message DotReplitUnitTest { string language = 1; }
 
 message DebuggerConfig {
-	bool support = 1;
-	CompileConfig compile = 2;
-	DapConfig interactive = 3;
-	TimeTravelConfig timeTravel = 4;
-	string dapTransport = 5;
-	int64 dapConnectTimeout = 6;
-	DapIntegratedAdapterConfig dapIntegratedAdapter = 7;
-	Exec dapStartCommand = 8;
-	google.protobuf.Struct dapInitializeMessage = 9;
-	google.protobuf.Struct dapLaunchMessage = 10;
+  bool support = 1;
+  CompileConfig compile = 2;
+  DapConfig interactive = 3;
+  TimeTravelConfig timeTravel = 4;
+  string dapTransport = 5;
+  int64 dapConnectTimeout = 6;
+  DapIntegratedAdapterConfig dapIntegratedAdapter = 7;
+  Exec dapStartCommand = 8;
+  google.protobuf.Struct dapInitializeMessage = 9;
+  google.protobuf.Struct dapLaunchMessage = 10;
 }
 
 message CompileConfig {
-	Exec command = 1;
-	bool onlyMain = 2;
-	bool noFileArgs = 3;
+  Exec command = 1;
+  bool onlyMain = 2;
+  bool noFileArgs = 3;
 }
 
 message DapConfig {
-	string transport = 1;
-	int64 connectTimeout = 2;
-	DapIntegratedAdapterConfig integratedAdapter = 3;
-	Exec startCommand = 4;
-	google.protobuf.Struct initializeMessage = 5;
-	google.protobuf.Struct launchMessage = 6;
+  string transport = 1;
+  int64 connectTimeout = 2;
+  DapIntegratedAdapterConfig integratedAdapter = 3;
+  Exec startCommand = 4;
+  google.protobuf.Struct initializeMessage = 5;
+  google.protobuf.Struct launchMessage = 6;
 }
 
 message TimeTravelConfig {
-	Exec record = 1;
-	DapConfig debug = 2;
+  Exec record = 1;
+  DapConfig debug = 2;
 }
 
-message DapIntegratedAdapterConfig {
-	string dapTcpAddress = 1;
-}
+message DapIntegratedAdapterConfig { string dapTcpAddress = 1; }
 
-message ProxyGoingAway {
-}
+message ProxyGoingAway {}
 
-message FirewallDenied {
-}
+message FirewallDenied {}
 
 message ReplLogMessage {
-	google.protobuf.Timestamp timestamp = 1;
-	string replId = 2;
-	string logLine = 3;
-	string userName = 4;
+  google.protobuf.Timestamp timestamp = 1;
+  string replId = 2;
+  string logLine = 3;
+  string userName = 4;
 }
 
 message UserEvent {
-	string eventName = 1;
-	google.protobuf.Struct eventData = 2;
-	int32 version = 3;
+  string eventName = 1;
+  google.protobuf.Struct eventData = 2;
+  int32 version = 3;
 }
 
-message NixModulesGetRequest {
-}
+message NixModulesGetRequest {}
 
-message NixModulesGetResponse {
-	repeated NixModule modules = 1;
-}
+message NixModulesGetResponse { repeated NixModule modules = 1; }
 
 message NixModule {
-	string id = 1;
-	string version = 2;
-	string name = 3;
-	string description = 4;
-	repeated RunOption runners = 5;
-	repeated DebuggerOption debuggers = 6;
-	repeated PackagerOption packagers = 7;
-	repeated LanguageServerOption languageServers = 8;
-	string buildType = 9;
-	repeated string resolutionPath = 10;
-	string resolvedId = 11;
-	string referencedId = 12;
+  string id = 1;
+  string version = 2;
+  string name = 3;
+  string description = 4;
+  repeated RunOption runners = 5;
+  repeated DebuggerOption debuggers = 6;
+  repeated PackagerOption packagers = 7;
+  repeated LanguageServerOption languageServers = 8;
+  string buildType = 9;
+  repeated string resolutionPath = 10;
+  string resolvedId = 11;
+  string referencedId = 12;
+  repeated FormatterOption formatters = 13;
 }
 
-message NixModulesChanged {
-	repeated NixModule modules = 1;
-}
+message NixModulesChanged { repeated NixModule modules = 1; }
 
-message NixModulesBuildRequest {
-}
+message NixModulesBuildRequest {}
 
-message NixModulesGetRegistryRequest {
-}
+message NixModulesGetRegistryRequest {}
 
 message NixModulesGetRegistryResponse {
-	repeated NixModulesRegistryEntry modules = 1;
-	map<string,NixModulesUpgradeMapEntry> autoUpgrade = 2;
-	map<string,NixModulesUpgradeMapEntry> recommendUpgrade = 3;
+  repeated NixModulesRegistryEntry modules = 1;
+  map<string, NixModulesUpgradeMapEntry> autoUpgrade = 2;
+  map<string, NixModulesUpgradeMapEntry> recommendUpgrade = 3;
 }
 
 message NixModulesRegistryEntry {
-	string id = 1;
-	string name = 2;
-	string description = 3;
-	int32 version = 4;
-	string tag = 5;
-	repeated string tags = 6;
-	string commit = 7;
-	string path = 8;
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 version = 4;
+  string tag = 5;
+  repeated string tags = 6;
+  string commit = 7;
+  string path = 8;
 }
 
 message NixModulesUpgradeMapEntry {
-	string to = 1;
-	string changelog = 2;
+  string to = 1;
+  string changelog = 2;
 }
 
-message ToolchainGetRequest {
-}
+message ToolchainGetRequest {}
 
 message ToolchainConfigs {
-	string entrypoint = 1;
-	repeated RunOption runs = 2;
-	repeated DebuggerOption debuggers = 3;
-	repeated LanguageServerOption languageServers = 4;
-	repeated PackagerOption packagers = 5;
+  string entrypoint = 1;
+  repeated RunOption runs = 2;
+  repeated DebuggerOption debuggers = 3;
+  repeated LanguageServerOption languageServers = 4;
+  repeated PackagerOption packagers = 5;
+  repeated FormatterOption formatters = 6;
+  bool disableInstallBeforeRun = 7;
+  bool disableGuessImports = 8;
 }
 
-message ToolchainGetResponse {
-	ToolchainConfigs configs = 1;
-}
+message ToolchainGetResponse { ToolchainConfigs configs = 1; }
 
-message ToolchainChanged {
-	ToolchainConfigs configs = 1;
-}
+message ToolchainChanged { ToolchainConfigs configs = 1; }
 
 message RunOption {
-	string id = 1;
-	string name = 2;
-	bool fileParam = 3;
-	string language = 4;
-	FileTypeAttrs fileTypeAttrs = 5;
+  string id = 1;
+  string name = 2;
+  bool fileParam = 3;
+  string language = 4;
+  FileTypeAttrs fileTypeAttrs = 5;
+  bool interpreter = 6;
+  bool optionalFileParam = 7;
 }
 
 message DebuggerOption {
-	string id = 1;
-	string name = 2;
-	bool fileParam = 3;
-	string language = 4;
-	FileTypeAttrs fileTypeAttrs = 5;
+  string id = 1;
+  string name = 2;
+  bool fileParam = 3;
+  string language = 4;
+  FileTypeAttrs fileTypeAttrs = 5;
 }
 
 message LanguageServerOption {
-	string id = 1;
-	string name = 2;
-	string language = 3;
-	FileTypeAttrs fileTypeAttrs = 4;
-	LanguageServerConfig config = 5;
+  string id = 1;
+  string name = 2;
+  string language = 3;
+  FileTypeAttrs fileTypeAttrs = 4;
+  LanguageServerConfig config = 5;
 }
 
 message FileTypeAttrs {
-	repeated string extensions = 1;
-	repeated string files = 2;
-	string filePattern = 3;
+  repeated string extensions = 1;
+  repeated string files = 2;
+  string filePattern = 3;
 }
 
 message PackagerOption {
-	string id = 1;
-	string name = 2;
-	string language = 3;
-	repeated string packagerFiles = 4;
-	bool enabledForHosting = 5;
-	bool packageSearch = 6;
-	bool guessImports = 7;
+  string id = 1;
+  string name = 2;
+  string language = 3;
+  repeated string packagerFiles = 4;
+  bool enabledForHosting = 5;
+  bool packageSearch = 6;
+  bool guessImports = 7;
+}
+
+message FormatterOption {
+  string id = 1;
+  string name = 2;
+  Exec startCommand = 3;
+  FileTypeAttrs fileTypeAttrs = 4;
 }
 
 message ReplDomainDoubleDash {
-	string user = 1;
-	string slug = 2;
-	string suffix = 3;
+  string user = 1;
+  string slug = 2;
+  string suffix = 3;
 }
 
 message ReplDomainDots {
-	string user = 1;
-	string slug = 2;
-	string suffix = 3;
+  string user = 1;
+  string slug = 2;
+  string suffix = 3;
 }
 
 message ReplDomainSingleDomain {
-	string user = 1;
-	string suffix = 2;
+  string user = 1;
+  string suffix = 2;
 }
 
 message ReplDomainId {
-	string id = 1;
-	string suffix = 2;
+  string id = 1;
+  string suffix = 2;
 }
 
 message ReplDomain {
-	oneof kind {
-		string custom = 1;
-		ReplDomainId id = 2;
-		ReplDomainDoubleDash doubleDash = 3;
-		ReplDomainDots dots = 4;
-		ReplDomainSingleDomain singleDomain = 5;
-	}
+  oneof kind {
+    string custom = 1;
+    ReplDomainId id = 2;
+    ReplDomainDoubleDash doubleDash = 3;
+    ReplDomainDots dots = 4;
+    ReplDomainSingleDomain singleDomain = 5;
+  }
+}
+
+message OutputBlockStartEvent {
+  enum ExecutionMode {
+    Run = 0;
+    Interpret = 1;
+  }
+
+  OutputBlockStartEvent.ExecutionMode executionMode = 1;
+  google.protobuf.Timestamp measureStartTime = 2;
+}
+
+message OutputBlockEndEvent {
+  sint32 exitCode = 1;
+  google.protobuf.Timestamp measureEndTime = 2;
+}
+
+message RulesConfig { FormatterRules formatter = 1; }
+
+message FormatterRules {
+  repeated FormatterConfigWithPattern patterns = 1;
+  map<string, FormatterConfig> fileExtensions = 2;
+  map<string, FormatterConfig> languages = 3;
+}
+
+message FormatterConfig { string id = 1; }
+
+message FormatterConfigWithPattern {
+  string id = 1;
+  string pattern = 2;
 }
 
 message ReplToken {
-	message ClassroomMetadata {
-		string id = 1;
-		string language = 2;
-	}
+  message ClassroomMetadata {
+    string id = 1;
+    string language = 2;
+  }
 
-	message ReplID {
-		string id = 1;
-		string sourceRepl = 2;
-	}
+  message ReplID {
+    string id = 1;
+    string sourceRepl = 2;
+  }
 
-	enum WireFormat {
-		PROTOBUF = 0;
-		JSON = 1;
-	}
+  enum WireFormat {
+    PROTOBUF = 0;
+    JSON = 1;
+    PID2 = 2;
+  }
 
-	message Presenced {
-		uint32 bearerID = 1;
-		string bearerName = 2;
-	}
+  message Presenced {
+    uint32 bearerID = 1;
+    string bearerName = 2;
+  }
 
-	google.protobuf.Timestamp iat = 1;
-	google.protobuf.Timestamp exp = 2;
-	string salt = 3;
-	string cluster = 4;
-	repl.Persistence persistence = 6;
-	repl.ResourceLimits resourceLimits = 10;
-	repl.ResourceLimits interactiveResourceLimits = 17;
-	ReplToken.WireFormat format = 12;
-	ReplToken.Presenced presenced = 13;
-	repeated string flags = 14;
-	repl.Permissions permissions = 15;
-	repeated features.Feature features = 16;
-	repl.BuildInfo buildInfo = 18;
-	oneof metadata {
-		repl.Repl repl = 7;
-		ReplToken.ReplID id = 8;
-		ReplToken.ClassroomMetadata classroom = 9;
-	}
+  google.protobuf.Timestamp iat = 1;
+  google.protobuf.Timestamp exp = 2;
+  string salt = 3;
+  string cluster = 4;
+  repl.Persistence persistence = 6;
+  repl.ResourceLimits resourceLimits = 10;
+  repl.ResourceLimits interactiveResourceLimits = 17;
+  ReplToken.WireFormat format = 12;
+  ReplToken.Presenced presenced = 13;
+  repeated string flags = 14;
+  repl.Permissions permissions = 15;
+  repeated features.Feature features = 16;
+  repl.BuildInfo buildInfo = 18;
+  oneof metadata {
+    repl.Repl repl = 7;
+    ReplToken.ReplID id = 8;
+    ReplToken.ClassroomMetadata classroom = 9;
+  }
 }
 
 message TLSCertificate {
-	string domain = 1;
-	bytes cert = 2;
+  string domain = 1;
+  bytes cert = 2;
 }
 
 message ReplTransfer {
-	repl.Repl repl = 1;
-	repl.ResourceLimits replLimits = 2;
-	repl.ResourceLimits userLimits = 3;
-	repeated string customDomains = 4;
-	repeated TLSCertificate certificates = 5;
-	repeated string flags = 6;
-	repl.Metadata metadata = 7;
+  repl.Repl repl = 1;
+  repl.ResourceLimits replLimits = 2;
+  repl.ResourceLimits userLimits = 3;
+  repeated string customDomains = 4;
+  repeated TLSCertificate certificates = 5;
+  repeated string flags = 6;
+  repl.Metadata metadata = 7;
 }
 
-message AllowReplRequest {
-	ReplTransfer replTransfer = 1;
-}
+message AllowReplRequest { ReplTransfer replTransfer = 1; }
 
 message ClusterMetadata {
-	string id = 1;
-	string conmanURL = 2;
-	string gurl = 3;
-	string proxy = 5;
-	string continent = 7;
+  string id = 1;
+  string conmanURL = 2;
+  string gurl = 3;
+  string proxy = 5;
+  string continent = 7;
 }
 
 message EvictReplRequest {
-	ClusterMetadata clusterMetadata = 1;
-	string token = 2;
-	string user = 3;
-	string slug = 4;
+  ClusterMetadata clusterMetadata = 1;
+  string token = 2;
+  string user = 3;
+  string slug = 4;
 }
 
-message EvictReplResponse {
-	ReplTransfer replTransfer = 1;
-}
+message EvictReplResponse { ReplTransfer replTransfer = 1; }
 
 enum TokenVersion {
-	BARE_REPL_TOKEN = 0;
-	TYPE_AWARE_TOKEN = 1;
+  BARE_REPL_TOKEN = 0;
+  TYPE_AWARE_TOKEN = 1;
 }
 
 message GovalSigningAuthority {
-	TokenVersion version = 3;
-	string issuer = 4;
-	oneof cert {
-		string keyId = 1;
-		string signedCert = 2;
-	}
+  TokenVersion version = 3;
+  string issuer = 4;
+  oneof cert {
+    string keyId = 1;
+    string signedCert = 2;
+  }
 }
 
 enum FlagClaim {
-	MINT_GOVAL_TOKEN = 0;
-	SIGN_INTERMEDIATE_CERT = 1;
-	IDENTITY = 5;
-	GHOSTWRITER = 6;
-	RENEW_IDENTITY = 7;
-	RENEW_KV = 8;
-	ANY_REPLID = 2;
-	ANY_USER = 3;
-	ANY_CLUSTER = 4;
+  MINT_GOVAL_TOKEN = 0;
+  SIGN_INTERMEDIATE_CERT = 1;
+  IDENTITY = 5;
+  GHOSTWRITER = 6;
+  RENEW_IDENTITY = 7;
+  RENEW_KV = 8;
+  DEPLOYMENTS = 10;
+  ANY_REPLID = 2;
+  ANY_USER = 3;
+  ANY_USER_ID = 11;
+  ANY_CLUSTER = 4;
+  ANY_SUBCLUSTER = 9;
 }
 
 message CertificateClaim {
-	oneof claim {
-		string replid = 1;
-		string user = 2;
-		string cluster = 4;
-		FlagClaim flag = 3;
-	}
+  oneof claim {
+    string replid = 1;
+    string user = 2;
+    int64 userId = 7;
+    string cluster = 4;
+    string subcluster = 5;
+    bool deployment = 6;
+    FlagClaim flag = 3;
+  }
 }
 
 message GovalCert {
-	google.protobuf.Timestamp iat = 1;
-	google.protobuf.Timestamp exp = 2;
-	repeated CertificateClaim claims = 3;
-	string publicKey = 4;
+  google.protobuf.Timestamp iat = 1;
+  google.protobuf.Timestamp exp = 2;
+  repeated CertificateClaim claims = 3;
+  string publicKey = 4;
 }
 
 message GovalToken {
-	google.protobuf.Timestamp iat = 1;
-	google.protobuf.Timestamp exp = 2;
-	string replid = 3;
-	oneof Token {
-		ReplToken replToken = 4;
-		GovalReplIdentity replIdentity = 5;
-	}
+  google.protobuf.Timestamp iat = 1;
+  google.protobuf.Timestamp exp = 2;
+  string replid = 3;
+  oneof Token {
+    ReplToken replToken = 4;
+    GovalReplIdentity replIdentity = 5;
+  }
 }
 
 message GovalReplIdentity {
-	string replid = 1;
-	string user = 2;
-	string slug = 3;
-	string aud = 4;
-	bool ephemeral = 5;
-	string originReplid = 6;
-	int64 userId = 7;
-	repl.BuildInfo buildInfo = 8;
-	bool isTeam = 9;
-	repeated string roles = 10;
+  string replid = 1;
+  string user = 2;
+  string slug = 3;
+  string aud = 4;
+  bool ephemeral = 5;
+  string originReplid = 6;
+  int64 userId = 7;
+  repl.BuildInfo buildInfo = 8;
+  bool isTeam = 9;
+  repeated string roles = 10;
+  oneof runtime {
+    ReplRuntimeInteractive interactive = 11;
+    ReplRuntimeHosting hosting = 13;
+    ReplRuntimeDeployment deployment = 12;
+  }
 }
 
+message ReplRuntimeInteractive {
+  string cluster = 1;
+  string subcluster = 2;
+}
+
+message ReplRuntimeHosting {
+  string cluster = 1;
+  string subcluster = 2;
+}
+
+message ReplRuntimeDeployment {}
+
 message lore {
-	message LoreCommand {
-		oneof command {
-			lore.ClusterTransfer clusterTransfer = 1;
-			lore.SoftTakedown softTakedown = 2;
-			lore.Takedown takedown = 6;
-			lore.GovalCommand govalCommand = 3;
-			lore.MultiGovalCommand multiGovalCommand = 5;
-			lore.Restore restore = 4;
-		}
-	}
+  message LoreCommand {
+    oneof command {
+      lore.ClusterTransfer clusterTransfer = 1;
+      lore.SoftTakedown softTakedown = 2;
+      lore.Takedown takedown = 6;
+      lore.GovalCommand govalCommand = 3;
+      lore.MultiGovalCommand multiGovalCommand = 5;
+      lore.Restore restore = 4;
+    }
+  }
 
-	message ClusterTransfer {
-		string replId = 1;
-		string user = 2;
-		string transferId = 4;
-		oneof location {
-			string newClusterId = 3;
-			string newContinentId = 5;
-		}
-	}
+  message ClusterTransfer {
+    string replId = 1;
+    string user = 2;
+    string transferId = 4;
+    oneof location {
+      string newClusterId = 3;
+      string newContinentId = 5;
+    }
+  }
 
-	message SoftTakedown {
-		string replId = 1;
-		string softTakedownId = 2;
-	}
+  message SoftTakedown {
+    string replId = 1;
+    string softTakedownId = 2;
+  }
 
-	message Takedown {
-		string replId = 1;
-	}
+  message Takedown { string replId = 1; }
 
-	message GovalCommand {
-		oneof command {
-			repl.Metadata updateMetadata = 1;
-			lore.PartialUpdateMetadata partialUpdateMetadata = 2;
-			lore.KillRepl killRepl = 3;
-			lore.UpdateSourceRepl updateSourceRepl = 4;
-			lore.UpdateReplFlags updateReplFlags = 5;
-			lore.SoftTakedown softTakedown = 6;
-			lore.Takedown takedown = 7;
-		}
-	}
+  message GovalCommand {
+    oneof command {
+      repl.Metadata updateMetadata = 1;
+      lore.PartialUpdateMetadata partialUpdateMetadata = 2;
+      lore.KillRepl killRepl = 3;
+      lore.UpdateSourceRepl updateSourceRepl = 4;
+      lore.UpdateReplFlags updateReplFlags = 5;
+      lore.SoftTakedown softTakedown = 6;
+      lore.Takedown takedown = 7;
+    }
+  }
 
-	message PartialUpdateMetadata {
-		google.protobuf.FieldMask fieldMask = 1;
-		repl.Metadata updateMetadata = 2;
-	}
+  message PartialUpdateMetadata {
+    google.protobuf.FieldMask fieldMask = 1;
+    repl.Metadata updateMetadata = 2;
+  }
 
-	message MultiGovalCommand {
-		string replId = 1;
-		repeated lore.GovalCommand govalCommands = 2;
-	}
+  message MultiGovalCommand {
+    string replId = 1;
+    repeated lore.GovalCommand govalCommands = 2;
+  }
 
-	message KillRepl {
-		string replId = 1;
-	}
+  message KillRepl { string replId = 1; }
 
-	message Restore {
-		string replId = 1;
-		string restoreReplId = 2;
-	}
+  message Restore { string replId = 1; }
 
-	message UpdateSourceRepl {
-		string replId = 1;
-		string sourceReplId = 2;
-	}
+  message UpdateSourceRepl {
+    string replId = 1;
+    string sourceReplId = 2;
+  }
 
-	message UpdateReplFlags {
-		string replId = 1;
-		repeated string flags = 2;
-	}
-
+  message UpdateReplFlags {
+    string replId = 1;
+    repeated string flags = 2;
+  }
 }
 
 message features {
-	message Gpu {
-	}
+  message Gpu {}
 
-	message Boosted {
-	}
+  message Boosted {}
 
-	message Feature {
-		bool required = 3;
-		oneof feature {
-			features.Gpu gpu = 1;
-			features.Boosted boosted = 2;
-		}
-	}
+  message Backpack {}
 
+  message Feature {
+    bool required = 3;
+    oneof feature {
+      features.Gpu gpu = 1;
+      features.Boosted boosted = 2;
+      features.Backpack backpack = 4;
+    }
+  }
 }
 
 message repl {
-	message Buckets {
-		string snapshots = 1;
-		string metadata = 2;
-		string diskBlocks = 3;
-	}
+  message Buckets {
+    string snapshots = 1;
+    string metadata = 2;
+    string diskBlocks = 3;
+  }
 
-	message Repl {
-		string id = 1;
-		string language = 2;
-		string bucket = 3;
-		string slug = 4;
-		string user = 5;
-		string sourceRepl = 6;
-		string database = 7;
-		repl.Buckets buckets = 8;
-		repl.UserId userId = 9;
-		bool isTeam = 10;
-		repeated string roles = 11;
-	}
+  message Repl {
+    string id = 1;
+    string language = 2;
+    string bucket = 3;
+    string slug = 4;
+    string user = 5;
+    string sourceRepl = 6;
+    string database = 7;
+    repl.Buckets buckets = 8;
+    repl.UserId userId = 9;
+    bool isTeam = 10;
+    repeated string roles = 11;
+    string logFields = 13;
+  }
 
-	enum Environment {
-		DEVELOPMENT = 0;
-		PRODUCTION = 1;
-	}
+  enum Environment {
+    DEVELOPMENT = 0;
+    PRODUCTION = 1;
+  }
 
-	message UserId {
-		int64 id = 1;
-		repl.Environment environment = 2;
-	}
+  message UserId {
+    int64 id = 1;
+    repl.Environment environment = 2;
+  }
 
-	message ResourceLimits {
-		enum Cachability {
-			NONE = 0;
-			USER = 1;
-			REPL = 2;
-		}
+  message ResourceLimits {
+    enum Cachability {
+      NONE = 0;
+      USER = 1;
+      REPL = 2;
+    }
 
-		bool net = 1;
-		int64 memory = 2;
-		double threads = 3;
-		double shares = 4;
-		int64 disk = 5;
-		repl.ResourceLimits.Cachability cache = 6;
-		bool restrictNetwork = 7;
-		bool preventWakeup = 8;
-	}
+    bool net = 1;
+    int64 memory = 2;
+    double threads = 3;
+    double shares = 4;
+    int64 disk = 5;
+    int64 minimumDisk = 10;
+    int64 scratchDisk = 9;
+    repl.ResourceLimits.Cachability cache = 6;
+    bool restrictNetwork = 7;
+    bool preventWakeup = 8;
+  }
 
-	message Permissions {
-		bool toggleAlwaysOn = 1;
-	}
+  message Permissions { bool toggleAlwaysOn = 1; }
 
-	enum Persistence {
-		PERSISTENT = 0;
-		EPHEMERAL = 1;
-		NONE = 2;
-		READ_ONLY = 3;
-	}
+  enum Persistence {
+    PERSISTENT = 0;
+    EPHEMERAL = 1;
+    NONE = 2;
+    READ_ONLY = 3;
+  }
 
-	message Metadata {
-		repl.Repl repl = 7;
-		repl.ResourceLimits resourceLimits = 10;
-		repl.ResourceLimits interactiveResourceLimits = 17;
-		repl.Persistence persistence = 6;
-		repeated string flags = 14;
-		repl.Permissions permissions = 15;
-		repeated features.Feature features = 16;
-		repl.BuildInfo buildInfo = 18;
-	}
+  message Metadata {
+    repl.Repl repl = 7;
+    repl.ResourceLimits resourceLimits = 10;
+    repl.ResourceLimits interactiveResourceLimits = 17;
+    repl.Persistence persistence = 6;
+    repeated string flags = 14;
+    repl.Permissions permissions = 15;
+    repeated features.Feature features = 16;
+    repl.BuildInfo buildInfo = 18;
+  }
 
-	message BuildInfo {
-		string deploymentId = 1;
-		string url = 2;
-		string buildId = 3;
-		string machineTier = 4;
-	}
-
+  message BuildInfo {
+    string deploymentId = 1;
+    string url = 2;
+    string buildId = 3;
+    string machineTier = 4;
+  }
 }
 
-message PrivateReplsPowerup {
-	bool enabled = 1;
-}
+message PrivateReplsPowerup { bool enabled = 1; }
 
-message GhostwriterPowerup {
-	bool enabled = 1;
-}
+message GhostwriterPowerup { bool enabled = 1; }
 
-message ConnectivityPowerup {
-	bool enabled = 1;
-}
+message ConnectivityPowerup { bool enabled = 1; }
 
 message PowerUp {
-	google.protobuf.Timestamp expiresAt = 1;
-	oneof powerup {
-		PrivateReplsPowerup private = 10;
-		GhostwriterPowerup ghostwriter = 11;
-		ConnectivityPowerup connectivity = 12;
-	}
+  google.protobuf.Timestamp expiresAt = 1;
+  oneof powerup {
+    PrivateReplsPowerup private = 10;
+    GhostwriterPowerup ghostwriter = 11;
+    ConnectivityPowerup connectivity = 12;
+  }
 }
 
 message UserPowerUps {
-	uint32 userId = 1;
-	string username = 2;
-	repeated PowerUp powerups = 3;
+  uint32 userId = 1;
+  string username = 2;
+  repeated PowerUp powerups = 3;
 }
-

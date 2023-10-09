@@ -9,7 +9,6 @@ use serde::Serialize;
 use anyhow::Result;
 
 use std::{path::Path, time::Duration};
-use tokio::sync::broadcast;
 
 use crate::ChannelMessage;
 

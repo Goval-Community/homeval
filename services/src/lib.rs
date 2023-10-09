@@ -1,9 +1,11 @@
 mod chat;
 mod gcsfiles;
 mod ot;
+mod output;
 mod presence;
 mod snapshot;
 mod stub;
+mod toolchain;
 mod traits;
 mod types;
 
@@ -12,6 +14,9 @@ use anyhow::Result;
 use log::as_display;
 use log::error;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use types::config::dotreplit::DotReplit;
 pub use types::*;
 
 pub struct Channel {
@@ -25,6 +30,7 @@ impl Channel {
         id: i32,
         service: String,
         name: Option<String>,
+        dotreplit: Arc<RwLock<DotReplit>>,
         sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
     ) -> Result<Channel> {
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
@@ -33,6 +39,8 @@ impl Channel {
             "presence" => Box::new(presence::Presence::new()),
             "ot" => Box::new(ot::OT::new(sender.clone()).await?),
             "snapshot" => Box::new(snapshot::Snapshot {}),
+            "output" => Box::new(output::Output::new().await),
+            "toolchain" => Box::new(toolchain::Toolchain {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
             "git" => Box::new(stub::Stub {}),  // Stub until replspace api is fixed
@@ -46,6 +54,7 @@ impl Channel {
             clients: HashMap::new(),
             sessions: HashMap::new(),
             sender,
+            dotreplit,
         };
 
         Ok(Channel {
@@ -62,7 +71,9 @@ impl Channel {
                 }
                 ChannelMessage::Detach(session) => self.detach(session).await,
                 ChannelMessage::IPC(ipc) => self.message(ipc.command, ipc.session).await,
-                ChannelMessage::ProcessDead(_, _) => todo!(),
+                ChannelMessage::ProcessDead(exit_code) => {
+                    self._inner.proccess_died(&self.info, exit_code).await
+                }
                 ChannelMessage::CmdDead(_) => todo!(),
                 ChannelMessage::Replspace(_, _) => todo!(),
                 ChannelMessage::Shutdown => match self._inner.shutdown(&self.info).await {
@@ -132,5 +143,14 @@ impl Channel {
 }
 
 pub static IMPLEMENTED_SERVICES: &[&str] = &[
-    "chat", "gcsfiles", "presence", "ot", "snapshot", "null", "git", "open",
+    "chat",
+    "gcsfiles",
+    "presence",
+    "ot",
+    "snapshot",
+    "null",
+    "git",
+    "open",
+    "output",
+    "toolchain",
 ];

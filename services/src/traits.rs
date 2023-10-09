@@ -21,6 +21,14 @@ pub(crate) trait Service {
         Ok(None)
     }
 
+    async fn proccess_died(
+        &mut self,
+        _info: &super::types::ChannelInfo,
+        _exit_code: i32,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     async fn fsevent(&mut self, _info: &super::types::ChannelInfo, _event: FSEvent) -> Result<()> {
         Ok(())
     }
