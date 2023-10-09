@@ -1,4 +1,5 @@
 mod chat;
+mod dotreplit;
 mod gcsfiles;
 mod git;
 mod ot;
@@ -55,6 +56,7 @@ impl Channel {
             "shell" => Box::new(shell::Shell::new(&info).await?),
             "toolchain" => Box::new(toolchain::Toolchain {}),
             "git" => Box::new(git::Git::new()),
+            "dotreplit" => Box::new(dotreplit::DotReplit {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
             _ => return Err(format_err!("Unknown service: {}", service)),
@@ -161,4 +163,5 @@ pub static IMPLEMENTED_SERVICES: &[&str] = &[
     "output",
     "shell",
     "toolchain",
+    "dotreplit",
 ];
