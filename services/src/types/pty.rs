@@ -1,10 +1,11 @@
 // use futures_util::{future::abortable, stream::AbortHandle};
 use log::{as_display, as_error, error};
-use portable_pty::{Child, PtySize};
+use portable_pty::{Child, PtyPair, PtySize};
 use std::{
     collections::{HashMap, VecDeque},
     io::{Error, ErrorKind, Write},
     sync::{atomic::AtomicBool, Arc},
+    time::Duration,
 };
 
 use crate::ChannelMessage;
@@ -95,6 +96,7 @@ pub struct Pty {
     cancelled: Arc<AtomicBool>,
     child_lock: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
     scrollback: Arc<RwLock<String>>,
+    pair: PtyPair,
 }
 
 impl Pty {
@@ -147,7 +149,6 @@ impl Pty {
 
         let child_lock = Arc::new(Mutex::new(child));
 
-        let child_lock_reaper = child_lock.clone();
         let cancelled = Arc::new(AtomicBool::new(false));
         let scrollback = Arc::new(RwLock::new(String::new()));
         let mut pty_writer = PtyWriter {
@@ -159,43 +160,54 @@ impl Pty {
 
         let contact_clone = contact.clone();
         tokio::task::spawn(async move {
+            if let Err(err) =
+                tokio::task::spawn_blocking(move || std::io::copy(&mut reader, &mut pty_writer))
+                    .await
+            {
+                error!("Error occurred copying from pty to channels: {}", err);
+            };
+
+            // let _read = crate::CHANNEL_MESSAGES.read().await;
+            // if !_read.contains_key(&channel) {
+            //     return Err(format_err!("Owning channel"));
+            // }
+        });
+
+        let child_lock_reaper = child_lock.clone();
+        tokio::task::spawn(async move {
             match tokio::task::spawn(async move {
-                if let Err(err) =
-                    tokio::task::spawn_blocking(move || std::io::copy(&mut reader, &mut pty_writer))
-                        .await
-                {
-                    error!("Error occurred copying from pty to channels: {}", err);
-                };
+                let mut interval = tokio::time::interval(Duration::from_millis(50));
 
-                // let _read = crate::CHANNEL_MESSAGES.read().await;
-                // if !_read.contains_key(&channel) {
-                //     return Err(format_err!("Owning channel"));
-                // }
-
-                let exit_code;
-
-                if let Some(code) = child_lock_reaper.lock().await.try_wait()? {
-                    exit_code = code.exit_code() as i32;
-                } else {
-                    exit_code = 0;
+                loop {
+                    interval.tick().await;
+                    let mut child_ = child_lock_reaper.lock().await;
+                    if let Some(exit_code) = child_.try_wait()? {
+                        return Ok::<i32, anyhow::Error>(exit_code.exit_code() as i32);
+                    }
+                    drop(child_);
                 }
-
-                // let queue = _read.get(&channel).unwrap().clone();
-                // drop(_read);
-                contact_clone.send(ChannelMessage::ProcessDead(exit_code))?;
-
-                Ok::<(), anyhow::Error>(())
             })
             .await
             {
-                Ok(res) => match res {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!(err = as_display!(err); "PTY child death alert error");
+                Ok(res) => {
+                    match res {
+                        Ok(exit_code) => {
+                            // let queue = _read.get(&channel).unwrap().clone();
+                            // drop(_read);
+                            match contact_clone.send(ChannelMessage::ProcessDead(exit_code)) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    error!(err = as_error!(err); "PTY child proc reaper errored when alerting channel")
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            error!(err = as_display!(err); "PTY child proc reaper errored")
+                        }
                     }
-                },
+                }
                 Err(err) => {
-                    error!(err = as_error!(err); "Join error in pty");
+                    error!(err = as_error!(err); "Join error on pty child proc reaper")
                 }
             }
         });
@@ -225,8 +237,20 @@ impl Pty {
             cancelled,
             child_lock,
             scrollback,
+            pair,
         };
         Ok(pty)
+    }
+
+    // TODO: use spawn_blocking, bcuz interacting with sync code
+    pub fn resize(&mut self, rows: u16, cols: u16) -> Result<()> {
+        self.pair.master.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+        Ok(())
     }
 
     pub async fn cancel(&mut self) -> Result<()> {
