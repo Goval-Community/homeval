@@ -1,7 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio::sync::mpsc::Sender;
 
-use crate::{ClientInfo, FSEvent, IPCMessage};
+use crate::{ClientInfo, FSEvent, IPCMessage, ReplspaceMessage};
 
 #[async_trait]
 pub(crate) trait Service {
@@ -25,6 +26,16 @@ pub(crate) trait Service {
         &mut self,
         _info: &super::types::ChannelInfo,
         _exit_code: i32,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn replspace(
+        &mut self,
+        _info: &super::types::ChannelInfo,
+        _msg: ReplspaceMessage,
+        _session: i32,
+        _respond: Option<Sender<ReplspaceMessage>>,
     ) -> Result<()> {
         Ok(())
     }

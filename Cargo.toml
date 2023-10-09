@@ -12,7 +12,7 @@ See https://govaldocs.pages.dev"""
 members = [".", "migration", "entity", "services", "protobuf"]
 
 [features]
-default = [] #"replspace", "database", "repldb", "verify_connections"]
+default = ["replspace"] #"replspace", "database", "repldb", "verify_connections"]
 repldb = ["database"]
 database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
 replspace = []

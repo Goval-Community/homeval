@@ -3,6 +3,7 @@ use goval;
 use prost::Message;
 use serde;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::Sender;
 
 use super::client::ClientInfo;
 
@@ -29,7 +30,7 @@ pub enum ChannelMessage {
     ProcessDead(i32),
     CmdDead(i32),
     FSEvent(super::FSEvent),
-    Replspace(i32, ReplspaceMessage), // session, message
+    Replspace(i32, ReplspaceMessage, Option<Sender<ReplspaceMessage>>), // session, message
     Shutdown, // Shutdown the service, value has to be true so that runtime.js can match it in an if check
 }
 

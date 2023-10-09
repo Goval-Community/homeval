@@ -5,10 +5,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use log::{as_debug, as_error, debug, error, info};
+use log::{as_debug, debug, error, info};
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
-use tokio::sync::oneshot::channel;
+use tokio::sync::mpsc::channel;
 
 use crate::{ChannelMessage, ReplspaceMessage};
 
@@ -55,33 +55,26 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
     }
 
     let nonce = TextNonce::new().into_string();
-    let (tx, rx) = channel();
+    let (tx, mut rx) = channel(1);
 
-    let mut callback_table = crate::REPLSPACE_CALLBACKS.write().await;
-
-    callback_table.insert(nonce.clone(), Some(tx));
-
-    drop(callback_table);
-
-    let to_send = ChannelMessage::Replspace(session, ReplspaceMessage::GithubTokenReq(nonce));
+    let to_send =
+        ChannelMessage::Replspace(session, ReplspaceMessage::GithubTokenReq(nonce), Some(tx));
 
     let msg_lock = crate::CHANNEL_MESSAGES.read().await;
 
     for channel in msg_lock.values() {
         channel.send(to_send.clone()).expect("TODO: deal with this");
     }
-    // let queue = msg_lock.get(&cmd.channel).unwrap().clone();
 
     drop(msg_lock);
 
     let res;
-    match rx.await {
-        Ok(token) => res = token,
-        Err(err) => {
-            error!(
-                error = as_error!(err);
-                "Got error awaiting replspace api github token fetcher callback"
-            );
+    let msg = rx.recv().await;
+    rx.close();
+    match msg {
+        Some(token) => res = token,
+        None => {
+            error!("rx#recv() returned None in gh get token");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(GithubTokenRes {
@@ -154,24 +147,20 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
 
     let nonce = TextNonce::new().into_string();
     let tx;
-    let rx;
+    let _rx;
     if query.wait_for_close {
-        let res = channel();
-        tx = res.0;
-        rx = Some(res.1);
-
-        let mut callback_table = crate::REPLSPACE_CALLBACKS.write().await;
-
-        callback_table.insert(nonce.clone(), Some(tx));
-
-        drop(callback_table);
+        let res = channel(1);
+        tx = Some(res.0);
+        _rx = Some(res.1);
     } else {
-        rx = None
+        _rx = None;
+        tx = None;
     }
 
     let to_send = ChannelMessage::Replspace(
         session,
         ReplspaceMessage::OpenFileReq(query.filename, query.wait_for_close, nonce),
+        tx,
     );
 
     let msg_lock = crate::CHANNEL_MESSAGES.read().await;
@@ -182,6 +171,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
 
     drop(msg_lock);
 
+    let mut rx;
     if !query.wait_for_close {
         return (
             StatusCode::OK,
@@ -189,16 +179,19 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
                 status: ReplspaceStatus::Ok,
             }),
         );
+    } else {
+        rx = _rx.expect("rx must be defined for this code to run");
     }
 
     let res;
-    match rx.expect("rx must be defined for this code to run").await {
-        Ok(token) => res = token,
-        Err(err) => {
-            error!(
-                error = as_error!(err);
-                "Got error awaiting replspace api open file fetcher callback"
-            );
+    let msg = rx.recv().await;
+    rx.close();
+    match msg {
+        Some(token) => {
+            res = token;
+        }
+        None => {
+            error!("rx#none() returned none in replspace api open file fetcher");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(OpenFileRes {

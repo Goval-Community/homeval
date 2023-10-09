@@ -3,6 +3,7 @@ pub struct Output {
     start_time: Option<i64>,
 }
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
     vec,
@@ -90,13 +91,16 @@ impl traits::Service for Output {
                     }
                 }
 
+                let mut env = HashMap::new();
+                env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
+
                 self.pty = Some(
                     Pty::start(
                         cmd,
                         info.id,
                         Arc::new(RwLock::new(info.clients.clone())),
                         info.sender.clone(),
-                        None,
+                        Some(env),
                     )
                     .await?,
                 );

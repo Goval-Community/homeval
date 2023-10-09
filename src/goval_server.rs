@@ -406,6 +406,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
                 tokio::spawn(async move {
                     CHANNEL_METADATA.write().await.remove(&channel);
                     CHANNEL_SESSIONS.write().await.remove(&channel);
+                    CHANNEL_MESSAGES.write().await.remove(&channel);
                     PROCCESS_CHANNEL_TO_ID.write().await.remove(&channel);
                     LAST_SESSION_USING_CHANNEL.write().await.remove(&channel);
                 });

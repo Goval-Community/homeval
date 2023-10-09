@@ -1,5 +1,6 @@
 mod chat;
 mod gcsfiles;
+mod git;
 mod ot;
 mod output;
 mod presence;
@@ -53,9 +54,9 @@ impl Channel {
             "output" => Box::new(output::Output::new().await),
             "shell" => Box::new(shell::Shell::new(&info).await?),
             "toolchain" => Box::new(toolchain::Toolchain {}),
+            "git" => Box::new(git::Git::new()),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
-            "git" => Box::new(stub::Stub {}),  // Stub until replspace api is fixed
             _ => return Err(format_err!("Unknown service: {}", service)),
         };
 
@@ -77,7 +78,11 @@ impl Channel {
                     self._inner.proccess_died(&self.info, exit_code).await
                 }
                 ChannelMessage::CmdDead(_) => todo!(),
-                ChannelMessage::Replspace(_, _) => todo!(),
+                ChannelMessage::Replspace(session, msg, respond) => {
+                    self._inner
+                        .replspace(&self.info, msg, session, respond)
+                        .await
+                }
                 ChannelMessage::Shutdown => match self._inner.shutdown(&self.info).await {
                     Ok(_) => break,
                     Err(err) => {

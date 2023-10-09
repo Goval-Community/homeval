@@ -1,7 +1,7 @@
 pub struct Shell {
     pty: Pty,
 }
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use log::{as_debug, debug};
@@ -72,12 +72,14 @@ static DEFAULT_SHELL: &'static str = "pwsh";
 
 impl Shell {
     async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
+        let mut env = HashMap::new();
+        env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
         Ok(Pty::start(
             vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,
             Arc::new(RwLock::new(info.clients.clone())),
             info.sender.clone(),
-            None,
+            Some(env),
         )
         .await?)
     }

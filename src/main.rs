@@ -9,6 +9,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 
 use homeval_services::{
     config::dotreplit::DotReplit,
+    messaging::ReplspaceMessage,
     ChannelMessage,
     ClientInfo,
     IPCMessage,
@@ -84,6 +85,8 @@ async fn main() -> Result<(), Error> {
     LazyLock::force(&CPU_STATS);
 
     debug!("Lazy statics initialized successfully");
+
+    std::env::set_var("HOMEVAL_START_DIR", std::env::current_dir()?);
 
     // console_subscriber::init();
     let _ = env_logger::try_init().unwrap();
