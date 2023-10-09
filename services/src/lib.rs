@@ -3,6 +3,7 @@ mod gcsfiles;
 mod ot;
 mod output;
 mod presence;
+mod shell;
 mod snapshot;
 mod stub;
 mod toolchain;
@@ -33,28 +34,29 @@ impl Channel {
         dotreplit: Arc<RwLock<DotReplit>>,
         sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
     ) -> Result<Channel> {
+        let info = ChannelInfo {
+            id,
+            name,
+            service: service.clone(),
+            clients: HashMap::new(),
+            sessions: HashMap::new(),
+            sender: sender.clone(),
+            dotreplit,
+        };
+
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
             "chat" => Box::new(chat::Chat::new()),
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
-            "ot" => Box::new(ot::OT::new(sender.clone()).await?),
+            "ot" => Box::new(ot::OT::new(sender).await?),
             "snapshot" => Box::new(snapshot::Snapshot {}),
             "output" => Box::new(output::Output::new().await),
+            "shell" => Box::new(shell::Shell::new(&info).await?),
             "toolchain" => Box::new(toolchain::Toolchain {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
             "git" => Box::new(stub::Stub {}),  // Stub until replspace api is fixed
             _ => return Err(format_err!("Unknown service: {}", service)),
-        };
-
-        let info = ChannelInfo {
-            id,
-            name,
-            service,
-            clients: HashMap::new(),
-            sessions: HashMap::new(),
-            sender,
-            dotreplit,
         };
 
         Ok(Channel {
@@ -152,5 +154,6 @@ pub static IMPLEMENTED_SERVICES: &[&str] = &[
     "git",
     "open",
     "output",
+    "shell",
     "toolchain",
 ];
