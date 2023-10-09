@@ -70,7 +70,7 @@ impl traits::Service for GCSFiles {
                             "repository": "https://github.com/goval-community/homeval",
                             "description": "", // TODO: do dis
                             "uptime": 0, // TODO: impl fo realz
-                            "services": super::IMPLEMENTED_SERVICES.clone()
+                            "services": super::IMPLEMENTED_SERVICES
                         });
 
                         val.to_string().as_bytes().to_vec()
