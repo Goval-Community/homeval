@@ -45,15 +45,16 @@ impl traits::Service for GCSFiles {
                 }
 
                 let mut ret = goval::Command::default();
-                let mut _inner = goval::Files::default();
-                _inner.files = res;
+                let _inner = goval::Files { files: res };
                 ret.body = Some(goval::command::Body::Files(_inner));
                 Ok(Some(ret))
             }
             goval::command::Body::Mkdir(dir) => {
                 fs::create_dir_all(dir.path).await?;
-                let mut ret = goval::Command::default();
-                ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ret = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ret))
             }
             goval::command::Body::Read(file) => {
@@ -78,11 +79,13 @@ impl traits::Service for GCSFiles {
                     _ => match fs::read(&file.path).await {
                         Err(err) => {
                             warn!(error = as_error!(err); "Error reading file in gcsfiles");
-                            let mut ret = goval::Command::default();
-                            ret.body = Some(goval::command::Body::Error(format!(
-                                "{}: no such file or directory",
-                                file.path
-                            )));
+                            let ret = goval::Command {
+                                body: Some(goval::command::Body::Error(format!(
+                                    "{}: no such file or directory",
+                                    file.path
+                                ))),
+                                ..Default::default()
+                            };
 
                             return Ok(Some(ret));
                         }
@@ -91,9 +94,11 @@ impl traits::Service for GCSFiles {
                 };
 
                 let mut ret = goval::Command::default();
-                let mut _inner = goval::File::default();
-                _inner.content = contents;
-                _inner.path = file.path;
+                let mut _inner = goval::File {
+                    content: contents,
+                    path: file.path,
+                    ..Default::default()
+                };
                 ret.body = Some(goval::command::Body::File(_inner));
                 Ok(Some(ret))
             }
@@ -105,21 +110,28 @@ impl traits::Service for GCSFiles {
                     fs::remove_file(&file.path).await?
                 }
 
-                let mut ret = goval::Command::default();
-                ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ret = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ret))
             }
             goval::command::Body::Move(move_req) => {
                 fs::rename(move_req.old_path, move_req.new_path).await?;
-                let mut ret = goval::Command::default();
-                ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ret = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ret))
             }
             goval::command::Body::Write(_file) => {
                 // TODO: Store this in the db
                 if &_file.path == ".env" {
-                    let mut ret = goval::Command::default();
-                    ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                    let ret = goval::Command {
+                        body: Some(goval::command::Body::Ok(goval::Ok {})),
+                        ..Default::default()
+                    };
+
                     return Ok(Some(ret));
                 }
 
@@ -129,9 +141,11 @@ impl traits::Service for GCSFiles {
                     .open(_file.path)
                     .await?;
                 file.set_len(0).await?;
-                file.write(&_file.content).await?;
-                let mut ret = goval::Command::default();
-                ret.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                file.write_all(&_file.content).await?;
+                let ret = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ret))
             }
             goval::command::Body::Stat(_) => {

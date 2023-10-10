@@ -36,7 +36,7 @@ impl ChannelInfo {
                 message.session = 0;
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
-                    _clients.push(client.clone())
+                    _clients.push(*client)
                 }
 
                 clients = _clients;
@@ -46,7 +46,7 @@ impl ChannelInfo {
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
                     if client != &excluded {
-                        _clients.push(client.clone())
+                        _clients.push(*client)
                     }
                 }
 

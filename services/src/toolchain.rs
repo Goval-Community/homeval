@@ -19,11 +19,12 @@ impl traits::Service for Toolchain {
         };
         match body {
             goval::command::Body::NixModulesGetRequest(_) => {
-                let mut modules = goval::Command::default();
-
-                modules.body = Some(goval::command::Body::NixModulesGetResponse(
-                    goval::NixModulesGetResponse::default(),
-                ));
+                let modules = goval::Command {
+                    body: Some(goval::command::Body::NixModulesGetResponse(
+                        goval::NixModulesGetResponse::default(),
+                    )),
+                    ..Default::default()
+                };
 
                 Ok(Some(modules))
             }
@@ -31,16 +32,20 @@ impl traits::Service for Toolchain {
                 let mut toolchain = goval::Command::default();
 
                 let mut inner = goval::ToolchainGetResponse::default();
-                let mut configs = goval::ToolchainConfigs::default();
-                configs.runs = vec![goval::RunOption {
-                    id: "homeval/test".into(),
-                    name: "Test".into(),
-                    file_param: false,
-                    language: "idk".into(),
-                    file_type_attrs: None,
-                    interpreter: false,
-                    optional_file_param: false,
-                }];
+
+                let configs = goval::ToolchainConfigs {
+                    runs: vec![goval::RunOption {
+                        id: "homeval/test".into(),
+                        name: "Test".into(),
+                        file_param: false,
+                        language: "idk".into(),
+                        file_type_attrs: None,
+                        interpreter: false,
+                        optional_file_param: false,
+                    }],
+                    ..Default::default()
+                };
+
                 inner.configs = Some(configs);
                 toolchain.body = Some(goval::command::Body::ToolchainGetResponse(inner));
 

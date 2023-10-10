@@ -108,17 +108,15 @@ impl Channel {
 // Private functions
 impl Channel {
     async fn message(&mut self, message: goval::Command, session: i32) -> Result<()> {
-        match self
+        if let Some(mut msg) = self
             ._inner
             .message(&self.info, message.clone(), session)
             .await?
         {
-            Some(mut msg) => {
-                msg.r#ref = message.r#ref;
-                self.info.send(msg, SendSessions::Only(session)).await?
-            }
-            None => {}
+            msg.r#ref = message.r#ref;
+            self.info.send(msg, SendSessions::Only(session)).await?
         }
+
         Ok(())
     }
 

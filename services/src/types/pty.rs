@@ -33,15 +33,14 @@ static MAX_SCROLLBACK: usize = 10_000;
 impl Write for PtyWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let mut cmd = goval::Command::default();
-        let output: String;
-        match String::from_utf8(buf.to_vec()) {
-            Ok(str) => output = str,
+        let output = match String::from_utf8(buf.to_vec()) {
+            Ok(str) => str,
             Err(err) => {
                 error!("Invalid utf-8 output in pty handler");
 
                 return Err(Error::new(ErrorKind::Other, err.utf8_error()));
             }
-        }
+        };
 
         cmd.body = Some(goval::command::Body::Output(output.clone()));
         cmd.channel = self.channel;
@@ -265,7 +264,7 @@ impl Pty {
             return Err(format_err!("Can't write to a cancelled pty"));
         }
 
-        self.writer.write(task.as_bytes())?;
+        self.writer.write_all(task.as_bytes())?;
         Ok(())
     }
 
@@ -277,13 +276,15 @@ impl Pty {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(format_err!("Can't add a session to a cancelled pty"));
         };
-        let mut cmd = goval::Command::default();
 
-        cmd.body = Some(goval::command::Body::Output(
-            self.scrollback.read().await.clone(),
-        ));
-        cmd.session = session;
-        cmd.channel = self.channel;
+        let cmd = goval::Command {
+            body: Some(goval::command::Body::Output(
+                self.scrollback.read().await.clone(),
+            )),
+            session,
+            channel: self.channel,
+            ..Default::default()
+        };
 
         sender.send(IPCMessage {
             command: cmd,

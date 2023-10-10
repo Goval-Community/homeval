@@ -29,7 +29,7 @@ pub static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
     LazyLock::new(|| Arc::new(cpu_time::ProcessTime::now()));
 
-pub static IMPLEMENTED_SERVICES: LazyLock<Vec<String>> = LazyLock::new(|| vec![]);
+pub static IMPLEMENTED_SERVICES: LazyLock<Vec<String>> = LazyLock::new(Vec::new);
 
 pub static DOTREPLIT_CONFIG: LazyLock<Arc<RwLock<DotReplit>>> = LazyLock::new(|| {
     Arc::new(RwLock::const_new(
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Error> {
     std::env::set_var("HOMEVAL_START_DIR", std::env::current_dir()?);
 
     // console_subscriber::init();
-    let _ = env_logger::try_init().unwrap();
+    env_logger::try_init().unwrap();
 
     #[cfg(feature = "database")]
     database::setup().await.unwrap();

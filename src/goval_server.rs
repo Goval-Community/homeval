@@ -75,7 +75,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
 
     debug!("Mutex acquired...");
     *max_session += 1;
-    let session_id = max_session.clone();
+    let session_id = *max_session;
     drop(max_session);
 
     let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
@@ -120,23 +120,23 @@ async fn handle_message(
 ) {
     let cmd: Command = message.clone().command;
 
-    let cmd_body: goval::command::Body;
-
-    match cmd.body {
+    let cmd_body = match cmd.body {
         None => {
             error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
             return;
         }
-        Some(body) => cmd_body = body,
-    }
+        Some(body) => body,
+    };
 
     if cmd.channel == 0 {
         match cmd_body {
             goval::command::Body::Ping(_) => {
-                let mut pong = goval::Command::default();
-                pong.body = Some(goval::command::Body::Pong(goval::Pong::default()));
-                pong.r#ref = cmd.r#ref;
-                pong.channel = 0;
+                let pong = goval::Command {
+                    body: Some(goval::command::Body::Pong(goval::Pong::default())),
+                    r#ref: cmd.r#ref,
+                    channel: 0,
+                    ..Default::default()
+                };
 
                 if let Some(sender) = session_map.read().await.get(&message.session) {
                     match sender.send(message.replace_cmd(pong)) {
@@ -174,7 +174,7 @@ async fn handle_message(
         if let goval::command::Body::Input(input) = cmd_body {
             if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
                 let mut to_continue = false;
-                if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(&pty_id) {
+                if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(pty_id) {
                     queue.push(input);
                     to_continue = true;
                 } else {
@@ -232,7 +232,7 @@ async fn open_channel(
                     && channel.service.clone() == open_chan.service
                 {
                     found = true;
-                    channel_id_held = id.clone();
+                    channel_id_held = *id;
                     continue;
                 }
             }
@@ -243,17 +243,15 @@ async fn open_channel(
             let service = open_chan.service.clone();
             let mut max_channel = max_channel.lock().await;
             *max_channel += 1;
-            let channel_id = max_channel.clone();
-            channel_id_held = channel_id.clone();
+            let channel_id = *max_channel;
+            channel_id_held = channel_id;
             drop(max_channel);
 
-            let _channel_name: Option<String>;
-
-            if open_chan.name.len() > 0 {
-                _channel_name = Some(open_chan.name);
+            let _channel_name = if !open_chan.name.is_empty() {
+                Some(open_chan.name)
             } else {
-                _channel_name = None;
-            }
+                None
+            };
 
             let service_data = ServiceMetadata {
                 service: service.clone(),
@@ -293,8 +291,9 @@ async fn open_channel(
         if !found {
             error!("Couldnt make channel");
             let mut protocol_error = goval::Command::default();
-            let mut _inner = goval::ProtocolError::default();
-            _inner.text = "Could not create / attach channel".to_string();
+            let _inner = goval::ProtocolError {
+                text: "Could not create / attach channel".to_string(),
+            };
 
             protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
             protocol_error.r#ref = message.command.r#ref.clone();
@@ -311,9 +310,12 @@ async fn open_channel(
         }
 
         let mut open_chan_res = goval::Command::default();
-        let mut _open_res = goval::OpenChannelRes::default();
-        _open_res.state = goval::open_channel_res::State::Created.into();
-        _open_res.id = channel_id_held;
+        let _open_res = goval::OpenChannelRes {
+            state: goval::open_channel_res::State::Created.into(),
+            id: channel_id_held,
+            ..Default::default()
+        };
+
         open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
         open_chan_res.r#ref = message.command.r#ref.clone();
         open_chan_res.channel = 0;
@@ -382,7 +384,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
         .write()
         .await
         .entry(session)
-        .and_modify(|channels| channels.retain(|chan: &i32| chan.clone() != channel));
+        .and_modify(|channels| channels.retain(|chan: &i32| *chan != channel));
 
     let msg_lock = CHANNEL_MESSAGES.read().await;
 
@@ -398,8 +400,8 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
 
     match guard.get_mut(&channel) {
         Some(arr) => {
-            arr.retain(|sess| sess.clone() != session);
-            if arr.len() == 0 {
+            arr.retain(|sess| *sess != session);
+            if arr.is_empty() {
                 trace!(channel = channel; "Shutting down channel");
                 queue.send(ChannelMessage::Shutdown)?;
 
@@ -427,8 +429,7 @@ async fn send_message(
     message: goval::Command,
     stream: &mut futures_util::stream::SplitSink<WebSocket, WsMessage>,
 ) -> Result<()> {
-    let mut buf = Vec::new();
-    buf.reserve(message.encoded_len());
+    let mut buf = Vec::with_capacity(message.encoded_len());
     message.encode(&mut buf)?;
 
     Ok(stream.send(WsMessage::Binary(buf)).await?)
@@ -454,24 +455,28 @@ async fn accept_connection(
     let (mut write, mut read) = ws_stream.split();
 
     let mut boot_status = goval::Command::default();
-    let mut inner = goval::BootStatus::default();
-    inner.stage = goval::boot_status::Stage::Complete.into();
+    let inner = goval::BootStatus {
+        stage: goval::boot_status::Stage::Complete.into(),
+        ..Default::default()
+    };
     boot_status.body = Some(goval::command::Body::BootStatus(inner));
 
     send_message(boot_status, &mut write).await?;
 
     // Sending container state
     let mut container_state = goval::Command::default();
-    let mut inner_state = goval::ContainerState::default();
-    inner_state.state = goval::container_state::State::Ready.into();
+    let inner_state = goval::ContainerState {
+        state: goval::container_state::State::Ready.into(),
+    };
     container_state.body = Some(goval::command::Body::ContainerState(inner_state));
 
     send_message(container_state, &mut write).await?;
 
     // Sending server info message
     let mut toast = goval::Command::default();
-    let mut inner_state = goval::Toast::default();
-    inner_state.text = format!("Hello @{}, welcome to homeval!", client.username);
+    let inner_state = goval::Toast {
+        text: format!("Hello @{}, welcome to homeval!", client.username),
+    };
     toast.body = Some(goval::command::Body::Toast(inner_state));
 
     send_message(toast, &mut write).await?;
@@ -495,17 +500,16 @@ async fn accept_connection(
                 Ok(msg) => match msg {
                     WsMessage::Binary(buf) => {
                         let _message: anyhow::Result<IPCMessage> = buf.try_into();
-                        let message: IPCMessage;
-                        match _message {
+                        let message = match _message {
                             Ok(mut msg) => {
                                 msg.session = session;
-                                message = msg
+                                msg
                             }
                             Err(err) => {
                                 error!(error = as_display!(err), session = session; "Error decoding message from client");
                                 continue;
                             }
-                        }
+                        };
 
                         if let Err(err) = propagate.send(message) {
                             error!(session = session, error = as_error!(err); "An error occured when enqueing message to global message queue")
@@ -515,7 +519,7 @@ async fn accept_connection(
                         warn!(session = session; "CLOSING SESSION");
                         for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
                         {
-                            let channel = _channel.clone();
+                            let channel = *_channel;
                             tokio::spawn(async move {
                                 match detach_channel(channel, session, true).await {
                                     Ok(_) => {}

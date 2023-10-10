@@ -147,25 +147,25 @@ pub mod dotreplit {
         pub hidden: Option<Vec<String>>,
     }
 
-    impl Into<goval::DotReplit> for DotReplit {
-        fn into(self) -> goval::DotReplit {
+    impl From<DotReplit> for goval::DotReplit {
+        fn from(val: DotReplit) -> Self {
             let mut ret = goval::DotReplit::default();
 
-            if let Some(run) = self.run {
+            if let Some(run) = val.run {
                 // let mut inner = goval::Exec::default();
                 // inner.args = vec!["sh".into(), "-c".into(), run];
                 ret.run = Some(run.into());
             }
 
-            if let Some(lang) = self.language {
+            if let Some(lang) = val.language {
                 ret.language = lang;
             }
 
-            if let Some(entrypoint) = self.entrypoint {
+            if let Some(entrypoint) = val.entrypoint {
                 ret.entrypoint = entrypoint;
             }
 
-            if let Some(languages) = self.languages {
+            if let Some(languages) = val.languages {
                 let mut inner = HashMap::new();
 
                 for (lang, data) in languages.iter() {
@@ -175,7 +175,7 @@ pub mod dotreplit {
                 ret.languages = inner
             }
 
-            if let Some(hidden) = self.hidden {
+            if let Some(hidden) = val.hidden {
                 ret.hidden = hidden;
             }
 
@@ -198,19 +198,19 @@ pub mod dotreplit {
         pub language_server: Option<LanguageServerConfig>,
     }
 
-    impl Into<goval::DotReplitLanguage> for DotReplitLanguage {
-        fn into(self) -> goval::DotReplitLanguage {
+    impl From<DotReplitLanguage> for goval::DotReplitLanguage {
+        fn from(val: DotReplitLanguage) -> Self {
             let mut ret = goval::DotReplitLanguage::default();
 
-            if let Some(pattern) = self.pattern {
+            if let Some(pattern) = val.pattern {
                 ret.pattern = pattern;
             }
 
-            if let Some(syntax) = self.syntax {
+            if let Some(syntax) = val.syntax {
                 ret.syntax = syntax;
             }
 
-            if let Some(language_server) = self.language_server {
+            if let Some(language_server) = val.language_server {
                 ret.language_server = Some(language_server.into());
             }
 
@@ -236,22 +236,22 @@ pub struct LanguageServerConfig {
     pub initialization_options_json: Option<String>,
 }
 
-impl Into<goval::LanguageServerConfig> for LanguageServerConfig {
-    fn into(self) -> goval::LanguageServerConfig {
+impl From<LanguageServerConfig> for goval::LanguageServerConfig {
+    fn from(val: LanguageServerConfig) -> Self {
         let mut ret = goval::LanguageServerConfig::default();
 
-        if let Some(start_command) = self.start_command {
+        if let Some(start_command) = val.start_command {
             // let mut inner = goval::Exec::default();
             // inner.args = vec!["sh".into(), "-c".into(), start_command];
             // ret.start_command = Some(inner);
             ret.start_command = Some(start_command.into());
         }
 
-        if let Some(configuration_json) = self.configuration_json {
+        if let Some(configuration_json) = val.configuration_json {
             ret.configuration_json = configuration_json;
         }
 
-        if let Some(initialization_options_json) = self.initialization_options_json {
+        if let Some(initialization_options_json) = val.initialization_options_json {
             ret.initialization_options_json = initialization_options_json;
         };
 
@@ -293,31 +293,31 @@ pub struct Exec {
     pub split_logs: Option<bool>,
 }
 
-impl Into<goval::Exec> for Exec {
-    fn into(self) -> goval::Exec {
+impl From<Exec> for goval::Exec {
+    fn from(val: Exec) -> Self {
         let mut ret = goval::Exec::default();
 
-        if let Some(args) = self.args {
+        if let Some(args) = val.args {
             ret.args = args;
         }
 
-        if let Some(env) = self.env {
+        if let Some(env) = val.env {
             ret.env = env;
         }
 
-        if let Some(blocking) = self.blocking {
+        if let Some(blocking) = val.blocking {
             ret.blocking = blocking;
         }
 
-        if let Some(split_stderr) = self.split_stderr {
+        if let Some(split_stderr) = val.split_stderr {
             ret.split_stderr = split_stderr;
         }
 
-        if let Some(split_logs) = self.split_logs {
+        if let Some(split_logs) = val.split_logs {
             ret.split_logs = split_logs;
         }
 
-        if let Some(lifecycle) = self.lifecycle {
+        if let Some(lifecycle) = val.lifecycle {
             ret.lifecycle = match lifecycle {
                 ExecLifecycle::NonBlocking => goval::exec::Lifecycle::NonBlocking,
                 ExecLifecycle::Blocking => goval::exec::Lifecycle::Blocking,

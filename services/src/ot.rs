@@ -59,20 +59,19 @@ impl traits::Service for OT {
             Some(body) => body,
         };
 
-        if &self.path == "" {
+        if self.path.is_empty() {
             if let goval::command::Body::OtLinkFile(link_file) = body.clone() {
                 let path = link_file.file.unwrap().path;
-                match fs::metadata(path.clone()).await {
-                    Err(_) => {
-                        let mut error = goval::Command::default();
-                        error.body = Some(goval::command::Body::Error(format!(
+                if (fs::metadata(path.clone()).await).is_err() {
+                    let error = goval::Command {
+                        body: Some(goval::command::Body::Error(format!(
                             "{}: no such file or directory",
                             path
-                        )));
-                        return Ok(Some(error));
-                    }
-                    Ok(_) => {}
-                };
+                        ))),
+                        ..Default::default()
+                    };
+                    return Ok(Some(error));
+                }
 
                 self.path = path.clone();
                 let byte_contents = fs::read(path.clone()).await?;
@@ -111,9 +110,11 @@ impl traits::Service for OT {
 
                 let mut link_response = goval::Command::default();
 
-                let mut file = goval::File::default();
-                file.path = path.clone();
-                file.content = byte_contents;
+                let file = goval::File {
+                    path: path.clone(),
+                    content: byte_contents,
+                    ..Default::default()
+                };
 
                 let _inner = goval::OtLinkFileResponse {
                     version: self.version,
@@ -172,10 +173,12 @@ impl traits::Service for OT {
                         goval::ot_op_component::OpComponent::Skip(_skip) => {
                             let skip: usize = _skip.try_into()?;
                             if skip + cursor > self.contents.len_chars() {
-                                let mut err = goval::Command::default();
-                                err.body = Some(goval::command::Body::Error(
-                                    "Invalid skip past bounds".to_string(),
-                                ));
+                                let err = goval::Command {
+                                    body: Some(goval::command::Body::Error(
+                                        "Invalid skip past bounds".to_string(),
+                                    )),
+                                    ..Default::default()
+                                };
                                 return Ok(Some(err));
                             }
 
@@ -184,10 +187,12 @@ impl traits::Service for OT {
                         goval::ot_op_component::OpComponent::Delete(_delete) => {
                             let delete: usize = _delete.try_into()?;
                             if delete + cursor > self.contents.len_chars() {
-                                let mut err = goval::Command::default();
-                                err.body = Some(goval::command::Body::Error(
-                                    "Invalid delete past bounds".to_string(),
-                                ));
+                                let err = goval::Command {
+                                    body: Some(goval::command::Body::Error(
+                                        "Invalid delete past bounds".to_string(),
+                                    )),
+                                    ..Default::default()
+                                };
                                 return Ok(Some(err));
                             }
 
@@ -206,12 +211,10 @@ impl traits::Service for OT {
                 let user_id;
                 if ot.author == goval::ot_packet::Author::Ghostwriter as i32 {
                     user_id = 22261053 // https://replit.com/@ghostwriterai
+                } else if let Some(user) = info.sessions.get(&session) {
+                    user_id = user.id
                 } else {
-                    if let Some(user) = info.sessions.get(&session) {
-                        user_id = user.id.clone()
-                    } else {
-                        user_id = 23054564 // https://replit.com/@homeval-user
-                    }
+                    user_id = 23054564 // https://replit.com/@homeval-user
                 }
 
                 let crc32 = crc32fast::hash(to_write.as_bytes());
@@ -238,23 +241,29 @@ impl traits::Service for OT {
 
                 self.history.push(packet.clone());
 
-                let mut ot_notif = goval::Command::default();
-                ot_notif.body = Some(goval::command::Body::Ot(packet));
+                let ot_notif = goval::Command {
+                    body: Some(goval::command::Body::Ot(packet)),
+                    ..Default::default()
+                };
 
                 info.send(ot_notif, crate::SendSessions::Everyone).await?;
 
                 fs::write(&self.path, to_write).await?;
 
-                let mut ok = goval::Command::default();
-                ok.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ok = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
+
                 Ok(Some(ok))
             }
             goval::command::Body::OtNewCursor(cursor) => {
                 self.cursors.insert(cursor.id.clone(), cursor.clone());
 
-                let mut cursor_notif = goval::Command::default();
-
-                cursor_notif.body = Some(goval::command::Body::OtNewCursor(cursor));
+                let cursor_notif = goval::Command {
+                    body: Some(goval::command::Body::OtNewCursor(cursor)),
+                    ..Default::default()
+                };
 
                 info.send(cursor_notif, crate::SendSessions::EveryoneExcept(session))
                     .await?;
@@ -263,9 +272,10 @@ impl traits::Service for OT {
             goval::command::Body::OtDeleteCursor(cursor) => {
                 self.cursors.remove(&cursor.id);
 
-                let mut cursor_delete_notif = goval::Command::default();
-
-                cursor_delete_notif.body = Some(goval::command::Body::OtDeleteCursor(cursor));
+                let cursor_delete_notif = goval::Command {
+                    body: Some(goval::command::Body::OtDeleteCursor(cursor)),
+                    ..Default::default()
+                };
 
                 info.send(
                     cursor_delete_notif,
@@ -292,8 +302,10 @@ impl traits::Service for OT {
                 Ok(Some(history_result))
             }
             goval::command::Body::Flush(_) => {
-                let mut ok = goval::Command::default();
-                ok.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ok = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ok))
             }
             _ => {
@@ -347,8 +359,10 @@ impl traits::Service for OT {
 
                     self.history.push(packet.clone());
 
-                    let mut ot_notif = goval::Command::default();
-                    ot_notif.body = Some(goval::command::Body::Ot(packet));
+                    let ot_notif = goval::Command {
+                        body: Some(goval::command::Body::Ot(packet)),
+                        ..Default::default()
+                    };
 
                     info.send(ot_notif, crate::SendSessions::Everyone).await?;
                 }
@@ -372,15 +386,19 @@ impl traits::Service for OT {
         _session: i32,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
-        if &self.path == "" {
-            let mut cmd = goval::Command::default();
-            cmd.body = Some(goval::command::Body::Otstatus(goval::OtStatus::default()));
+        if self.path.is_empty() {
+            let cmd = goval::Command {
+                body: Some(goval::command::Body::Otstatus(goval::OtStatus::default())),
+                ..Default::default()
+            };
             return Ok(Some(cmd));
         }
         let mut status = goval::Command::default();
 
-        let mut file = goval::File::default();
-        file.path = self.path.clone();
+        let file = goval::File {
+            path: self.path.clone(),
+            ..Default::default()
+        };
 
         let mut cursors = vec![];
 

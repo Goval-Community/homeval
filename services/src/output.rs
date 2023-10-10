@@ -47,12 +47,11 @@ impl traits::Service for Output {
         }
 
         let mut status = goval::Command::default();
-        let state;
-        if self.start_time.is_some() {
-            state = goval::State::Running
+        let state = if self.start_time.is_some() {
+            goval::State::Running
         } else {
-            state = goval::State::Stopped
-        }
+            goval::State::Stopped
+        };
 
         status.body = Some(goval::command::Body::State(state.into()));
         Ok(Some(status))
@@ -118,9 +117,11 @@ impl traits::Service for Output {
                 new_frame.body = Some(goval::command::Body::OutputBlockStartEvent(event));
                 info.send(new_frame, crate::SendSessions::Everyone).await?;
 
-                let mut status = goval::Command::default();
+                let status = goval::Command {
+                    body: Some(goval::command::Body::State(goval::State::Running.into())),
+                    ..Default::default()
+                };
 
-                status.body = Some(goval::command::Body::State(goval::State::Running.into()));
                 info.send(status, crate::SendSessions::Everyone).await?;
             }
             goval::command::Body::Clear(_) => {
@@ -168,15 +169,20 @@ impl traits::Service for Output {
         info.send(end_frame, crate::SendSessions::Everyone).await?;
 
         if exit_code != 0 {
-            let mut error = goval::Command::default();
-            error.body = Some(goval::command::Body::Error(format!(
-                "exit code {exit_code}"
-            )));
+            let error = goval::Command {
+                body: Some(goval::command::Body::Error(format!(
+                    "exit code {exit_code}"
+                ))),
+                ..Default::default()
+            };
+
             info.send(error, crate::SendSessions::Everyone).await?;
         }
 
-        let mut status = goval::Command::default();
-        status.body = Some(goval::command::Body::State(goval::State::Stopped.into()));
+        let status = goval::Command {
+            body: Some(goval::command::Body::State(goval::State::Stopped.into())),
+            ..Default::default()
+        };
         info.send(status, crate::SendSessions::Everyone).await?;
         Ok(())
     }

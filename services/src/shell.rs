@@ -66,22 +66,22 @@ impl traits::Service for Shell {
 }
 
 #[cfg(target_family = "unix")]
-static DEFAULT_SHELL: &'static str = "sh";
+static DEFAULT_SHELL: &str = "sh";
 #[cfg(target_family = "windows")]
-static DEFAULT_SHELL: &'static str = "pwsh";
+static DEFAULT_SHELL: &str = "pwsh";
 
 impl Shell {
     async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
         let mut env = HashMap::new();
         env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
-        Ok(Pty::start(
+        Pty::start(
             vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,
             Arc::new(RwLock::new(info.clients.clone())),
             info.sender.clone(),
             Some(env),
         )
-        .await?)
+        .await
     }
     pub async fn new(info: &super::types::ChannelInfo) -> Result<Shell> {
         Ok(Shell {

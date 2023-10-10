@@ -19,8 +19,10 @@ impl traits::Service for Snapshot {
 
         match body {
             goval::command::Body::FsSnapshot(_) => {
-                let mut ok = goval::Command::default();
-                ok.body = Some(goval::command::Body::Ok(goval::Ok {}));
+                let ok = goval::Command {
+                    body: Some(goval::command::Body::Ok(goval::Ok {})),
+                    ..Default::default()
+                };
                 Ok(Some(ok))
             }
             _ => Ok(None),

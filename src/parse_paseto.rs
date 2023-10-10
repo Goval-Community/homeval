@@ -1,6 +1,5 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
-use goval;
 use homeval_services::ClientInfo;
 use prost::Message;
 use std::io::Error;
@@ -16,7 +15,7 @@ static KEYS: tokio::sync::OnceCell<std::collections::HashMap<String, String>> =
 use log::{as_display, warn};
 
 fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool)> {
-    let token_parts = token.split(".").collect::<Vec<_>>();
+    let token_parts = token.split('.').collect::<Vec<_>>();
     if token_parts.len() < 3 {
         return Err(Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
     }

@@ -71,26 +71,30 @@ impl traits::Service for Git {
 
         match msg {
             ReplspaceMessage::GithubTokenReq(nonce) => {
-                let mut token_req = goval::Command::default();
-                token_req.body = Some(goval::command::Body::ReplspaceApiGetGitHubToken(
-                    goval::ReplspaceApiGetGitHubToken {
-                        nonce: nonce.clone(),
-                    },
-                ));
+                let token_req = goval::Command {
+                    body: Some(goval::command::Body::ReplspaceApiGetGitHubToken(
+                        goval::ReplspaceApiGetGitHubToken {
+                            nonce: nonce.clone(),
+                        },
+                    )),
+                    ..Default::default()
+                };
                 info.send(token_req, crate::SendSessions::Only(session))
                     .await?;
 
                 self.replspace.insert(nonce, respond);
             }
             ReplspaceMessage::OpenFileReq(path, wait_for_close, nonce) => {
-                let mut token_req = goval::Command::default();
-                token_req.body = Some(goval::command::Body::ReplspaceApiOpenFile(
-                    goval::ReplspaceApiOpenFile {
-                        nonce: nonce.clone(),
-                        wait_for_close,
-                        file: path,
-                    },
-                ));
+                let token_req = goval::Command {
+                    body: Some(goval::command::Body::ReplspaceApiOpenFile(
+                        goval::ReplspaceApiOpenFile {
+                            nonce: nonce.clone(),
+                            wait_for_close,
+                            file: path,
+                        },
+                    )),
+                    ..Default::default()
+                };
                 info.send(token_req, crate::SendSessions::Only(session))
                     .await?;
 

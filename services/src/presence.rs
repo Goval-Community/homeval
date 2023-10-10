@@ -41,23 +41,24 @@ impl traits::Service for Presence {
 
         match body {
             goval::command::Body::FollowUser(follow) => {
-                let mut follow_notif = goval::Command::default();
-
-                follow_notif.body = Some(goval::command::Body::FollowUser(goval::FollowUser {
-                    session,
-                }));
+                let follow_notif = goval::Command {
+                    body: Some(goval::command::Body::FollowUser(goval::FollowUser {
+                        session,
+                    })),
+                    ..Default::default()
+                };
 
                 info.send(follow_notif, SendSessions::Only(follow.session))
                     .await?;
                 Ok(None)
             }
             goval::command::Body::UnfollowUser(unfollow) => {
-                let mut unfollow_notif = goval::Command::default();
-
-                unfollow_notif.body =
-                    Some(goval::command::Body::UnfollowUser(goval::UnfollowUser {
+                let unfollow_notif = goval::Command {
+                    body: Some(goval::command::Body::UnfollowUser(goval::UnfollowUser {
                         session,
-                    }));
+                    })),
+                    ..Default::default()
+                };
 
                 info.send(unfollow_notif, SendSessions::Only(unfollow.session))
                     .await?;
@@ -117,13 +118,17 @@ impl traits::Service for Presence {
         _inner.user = self.users.clone();
         roster.body = Some(goval::command::Body::Roster(_inner));
 
-        let mut user = goval::User::default();
-        user.session = session;
-        user.id = client.id;
-        user.name = client.username;
+        let user = goval::User {
+            session,
+            id: client.id,
+            name: client.username,
+            ..Default::default()
+        };
 
-        let mut join = goval::Command::default();
-        join.body = Some(goval::command::Body::Join(user.clone()));
+        let join = goval::Command {
+            body: Some(goval::command::Body::Join(user.clone())),
+            ..Default::default()
+        };
 
         info.send(join, SendSessions::EveryoneExcept(session))
             .await?;

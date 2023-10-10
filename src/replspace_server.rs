@@ -48,7 +48,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
         debug!(channel = query.channel; "Got git askpass");
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
-        session = last_session.get(&query.channel).unwrap_or(&0).clone();
+        session = *last_session.get(&query.channel).unwrap_or(&0);
     } else {
         debug!("Got git askpass without channel id");
         session = 0;
@@ -68,11 +68,10 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
 
     drop(msg_lock);
 
-    let res;
     let msg = rx.recv().await;
     rx.close();
-    match msg {
-        Some(token) => res = token,
+    let res = match msg {
+        Some(token) => token,
         None => {
             error!("rx#recv() returned None in gh get token");
             return (
@@ -83,12 +82,10 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
                 }),
             );
         }
-    }
+    };
 
-    let token;
-
-    match res {
-        ReplspaceMessage::GithubTokenRes(_token) => token = _token,
+    let token = match res {
+        ReplspaceMessage::GithubTokenRes(token) => token,
         _ => {
             error!(
                 result = as_debug!(res);
@@ -102,7 +99,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
                 }),
             );
         }
-    }
+    };
 
     (
         StatusCode::OK,
@@ -135,7 +132,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
             debug!(channel = channel; "Got git open file");
 
             let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
-            session = last_session.get(&channel).unwrap_or(&0).clone();
+            session = *last_session.get(&channel).unwrap_or(&0);
         } else {
             debug!("Got git open file with channel id set to 0 (unknown)");
             session = 0;
@@ -183,13 +180,10 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
         rx = _rx.expect("rx must be defined for this code to run");
     }
 
-    let res;
     let msg = rx.recv().await;
     rx.close();
-    match msg {
-        Some(token) => {
-            res = token;
-        }
+    let res = match msg {
+        Some(token) => token,
         None => {
             error!("rx#none() returned none in replspace api open file fetcher");
             return (
@@ -199,7 +193,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
                 }),
             );
         }
-    }
+    };
 
     match res {
         ReplspaceMessage::OpenFileRes => (
@@ -213,12 +207,12 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
                 result = as_debug!(res);
                 "Got unexpected result in replspace api github token fetcher"
             );
-            return (
+            (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(OpenFileRes {
                     status: ReplspaceStatus::Err,
                 }),
-            );
+            )
         }
     }
 }
