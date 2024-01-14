@@ -54,6 +54,6 @@ migration = { path = "migration", optional = true}
 entity = { path = "entity", optional = true}
 sea-query = { version = "0.28.5", optional = true }
 pasetors = { version = "0.6.7", default-features = false, features = ["v2"] }
-hyper = { version = "0.14.26", features = ["http1", "http2", "client"], optional = true }
+hyper = { version = "1.1.0", features = ["http1", "http2", "client"], optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 anyhow = "1.0.71"
