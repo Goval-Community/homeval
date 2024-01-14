@@ -7,7 +7,7 @@ updates:
       assignees:
           - "PotentialStyx"
       commit-message:
-          prefix: "build(deps):"
+          prefix: "build"
           include: "scope"
       labels:
           - "cargo"
