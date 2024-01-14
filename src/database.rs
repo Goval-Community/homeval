@@ -9,10 +9,8 @@ pub static DATABASE: OnceCell<sea_orm::DatabaseConnection> = OnceCell::const_new
 
 // TODO: allow disabling of db at runtime as well as compile time
 pub async fn setup() -> Result<()> {
-    let db_url;
-
-    match std::env::var("HOMEVAL_DB") {
-        Ok(url) => db_url = url,
+    let db_url = match std::env::var("HOMEVAL_DB") {
+        Ok(url) => url,
         Err(err) => {
             warn!(
                 "Encountered error fetching $HOMEVAL_DB: `{}`. Disabling database integration.",
@@ -20,7 +18,7 @@ pub async fn setup() -> Result<()> {
             );
             return Ok(());
         }
-    }
+    };
 
     let connect_options = ConnectOptions::new(db_url)
         .acquire_timeout(Duration::from_secs(5))

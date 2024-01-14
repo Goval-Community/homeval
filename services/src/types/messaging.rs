@@ -5,6 +5,8 @@ use serde;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
+use crate::SendSessions;
+
 use super::client::ClientInfo;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,10 +30,10 @@ pub enum ChannelMessage {
     ),
     Detach(i32),
     ProcessDead(i32),
-    CmdDead(i32),
     FSEvent(super::FSEvent),
     Replspace(i32, ReplspaceMessage, Option<Sender<ReplspaceMessage>>), // session, message
-    Shutdown, // Shutdown the service, value has to be true so that runtime.js can match it in an if check
+    Shutdown,
+    ExternalMessage(goval::Command, SendSessions),
 }
 
 #[derive(Debug, Clone)]

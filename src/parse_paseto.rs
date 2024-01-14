@@ -1,11 +1,9 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use homeval_services::ClientInfo;
+use pasetors::{token::UntrustedToken, version2::V2, Public};
 use prost::Message;
 use std::io::Error;
-
-#[cfg(feature = "verify_connections")]
-use pasetors;
 
 #[cfg(feature = "verify_connections")]
 static KEYS: tokio::sync::OnceCell<std::collections::HashMap<String, String>> =
@@ -14,21 +12,31 @@ static KEYS: tokio::sync::OnceCell<std::collections::HashMap<String, String>> =
 #[cfg(feature = "verify_connections")]
 use log::{as_display, warn};
 
-fn parse_noverify(token: &str) -> Result<(Vec<u8>, bool)> {
-    let token_parts = token.split('.').collect::<Vec<_>>();
-    if token_parts.len() < 3 {
-        return Err(Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
-    }
+fn parse_noverify(input: &str) -> Result<(Vec<u8>, bool)> {
+    let token: UntrustedToken<Public, V2> = match UntrustedToken::try_from(input) {
+        Ok(token) => token,
+        Err(_err) => {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Parsing error on paseto token",
+            )
+            .into())
+        }
+    };
+    // let token_parts = token.split('.').collect::<Vec<_>>();
+    // if token_parts.len() < 3 {
+    //     return Err(Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
+    // }
 
-    if token_parts[0] != "v2" || token_parts[1] != "public" {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
-    }
+    // if token_parts[0] != "v2" || token_parts[1] != "public" {
+    //     return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid Token").into());
+    // }
 
-    let decoded = general_purpose::URL_SAFE_NO_PAD.decode(token_parts[2].as_bytes())?;
-    let decoded_len = decoded.len();
-    // currently doesn't verify signature
-    let (msg, _sig) = decoded.split_at(decoded_len - 64);
-    Ok((msg.to_vec(), false))
+    // let decoded = general_purpose::URL_SAFE_NO_PAD.decode(token_parts[2].as_bytes())?;
+    // let decoded_len = decoded.len();
+    // // currently doesn't verify signature
+    // let (msg, _sig) = decoded.split_at(decoded_len - 64);
+    Ok((token.untrusted_payload().to_vec(), false))
 }
 
 #[cfg(feature = "verify_connections")]
@@ -47,10 +55,8 @@ async fn init_keys() -> Result<std::collections::HashMap<String, String>> {
 #[cfg(feature = "verify_connections")]
 async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
     let keys = KEYS.get_or_try_init(init_keys).await?;
-    let token: pasetors::token::UntrustedToken<pasetors::token::Public, pasetors::version2::V2>;
-
-    match pasetors::token::UntrustedToken::try_from(input) {
-        Ok(_token) => token = _token,
+    let token = match pasetors::token::UntrustedToken::try_from(input) {
+        Ok(token) => token,
         Err(_err) => {
             return Err(Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -58,7 +64,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
             )
             .into())
         }
-    }
+    };
 
     let _authority = general_purpose::STANDARD.decode(token.untrusted_footer())?;
     let authority = goval::GovalSigningAuthority::decode(_authority.as_slice())?;
@@ -96,10 +102,8 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
         .into());
     }
 
-    let result;
-
-    match pasetors::version2::PublicToken::verify(&pubkey, &token, None) {
-        Ok(trusted) => result = trusted,
+    let result = match pasetors::version2::PublicToken::verify(&pubkey, &token, None) {
+        Ok(trusted) => trusted,
         Err(err) => {
             return Err(Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -107,7 +111,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
             )
             .into());
         }
-    }
+    };
 
     Ok((result.payload().as_bytes().to_vec(), true))
 }

@@ -11,6 +11,7 @@ use crate::config::dotreplit::DotReplit;
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
 
+#[derive(Clone, Copy, Debug)]
 pub enum SendSessions {
     Only(i32),
     EveryoneExcept(i32),

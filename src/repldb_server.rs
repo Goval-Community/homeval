@@ -13,7 +13,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, net::TcpListener};
 
 pub async fn start_server() -> Result<()> {
-    if let None = crate::DATABASE.get() {
+    if crate::DATABASE.get().is_none() {
         warn!("Database missing, disabling repldb server.");
         return Ok(());
     }
@@ -127,11 +127,10 @@ struct ListKeys {
 }
 
 async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
-    let prefix;
-    match __prefix.prefix {
-        Some(_prefix) => prefix = _prefix,
+    let prefix = match __prefix.prefix {
+        Some(prefix) => prefix,
         None => return (StatusCode::OK, "".to_string()),
-    }
+    };
 
     let database = crate::DATABASE
         .get()

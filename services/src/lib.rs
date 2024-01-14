@@ -1,5 +1,6 @@
 mod chat;
 mod dotreplit;
+mod exec;
 mod gcsfiles;
 mod git;
 mod ot;
@@ -19,7 +20,6 @@ use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use types::config::dotreplit::DotReplit;
 pub use types::*;
 
 pub struct Channel {
@@ -56,6 +56,7 @@ impl Channel {
             "shell" => Box::new(shell::Shell::new(&info).await?),
             "toolchain" => Box::new(toolchain::Toolchain {}),
             "git" => Box::new(git::Git::new()),
+            "exec" => Box::new(exec::Exec::new()),
             "dotreplit" => Box::new(dotreplit::DotReplit {}),
             "null" => Box::new(stub::Stub {}), // This channel never does anything
             "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
@@ -79,7 +80,6 @@ impl Channel {
                 ChannelMessage::ProcessDead(exit_code) => {
                     self._inner.proccess_died(&self.info, exit_code).await
                 }
-                ChannelMessage::CmdDead(_) => todo!(),
                 ChannelMessage::Replspace(session, msg, respond) => {
                     self._inner
                         .replspace(&self.info, msg, session, respond)
@@ -93,6 +93,9 @@ impl Channel {
                     }
                 },
                 ChannelMessage::FSEvent(event) => self._inner.fsevent(&self.info, event).await,
+                ChannelMessage::ExternalMessage(msg, sessions) => {
+                    self.info.send(msg, sessions).await
+                }
             };
 
             match result {
@@ -162,4 +165,5 @@ pub static IMPLEMENTED_SERVICES: &[&str] = &[
     "shell",
     "toolchain",
     "dotreplit",
+    "exec",
 ];

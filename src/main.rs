@@ -68,8 +68,8 @@ static LAST_SESSION_USING_CHANNEL: LazyLock<RwLock<HashMap<i32, i32>>> =
 //     RwLock<HashMap<String, Option<tokio::sync::oneshot::Sender<ReplspaceMessage>>>>,
 // > = LazyLock::new(|| RwLock::new(HashMap::new()));
 
-// static CHILD_PROCS_ENV_BASE: LazyLock<RwLock<HashMap<String, String>>> =
-//     LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHILD_PROCS_ENV_BASE: LazyLock<RwLock<HashMap<String, String>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[cfg(feature = "database")]
 mod database;

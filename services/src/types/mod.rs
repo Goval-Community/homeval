@@ -14,5 +14,10 @@ pub mod service;
 pub use service::ServiceMetadata;
 
 pub mod pty;
+pub use pty::Pty;
 
 pub mod config;
+pub use config::dotreplit::DotReplit;
+
+pub mod proc;
+pub use proc::Proc;

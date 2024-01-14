@@ -1,3 +1,8 @@
+cargo-features = ["codegen-backend"]
+
+[profile.dev]
+codegen-backend = "cranelift"
+
 [package]
 name = "homeval"
 version = "0.3.0"
@@ -12,12 +17,12 @@ See https://govaldocs.pages.dev"""
 members = [".", "migration", "entity", "services", "protobuf"]
 
 [features]
-default = ["replspace"] # "database", "repldb", "verify_connections"]
+default = ["replspace", "database", "repldb", "verify_connections"]
 repldb = ["database"]
 database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
 replspace = []
 fun-stuff = ["dep:chrono", "dep:chrono-tz"]
-verify_connections = ["dep:pasetors", "dep:hyper", "dep:hyper-tls"]
+verify_connections = ["dep:hyper", "dep:hyper-tls"]
 
 [dependencies]
 goval = { path = "protobuf", package = "protobuf" }
@@ -48,7 +53,7 @@ sea-orm = { version = "0.11.3", features = [ "sqlx-postgres", "runtime-tokio-rus
 migration = { path = "migration", optional = true}
 entity = { path = "entity", optional = true}
 sea-query = { version = "0.28.5", optional = true }
-pasetors = { version = "0.6.7", default-features = false, features = ["v2"], optional = true }
+pasetors = { version = "0.6.7", default-features = false, features = ["v2"] }
 hyper = { version = "0.14.26", features = ["http1", "http2", "client"], optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 anyhow = "1.0.71"
