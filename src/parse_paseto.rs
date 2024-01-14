@@ -41,15 +41,23 @@ fn parse_noverify(input: &str) -> Result<(Vec<u8>, bool)> {
 
 #[cfg(feature = "verify_connections")]
 async fn init_keys() -> Result<std::collections::HashMap<String, String>> {
+    use http_body_util::{BodyExt, Collected};
+    use hyper_tls::HttpsConnector;
+    use hyper_util::client::legacy::{connect::HttpConnector, Client};
+    use hyper_util::rt::TokioExecutor;
+
     let key_get = std::env::var("HOMEVAL_PASETO_KEY_URL")?;
 
-    let https = hyper_tls::HttpsConnector::new();
-    let client = hyper::Client::builder().build::<_, hyper::Body>(https);
+    let https = HttpsConnector::new();
+    let client: Client<HttpsConnector<HttpConnector>, Collected<_>> =
+        Client::builder(TokioExecutor::new())
+            .build::<HttpsConnector<HttpConnector>, Collected<prost::bytes::Bytes>>(https);
 
-    let _body = client.get(hyper::Uri::try_from(key_get)?).await?;
-    let body = hyper::body::to_bytes(_body).await?.to_vec();
+    let mut _body = client.get(hyper::Uri::try_from(key_get)?).await?;
 
-    Ok(serde_json::from_slice(body.as_slice())?)
+    let body = _body.body_mut().collect().await?.to_bytes();
+
+    Ok(serde_json::from_slice(&body)?)
 }
 
 #[cfg(feature = "verify_connections")]
