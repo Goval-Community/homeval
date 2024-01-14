@@ -45,7 +45,7 @@ toml = "0.7.4"
 textnonce = "1.0.0"
 
 
-chrono = { version = "0.4.26", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
+chrono = { version = "0.4.29", default-features = false, features = ["time", "std", "libc", "clock"], optional = true }
 chrono-tz =  { version = "0.8.2", optional = true }
 
 
