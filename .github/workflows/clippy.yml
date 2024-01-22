@@ -1,0 +1,47 @@
+{
+    "on": { "push": {}, "pull_request": {} },
+    "name": "Clippy",
+    "permissions": { "security-events": "write" },
+    "jobs":
+        {
+            "enforce-clippy":
+                {
+                    "runs-on": "ubuntu-latest",
+                    "steps":
+                        [
+                            {
+                                "name": "Checkout",
+                                "uses": "actions/checkout@v4",
+                            },
+                            {
+                                "name": "Install Rust",
+                                "uses": "dtolnay/rust-toolchain@master",
+                                "with":
+                                    {
+                                        "components": "clippy",
+                                        "toolchain": "nightly-2024-01-01",
+                                    },
+                            },
+                            {
+                                "name": "Cache",
+                                "uses": "Swatinem/rust-cache@v2",
+                            },
+                            {
+                                "name": "Install tools",
+                                "run": "cargo install clippy-sarif sarif-fmt",
+                            },
+                            {
+                                "name": "Generate SARIF",
+                                "run":
+                                    "cargo clippy --all-features --message-format=json |
+                                    clippy-sarif | tee results.sarif | sarif-fmt",
+                            },
+                            {
+                                "name": "Upload SARIF file",
+                                "uses": "github/codeql-action/upload-sarif@v2",
+                                "with": { "sarif_file": "results.sarif" },
+                            },
+                        ],
+                },
+        },
+}
