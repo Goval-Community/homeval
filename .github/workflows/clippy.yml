@@ -35,6 +35,10 @@
                                 "run": "cargo install clippy-sarif sarif-fmt",
                             },
                             {
+                                "name": "Test build",
+                                "run": "cargo build --all-features",
+                            },
+                            {
                                 "name": "Generate SARIF",
                                 "run":
                                     "cargo clippy --all-features --message-format=json |
