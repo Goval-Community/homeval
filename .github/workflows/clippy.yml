@@ -23,6 +23,10 @@
                                     },
                             },
                             {
+                                "name": "Install Mold Linker",
+                                "uses": "rui314/setup-mold@v1",
+                            },
+                            {
                                 "name": "Cache",
                                 "uses": "Swatinem/rust-cache@v2",
                             },
