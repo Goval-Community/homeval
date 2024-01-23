@@ -1,0 +1,102 @@
+{
+    "on": { "push": { "branches": "main" }, "pull_request": {} },
+    "name": "CI",
+    "permissions": { "security-events": "write" },
+    "jobs":
+        {
+            "enforce-clippy":
+                {
+                    "name": "Upload Clippy Lints",
+                    "runs-on": "ubuntu-latest",
+                    "steps":
+                        [
+                            {
+                                "name": "Checkout",
+                                "uses": "actions/checkout@v4",
+                            },
+                            {
+                                "name": "Install Rust",
+                                "uses": "dtolnay/rust-toolchain@master",
+                                "with":
+                                    {
+                                        "components": "clippy,rustc-codegen-cranelift",
+                                        "toolchain": "nightly-2024-01-22",
+                                    },
+                            },
+                            {
+                                "name": "Install Mold Linker",
+                                "uses": "rui314/setup-mold@v1",
+                            },
+                            {
+                                "name": "Install Protoc",
+                                "uses": "arduino/setup-protoc@v2",
+                            },
+                            {
+                                "name": "Cache",
+                                "uses": "Swatinem/rust-cache@v2",
+                            },
+                            {
+                                "name": "Install tools",
+                                "run": "cargo install clippy-sarif sarif-fmt",
+                            },
+                            {
+                                "name": "Generate SARIF",
+                                "run":
+                                    "cargo clippy --all-features --message-format=json |
+                                    clippy-sarif | tee results.sarif | sarif-fmt",
+                            },
+                            {
+                                "name": "Upload SARIF file",
+                                "uses": "github/codeql-action/upload-sarif@v2",
+                                "with": { "sarif_file": "results.sarif" },
+                            },
+                        ],
+                },
+            "build":
+                {
+                    "name": "Build",
+                    "runs-on": "ubuntu-latest",
+                    "steps":
+                        [
+                            {
+                                "name": "Checkout",
+                                "uses": "actions/checkout@v4",
+                            },
+                            {
+                                "name": "Install Rust",
+                                "uses": "dtolnay/rust-toolchain@master",
+                                "with":
+                                    {
+                                        "components": "clippy",
+                                        "toolchain": "nightly-2024-01-22",
+                                    },
+                            },
+                            {
+                                "name": "Install Mold Linker",
+                                "uses": "rui314/setup-mold@v1",
+                            },
+                            {
+                                "name": "Install Protoc",
+                                "uses": "arduino/setup-protoc@v2",
+                            },
+                            {
+                                "name": "Cache",
+                                "uses": "Swatinem/rust-cache@v2",
+                            },
+                            {
+                                "name": "Build Homeval",
+                                "run": "cargo build --release --all-features",
+                            },
+                            {
+                                "name": "Upload Artifact",
+                                "uses": "actions/upload-artifact@v4",
+                                "with":
+                                    {
+                                        "path": "target/release/homeval",
+                                        "name": "homeval-linux-x86",
+                                    },
+                            },
+                        ],
+                },
+        },
+}
