@@ -18,8 +18,8 @@
                                 "uses": "dtolnay/rust-toolchain@master",
                                 "with":
                                     {
-                                        "components": "clippy",
-                                        "toolchain": "nightly-2024-01-01",
+                                        "components": "clippy,rustc-codegen-cranelift",
+                                        "toolchain": "nightly-2024-01-22",
                                     },
                             },
                             {
@@ -33,10 +33,6 @@
                             {
                                 "name": "Install tools",
                                 "run": "cargo install clippy-sarif sarif-fmt",
-                            },
-                            {
-                                "name": "Test build",
-                                "run": "cargo build --all-features",
                             },
                             {
                                 "name": "Generate SARIF",
