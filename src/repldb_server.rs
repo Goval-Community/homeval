@@ -10,7 +10,7 @@ use log::{as_error, error, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_query::OnConflict;
 use serde::Deserialize;
-use std::{collections::HashMap, net::TcpListener};
+use std::{collections::HashMap, net::SocketAddr};
 
 pub async fn start_server() -> Result<()> {
     if crate::DATABASE.get().is_none() {
@@ -24,10 +24,13 @@ pub async fn start_server() -> Result<()> {
         .route("/:key", get(get_value))
         .route("/:key", delete(delete_value));
 
-    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let listener = if let Ok(addr) = std::env::var("HOMEVAL_REPLDB_ADDR") {
+        tokio::net::TcpListener::bind(addr.parse::<SocketAddr>()?).await?
+    } else {
+        tokio::net::TcpListener::bind("127.0.0.1:0").await?
+    };
 
-    let port = listener.local_addr()?.port();
-    let host = format!("127.0.0.1:{}", port);
+    let host = format!("127.0.0.1:{}", listener.local_addr()?);
 
     info!("ReplDB server listening on: {}", host);
     crate::CHILD_PROCS_ENV_BASE
@@ -35,15 +38,7 @@ pub async fn start_server() -> Result<()> {
         .await
         .insert("REPLIT_DB_URL".to_string(), host);
 
-    let builder;
-
-    if let Ok(addr) = std::env::var("HOMEVAL_REPLDB_ADDR") {
-        builder = axum::Server::bind(&addr.parse()?)
-    } else {
-        builder = axum::Server::from_tcp(listener)?
-    }
-
-    builder.serve(app.into_make_service()).await?;
+    axum::serve(listener, app.into_make_service()).await?;
 
     Ok(())
 }

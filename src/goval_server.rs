@@ -37,9 +37,10 @@ struct AppState {
 static DEFAULT_REPLY: &str = "(づ ◕‿◕ )づ Hello there";
 
 pub async fn start_server() -> Result<()> {
-    let addr = std::env::args()
+    let addr: SocketAddr = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string())
+        .parse()?;
 
     let (tx, mut rx) = mpsc::unbounded_channel::<IPCMessage>();
 
@@ -50,17 +51,19 @@ pub async fn start_server() -> Result<()> {
     info!("Goval server listening on: {}", addr);
 
     tokio::spawn(async move {
-        axum::Server::bind(&addr.parse().unwrap())
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await
-            .unwrap()
+        let max_channel = Mutex::new(0);
+
+        while let Some(message) = rx.recv().await {
+            handle_message(message, &SESSION_MAP, &max_channel).await;
+        }
     });
 
-    let max_channel = Mutex::new(0);
-
-    while let Some(message) = rx.recv().await {
-        handle_message(message, &SESSION_MAP, &max_channel).await;
-    }
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

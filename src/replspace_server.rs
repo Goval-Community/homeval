@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use axum::{
     extract::Query,
@@ -18,9 +20,12 @@ pub async fn start_server() -> Result<()> {
         .route("/files/open", post(open_file))
         .route("/github/token", get(get_gh_token));
 
-    axum::Server::bind(&"127.0.0.1:8283".parse().unwrap())
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(&"127.0.0.1:8283".parse::<SocketAddr>()?)
+        .await
+        .unwrap();
+    axum::serve(listener, app.into_make_service())
+        .await
+        .unwrap();
     Ok(())
 }
 
