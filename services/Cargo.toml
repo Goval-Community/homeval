@@ -13,7 +13,7 @@ deadqueue = { version = "0.2.4", default-features = false, features = ["unlimite
 futures-util = "0.3.28"
 goval = { package = "protobuf", path = "../protobuf"}
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_serde"] }
-notify-debouncer-full = { version = "0.2.0", default-features = false }
+notify-debouncer-full = { version = "0.3.1", default-features = false }
 portable-pty = "0.8.1"
 prost = "0.12.3"
 prost-types = "0.12.3"
