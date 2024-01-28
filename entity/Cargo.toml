@@ -10,4 +10,4 @@ path = "src/mod.rs"
 
 [dependencies]
 sea-orm = "0.12.2"
-serde = "1.0.162"
+serde = "1.0.196"
