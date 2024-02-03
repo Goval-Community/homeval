@@ -70,6 +70,25 @@
                                             "macos-13",
                                             "macos-14",
                                         ],
+                                    "include":
+                                        [
+                                            {
+                                                "os": "windows-latest",
+                                                "descriptor": "windows-x86",
+                                            },
+                                            {
+                                                "os": "ubuntu-latest",
+                                                "descriptor": "linux-x86",
+                                            },
+                                            {
+                                                "os": "macos-13",
+                                                "descriptor": "macos-x86",
+                                            },
+                                            {
+                                                "os": "macos-14",
+                                                "descriptor": "macos-arm",
+                                            },
+                                        ],
                                 },
                         },
 
@@ -115,8 +134,8 @@
                                 "uses": "actions/upload-artifact@v4",
                                 "with":
                                     {
-                                        "path": "target/release/homeval",
-                                        "name": "homeval-${{ runner.os }}-${{ runner.arch }}",
+                                        "path": "${{ runner.os != 'Windows' && 'target/release/homeval' || 'target\\release\\homeval.exe' }}",
+                                        "name": "homeval-${{ matrix.descriptor && matrix.descriptor || format('{0}-{1}', runner.os, runner.arch) }}",
                                     },
                             },
                         ],
