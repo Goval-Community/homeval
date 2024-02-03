@@ -74,19 +74,19 @@
                                         [
                                             {
                                                 "os": "windows-latest",
-                                                "descriptor": "windows-x86",
+                                                "suffix": "windows-x86.exe",
                                             },
                                             {
                                                 "os": "ubuntu-latest",
-                                                "descriptor": "linux-x86",
+                                                "suffix": "linux-x86",
                                             },
                                             {
                                                 "os": "macos-13",
-                                                "descriptor": "macos-x86",
+                                                "suffix": "macos-x86",
                                             },
                                             {
                                                 "os": "macos-14",
-                                                "descriptor": "macos-arm",
+                                                "suffix": "macos-arm",
                                             },
                                         ],
                                 },
@@ -135,7 +135,7 @@
                                 "with":
                                     {
                                         "path": "${{ runner.os != 'Windows' && 'target/release/homeval' || 'target\\release\\homeval.exe' }}",
-                                        "name": "homeval-${{ matrix.descriptor && matrix.descriptor || format('{0}-{1}', runner.os, runner.arch) }}",
+                                        "name": "homeval-${{ matrix.suffix && matrix.suffix || format('{0}-{1}', runner.os, runner.arch) }}",
                                     },
                             },
                         ],
