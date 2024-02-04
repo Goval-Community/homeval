@@ -48,4 +48,10 @@ FROM base as runtime
 
 COPY --from=build /app/target/release/homeval .
 
+# Container metadata
+
+LABEL org.opencontainers.image.source=https://github.com/goval-community/homeval
+LABEL org.opencontainers.image.description="Custom replit eval server implementation"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+
 ENTRYPOINT [ "./homeval" ]
