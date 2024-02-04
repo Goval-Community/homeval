@@ -1,7 +1,7 @@
 {
     "on": { "push": { "branches": "main" }, "pull_request": {} },
     "name": "CI",
-    "permissions": { "security-events": "write" },
+    "permissions": { "security-events": "write", "packages": "write" },
     "jobs":
         {
             "enforce-clippy":
@@ -137,6 +137,31 @@
                                         "path": "${{ runner.os != 'Windows' && 'target/release/homeval' || 'target\\release\\homeval.exe' }}",
                                         "name": "homeval-${{ matrix.suffix && matrix.suffix || format('{0}-{1}', runner.os, runner.arch) }}",
                                     },
+                            },
+                        ],
+                },
+            "docker-build":
+                {
+                    "name": "Build & Push Docker Container",
+                    "needs": ["build"],
+                    "runs-on": "ubuntu-latest",
+                    "steps":
+                        [
+                            {
+                                "name": "Checkout",
+                                "uses": "actions/checkout@v4",
+                            },
+                            {
+                                "name": "Build Image",
+                                "run": "docker buildx build -t ghcr.io/goval-community/homeval:${{ github.sha }} .",
+                            },
+                            {
+                                "name": "Log In to Registry",
+                                "run": 'echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin',
+                            },
+                            {
+                                "name": "Push Image",
+                                "run": "docker push ghcr.io/goval-community/homeval:${{ github.sha }}",
                             },
                         ],
                 },
