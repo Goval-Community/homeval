@@ -19,8 +19,8 @@ use std::{net::SocketAddr, sync::LazyLock};
 use tokio::sync::{mpsc::UnboundedSender, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{as_debug, as_display, as_error, debug, error, info, trace, warn};
 use tokio::sync::mpsc;
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     CHANNEL_MESSAGES, CHANNEL_METADATA, CHANNEL_SESSIONS, LAST_SESSION_USING_CHANNEL, MAX_SESSION,
@@ -100,7 +100,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
     {
         Ok(_) => {}
         Err(err) => {
-            error!(error = as_display!(err); "accept_connection errored")
+            error!(?err, "accept_connection errored")
         }
     };
 }
@@ -125,7 +125,7 @@ async fn handle_message(
 
     let cmd_body = match cmd.body {
         None => {
-            error!(command = as_debug!(cmd); "MISSING COMMAND BODY");
+            error!(?cmd, "MISSING COMMAND BODY");
             return;
         }
         Some(body) => body,
@@ -145,7 +145,7 @@ async fn handle_message(
                     match sender.send(message.replace_cmd(pong)) {
                         Ok(_) => {}
                         Err(err) => {
-                            error!(error = as_error!(err);"Error occured while sending Pong");
+                            error!(?err, "Error occured while sending Pong");
                         }
                     }
                 } else {
@@ -154,7 +154,7 @@ async fn handle_message(
             }
             goval::command::Body::OpenChan(open_chan) => {
                 if let Err(err) = open_channel(open_chan, message, max_channel, session_map).await {
-                    error!(error = as_display!(err); "Error in open chan handler")
+                    error!(?err, "Error in open chan handler")
                 }
             }
 
@@ -164,7 +164,7 @@ async fn handle_message(
                     match detach_channel(close_chan.id, message.session, true).await {
                         Ok(_) => {}
                         Err(err) => {
-                            error!(error = as_display!(err), session = message.session, channel = close_chan.id;
+                            error!(%err, session = message.session, channel = close_chan.id,
                             "Error occured while detaching from channel")
                         }
                     }
@@ -181,7 +181,7 @@ async fn handle_message(
                     queue.push(input);
                     to_continue = true;
                 } else {
-                    error!(pty_id = pty_id; "Couldn't find pty to write to");
+                    error!(pty_id, "Couldn't find pty to write to");
                 }
 
                 if to_continue {
@@ -262,7 +262,7 @@ async fn open_channel(
                 name: _channel_name.clone(),
             };
 
-            trace!(channel = channel_id; "Awaiting queue write");
+            trace!(channel = channel_id, "Awaiting queue write");
 
             let (writer, reader) = mpsc::unbounded_channel();
 
@@ -274,7 +274,7 @@ async fn open_channel(
             let mut metadata = CHANNEL_METADATA.write().await;
             metadata.insert(channel_id_held, service_data.clone());
             drop(metadata);
-            trace!(channel = channel_id_held; "Added channel to queue list");
+            trace!(channel = channel_id_held, "Added channel to queue list");
 
             tokio::spawn(async move {
                 let channel = homeval_services::Channel::new(
@@ -373,7 +373,7 @@ async fn open_channel(
             .and_modify(|channels| channels.push(channel_id_held));
     } else {
         warn!(
-            service = open_chan.service;
+            service = open_chan.service,
             "Missing service requested by openChan"
         )
     }
@@ -381,7 +381,7 @@ async fn open_channel(
 }
 
 async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> {
-    trace!(session = session, channel = channel, forced = forced; "Client is closing a channel");
+    trace!(session, channel, forced, "Client is closing a channel");
 
     SESSION_CHANNELS
         .write()
@@ -405,7 +405,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
         Some(arr) => {
             arr.retain(|sess| *sess != session);
             if arr.is_empty() {
-                trace!(channel = channel; "Shutting down channel");
+                trace!(channel, "Shutting down channel");
                 queue.send(ChannelMessage::Shutdown)?;
 
                 tokio::spawn(async move {
@@ -416,11 +416,11 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
                     LAST_SESSION_USING_CHANNEL.write().await.remove(&channel);
                 });
             } else {
-                trace!(sessions = as_debug!(arr); "Sessions still remain on channel");
+                trace!(sessions = ?arr, "Sessions still remain on channel");
             }
         }
         None => {
-            warn!(channel = channel; "Missing CHANNEL_SESSIONS");
+            warn!(channel, "Missing CHANNEL_SESSIONS");
         }
     }
 
@@ -446,9 +446,9 @@ async fn accept_connection(
     client: ClientInfo,
     addr: SocketAddr,
 ) -> Result<()> {
-    info!(peer_address = as_display!(addr); "New connection");
+    info!(peer_address = %addr, "New connection");
 
-    info!(client = as_debug!(client); "New client");
+    info!(?client, "New client");
 
     SESSION_CLIENT_INFO
         .write()
@@ -500,49 +500,53 @@ async fn accept_connection(
     tokio::spawn(async move {
         while let Some(_msg) = read.next().await {
             match _msg {
-                Ok(msg) => match msg {
-                    WsMessage::Binary(buf) => {
-                        let _message: anyhow::Result<IPCMessage> = buf.try_into();
-                        let message = match _message {
-                            Ok(mut msg) => {
-                                msg.session = session;
-                                msg
-                            }
-                            Err(err) => {
-                                error!(error = as_display!(err), session = session; "Error decoding message from client");
-                                continue;
-                            }
-                        };
-
-                        if let Err(err) = propagate.send(message) {
-                            error!(session = session, error = as_error!(err); "An error occured when enqueing message to global message queue")
-                        }
-                    }
-                    WsMessage::Close(_) => {
-                        warn!(session = session; "CLOSING SESSION");
-                        for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
-                        {
-                            let channel = *_channel;
-                            tokio::spawn(async move {
-                                match detach_channel(channel, session, true).await {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        error!(error = as_display!(err), session = session, channel = channel; "Error occured while detaching from channel")
-                                    }
+                Ok(msg) => {
+                    match msg {
+                        WsMessage::Binary(buf) => {
+                            let _message: anyhow::Result<IPCMessage> = buf.try_into();
+                            let message = match _message {
+                                Ok(mut msg) => {
+                                    msg.session = session;
+                                    msg
                                 }
-                            });
-                        }
+                                Err(err) => {
+                                    error!(%err, session, "Error decoding message from client");
+                                    continue;
+                                }
+                            };
 
-                        SESSION_MAP.write().await.remove(&session);
-                        SESSION_CLIENT_INFO.write().await.remove(&session);
-                        SESSION_CHANNELS.write().await.remove(&session);
-                        warn!(session = session;  "CLOSED SESSION");
+                            if let Err(err) = propagate.send(message) {
+                                error!(session = session, ?err, "An error occured when enqueing message to global message queue")
+                            }
+                        }
+                        WsMessage::Close(_) => {
+                            warn!(session, "CLOSING SESSION");
+                            for _channel in
+                                SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
+                            {
+                                let channel = *_channel;
+                                tokio::spawn(async move {
+                                    match detach_channel(channel, session, true).await {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            error!(%err, session, channel, "Error occured while detaching from channel")
+                                        }
+                                    }
+                                });
+                            }
+
+                            SESSION_MAP.write().await.remove(&session);
+                            SESSION_CLIENT_INFO.write().await.remove(&session);
+                            SESSION_CHANNELS.write().await.remove(&session);
+                            warn!(session, "CLOSED SESSION");
+                        }
+                        _ => {}
                     }
-                    _ => {}
-                },
+                }
                 Err(err) => {
                     error!(
-                        session = session, error = as_error!(err);
+                        session = session,
+                        ?err,
                         "An error occured while reading messages"
                     );
                 }
@@ -555,7 +559,8 @@ async fn accept_connection(
             Ok(_) => {}
             Err(err) => {
                 error!(
-                    session = i.session, error = as_error!(err);
+                    session = i.session,
+                    ?err,
                     "An error occured while sending a message"
                 )
             }

@@ -8,12 +8,12 @@ use std::{
 
 use crate::{ChannelMessage, IPCMessage, SendSessions};
 use anyhow::Result;
-use log::{error, trace};
 use tokio::{
     io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     process::ChildStdin,
     sync::RwLock,
 };
+use tracing::{error, trace};
 
 struct CmdWriter {
     channel: i32,

@@ -15,11 +15,10 @@ mod types;
 
 use anyhow::format_err;
 use anyhow::Result;
-use log::as_display;
-use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::error;
 pub use types::*;
 
 pub struct Channel {
@@ -88,7 +87,7 @@ impl Channel {
                 ChannelMessage::Shutdown => match self._inner.shutdown(&self.info).await {
                     Ok(_) => break,
                     Err(err) => {
-                        error!(error = as_display!(err); "Error encountered in Service#shutdown");
+                        error!(%err, "Error encountered in Service#shutdown");
                         break;
                     }
                 },
@@ -101,7 +100,7 @@ impl Channel {
             match result {
                 Ok(_) => {}
                 Err(err) => {
-                    error!(error = as_display!(err); "Error encountered in service")
+                    error!(%err, "Error encountered in service")
                 }
             }
         }

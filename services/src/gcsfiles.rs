@@ -3,8 +3,8 @@ pub struct GCSFiles {}
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, as_error, debug, warn};
 use tokio::{fs, io::AsyncWriteExt};
+use tracing::{debug, warn};
 
 #[async_trait]
 impl traits::Service for GCSFiles {
@@ -58,7 +58,7 @@ impl traits::Service for GCSFiles {
                 Ok(Some(ret))
             }
             goval::command::Body::Read(file) => {
-                debug!(path = file.path; "File path");
+                debug!(path = file.path, "File path");
                 let contents = match file.path.as_str() {
                     // TODO: Read this from in the db
                     ".env" => vec![],
@@ -78,7 +78,7 @@ impl traits::Service for GCSFiles {
                     }
                     _ => match fs::read(&file.path).await {
                         Err(err) => {
-                            warn!(error = as_error!(err); "Error reading file in gcsfiles");
+                            warn!(error = %err, "Error reading file in gcsfiles");
                             let ret = goval::Command {
                                 body: Some(goval::command::Body::Error(format!(
                                     "{}: no such file or directory",
@@ -153,7 +153,7 @@ impl traits::Service for GCSFiles {
                 Ok(None)
             }
             _ => {
-                warn!(cmd = as_debug!(message); "Unknown gcsfiles command");
+                warn!(cmd = ?message, "Unknown gcsfiles command");
                 Ok(None)
             }
         }

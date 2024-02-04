@@ -7,10 +7,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use log::{as_debug, debug, error, info};
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::mpsc::channel;
+use tracing::{debug, error, info};
 
 use crate::{ChannelMessage, ReplspaceMessage};
 
@@ -50,7 +50,7 @@ struct GithubTokenReq {
 async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Json<GithubTokenRes>) {
     let session;
     if let Some(query) = _query {
-        debug!(channel = query.channel; "Got git askpass");
+        debug!(channel = query.channel, "Got git askpass");
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
         session = *last_session.get(&query.channel).unwrap_or(&0);
@@ -93,7 +93,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
         ReplspaceMessage::GithubTokenRes(token) => token,
         _ => {
             error!(
-                result = as_debug!(res);
+                result = ?res,
                 "Got unexpected result in replspace api github token fetcher"
             );
             return (
@@ -134,7 +134,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
     let session;
     if let Some(channel) = query.channel {
         if channel != 0 {
-            debug!(channel = channel; "Got git open file");
+            debug!(channel, "Got git open file");
 
             let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
             session = *last_session.get(&channel).unwrap_or(&0);
@@ -209,7 +209,7 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
         ),
         _ => {
             error!(
-                result = as_debug!(res);
+                result = ?res,
                 "Got unexpected result in replspace api github token fetcher"
             );
             (

@@ -10,9 +10,9 @@ use std::{
 };
 
 use async_trait::async_trait;
-use log::{as_debug, debug, warn};
 use prost_types::Timestamp;
 use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
 use super::traits;
 use super::types::pty::Pty;
@@ -138,7 +138,7 @@ impl traits::Service for Output {
             }
             goval::command::Body::ResizeTerm(_) => {}
             _ => {
-                debug!(msg = as_debug!(message); "New message");
+                debug!(?message, "New message");
             }
         }
         Ok(None)

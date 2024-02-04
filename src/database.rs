@@ -1,9 +1,9 @@
 use anyhow::Result;
-use log::{debug, warn};
 use migration::MigratorTrait;
 use sea_orm::{ConnectOptions, Database};
 use std::time::Duration;
 use tokio::sync::OnceCell;
+use tracing::{debug, warn};
 
 pub static DATABASE: OnceCell<sea_orm::DatabaseConnection> = OnceCell::const_new();
 

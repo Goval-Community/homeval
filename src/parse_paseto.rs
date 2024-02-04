@@ -10,7 +10,7 @@ static KEYS: tokio::sync::OnceCell<std::collections::HashMap<String, String>> =
     tokio::sync::OnceCell::const_new();
 
 #[cfg(feature = "verify_connections")]
-use log::{as_display, warn};
+use tracing::warn;
 
 fn parse_noverify(input: &str) -> Result<(Vec<u8>, bool)> {
     let token: UntrustedToken<Public, V2> = match UntrustedToken::try_from(input) {
@@ -141,7 +141,7 @@ pub async fn parse(token: &str) -> Result<ClientInfo> {
             }
             Err(err) => {
                 warn!(
-                    error = as_display!(err);
+                    %err,
                     "Error in paseto parser + verification, falling back to non verifying parser"
                 );
                 (msg, is_secure) = parse_noverify(token)?;
