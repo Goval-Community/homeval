@@ -3,11 +3,11 @@ pub struct Presence {
     files: HashMap<i32, goval::FileOpened>,
 }
 use crate::{ClientInfo, IPCMessage, SendSessions};
-use log::{as_debug, info, warn};
 use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tracing::{info, warn};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -92,7 +92,7 @@ impl traits::Service for Presence {
                 Ok(None)
             }
             _ => {
-                warn!(cmd = as_debug!(message); "Unknown presence command");
+                warn!(cmd = ?message, "Unknown presence command");
                 Ok(None)
             }
         }
@@ -160,7 +160,7 @@ impl traits::Service for Presence {
             ));
         }
 
-        info!(e = as_debug!(part); "Presence#detach");
+        info!(?part, "Presence#detach");
         info.send(part, SendSessions::EveryoneExcept(session))
             .await?;
         Ok(())

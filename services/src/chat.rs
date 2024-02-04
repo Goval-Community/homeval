@@ -7,7 +7,7 @@ use crate::{ClientInfo, IPCMessage, SendSessions};
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, warn};
+use tracing::warn;
 
 impl Chat {
     pub fn new() -> Chat {
@@ -45,7 +45,7 @@ impl traits::Service for Chat {
                 Ok(None)
             }
             _ => {
-                warn!(cmd = as_debug!(message); "Unknown chat command");
+                warn!(cmd = ?message, "Unknown chat command");
                 Ok(None)
             }
         }

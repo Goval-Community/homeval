@@ -18,9 +18,9 @@ use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage};
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, debug, error, trace, warn};
 use similar::TextDiff;
 use tokio::fs;
+use tracing::{debug, error, trace, warn};
 
 impl OT {
     pub async fn new(
@@ -309,17 +309,22 @@ impl traits::Service for OT {
                 Ok(Some(ok))
             }
             _ => {
-                warn!(cmd = as_debug!(message); "Unknown ot command");
+                warn!(cmd = ?message, "Unknown ot command");
                 Ok(None)
             }
         }
     }
 
     async fn fsevent(&mut self, info: &super::types::ChannelInfo, event: FSEvent) -> Result<()> {
-        trace!(event = as_debug!(event), file_path = self.path; "fs event");
+        trace!(?event, file_path = self.path, "fs event");
         match event {
             FSEvent::Modify(path) => {
-                trace!(condition = (path == self.path), path = path, file_path = self.path; "Conditional time");
+                trace!(
+                    condition = (path == self.path),
+                    path = path,
+                    file_path = self.path,
+                    "Conditional time"
+                );
                 if path == self.path {
                     let new_contents = fs::read(&path).await?;
 
@@ -369,11 +374,11 @@ impl traits::Service for OT {
                 Ok(())
             }
             FSEvent::Err(err) => {
-                error!(error = err; "Error in FS event listener");
+                error!(err, "Error in FS event listener");
                 Ok(())
             }
             _ => {
-                debug!(message = as_debug!(event); "Ignoing FS event");
+                debug!(message = ?event, "Ignoing FS event");
                 Ok(())
             }
         }

@@ -8,8 +8,8 @@ use crate::ReplspaceMessage;
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
-use log::{as_debug, warn};
 use tokio::sync::mpsc::Sender;
+use tracing::warn;
 
 #[async_trait]
 impl traits::Service for Git {
@@ -35,7 +35,7 @@ impl traits::Service for Git {
                         }
                     }
                     None => {
-                        warn!(msg = as_debug!(message), nonce = token.nonce; "Missing replspace response callback for github token");
+                        warn!(msg = ?message, nonce = token.nonce, "Missing replspace response callback for github token");
                     }
                 }
             }
@@ -47,7 +47,7 @@ impl traits::Service for Git {
                         }
                     }
                     None => {
-                        warn!(msg = as_debug!(message), nonce = close.nonce; "Missing replspace response callback for close file");
+                        warn!(msg = ?message, nonce = close.nonce, "Missing replspace response callback for close file");
                     }
                 }
             }
@@ -65,7 +65,10 @@ impl traits::Service for Git {
         respond: Option<Sender<ReplspaceMessage>>,
     ) -> Result<()> {
         if session == 0 {
-            warn!(msg = as_debug!(msg); "Got replspace message from an unknown session, ignoring");
+            warn!(
+                ?msg,
+                "Got replspace message from an unknown session, ignoring"
+            );
             return Ok(());
         }
 

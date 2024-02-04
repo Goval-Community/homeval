@@ -1,10 +1,10 @@
-use log::{as_debug, error};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{self, event::ModifyKind, Event, EventKind, RecommendedWatcher, Watcher},
     DebounceEventResult, Debouncer,
 };
 use serde::Serialize;
+use tracing::error;
 
 use anyhow::Result;
 
@@ -61,7 +61,7 @@ impl FSWatcher {
                         }
                     }),
                     Err(errors) => errors.iter().for_each(|error| {
-                        error!(error = as_debug!(error); "Error in debouncer");
+                        error!(?error, "Error in debouncer");
                         debounce_writer
                             .send(ChannelMessage::FSEvent(FSEvent::Err(error.to_string())))
                             .expect("TODO: handle this");

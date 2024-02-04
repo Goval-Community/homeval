@@ -1,5 +1,4 @@
 // use futures_util::{future::abortable, stream::AbortHandle};
-use log::{as_display, as_error, error};
 use portable_pty::{Child, PtyPair, PtySize};
 use std::{
     collections::{HashMap, VecDeque},
@@ -7,6 +6,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
+use tracing::error;
 
 use crate::ChannelMessage;
 
@@ -196,17 +196,17 @@ impl Pty {
                             match contact_clone.send(ChannelMessage::ProcessDead(exit_code)) {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    error!(err = as_error!(err); "PTY child proc reaper errored when alerting channel")
+                                    error!(%err, "PTY child proc reaper errored when alerting channel")
                                 }
                             }
                         }
                         Err(err) => {
-                            error!(err = as_display!(err); "PTY child proc reaper errored")
+                            error!(%err, "PTY child proc reaper errored")
                         }
                     }
                 }
                 Err(err) => {
-                    error!(err = as_error!(err); "Join error on pty child proc reaper")
+                    error!(%err, "Join error on pty child proc reaper")
                 }
             }
         });

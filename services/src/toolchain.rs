@@ -1,7 +1,7 @@
 pub struct Toolchain {}
 use super::traits;
 use async_trait::async_trait;
-use log::{as_debug, debug};
+use tracing::debug;
 
 use anyhow::{format_err, Result};
 
@@ -52,7 +52,7 @@ impl traits::Service for Toolchain {
                 Ok(Some(toolchain))
             }
             _ => {
-                debug!(msg = as_debug!(message); "Unrecognized command :/");
+                debug!(?message, "Unrecognized command :/");
                 Ok(None)
             }
         }

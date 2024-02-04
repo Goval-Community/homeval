@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 use std::time::Instant;
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use log::{debug, info};
 use tokio::sync::{mpsc, Mutex, RwLock};
+use tracing::{debug, info};
 
 use homeval_services::{
     config::dotreplit::DotReplit,
@@ -80,6 +80,7 @@ mod goval_server;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    tracing_subscriber::fmt::init();
     debug!("Initializing lazy statics");
     LazyLock::force(&START_TIME);
     LazyLock::force(&CPU_STATS);
@@ -89,7 +90,6 @@ async fn main() -> Result<(), Error> {
     std::env::set_var("HOMEVAL_START_DIR", std::env::current_dir()?);
 
     // console_subscriber::init();
-    env_logger::try_init().unwrap();
 
     #[cfg(feature = "database")]
     database::setup().await.unwrap();

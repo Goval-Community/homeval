@@ -6,11 +6,11 @@ use axum::{
     Form, Router,
 };
 use entity::repldb;
-use log::{as_error, error, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_query::OnConflict;
 use serde::Deserialize;
 use std::{collections::HashMap, net::SocketAddr};
+use tracing::{error, info, warn};
 
 pub async fn start_server() -> Result<()> {
     if crate::DATABASE.get().is_none() {
@@ -66,7 +66,7 @@ async fn set_value(Form(data): Form<HashMap<String, String>>) -> StatusCode {
         match result {
             Ok(_) => {}
             Err(err) => {
-                error!(error = as_error!(err); "Encountered error inserting key into database");
+                error!(?err, "Encountered error inserting key into database");
                 return StatusCode::INTERNAL_SERVER_ERROR;
             }
         }
@@ -88,7 +88,7 @@ async fn get_value(Path(key): Path<String>) -> (StatusCode, String) {
             Some(data) => (StatusCode::OK, data.value),
         },
         Err(err) => {
-            error!(error = as_error!(err); "Encountered error reading key from database");
+            error!(?err, "Encountered error reading key from database");
             (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
         }
     }
@@ -110,7 +110,7 @@ async fn delete_value(Path(key): Path<String>) -> StatusCode {
             }
         }
         Err(err) => {
-            error!(error = as_error!(err); "Encountered error deleting key from database");
+            error!(?err, "Encountered error deleting key from database");
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -150,7 +150,7 @@ async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
             (StatusCode::OK, keys)
         }
         Err(err) => {
-            error!(error = as_error!(err); "Encountered error listing keys in database");
+            error!(?err, "Encountered error listing keys in database");
             (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
         }
     }

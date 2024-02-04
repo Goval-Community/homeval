@@ -4,8 +4,8 @@ pub struct Shell {
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use log::{as_debug, debug};
 use tokio::sync::RwLock;
+use tracing::debug;
 
 use super::traits;
 use super::types::pty::Pty;
@@ -49,7 +49,7 @@ impl traits::Service for Shell {
                 self.pty.resize(size.rows as u16, size.cols as u16)?
             }
             _ => {
-                debug!(msg = as_debug!(message); "New message");
+                debug!(?message, "New message");
             }
         }
         Ok(None)

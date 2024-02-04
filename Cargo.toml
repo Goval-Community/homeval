@@ -27,7 +27,9 @@ verify_connections = ["dep:hyper", "dep:hyper-tls", "dep:hyper-util", "dep:http-
 [dependencies]
 goval = { path = "protobuf", package = "protobuf" }
 homeval_services = { path = "services", package = "services" }
-env_logger = { git = "https://github.com/tmccombs/env_logger", rev = "a47d1d99", features=["kv_unstable"] }
+tracing = "0.1.40"
+tracing-futures = "0.2.5"
+tracing-subscriber = { version = "0.3.18", features = ["tracing-log"]}
 futures-channel = "0.3.26"
 futures-util = "0.3.26"
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_serde"] }

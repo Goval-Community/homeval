@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use goval;
-use log::error;
 use tokio::sync::RwLock;
+use tracing::error;
 
 use crate::config::dotreplit::DotReplit;
 
