@@ -9,5 +9,5 @@ path = "src/mod.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sea-orm = "0.12.2"
+sea-orm = "0.12.14"
 serde = "1.0.196"

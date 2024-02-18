@@ -51,7 +51,7 @@ chrono = { version = "0.4.34", default-features = false, features = ["std", "lib
 chrono-tz =  { version = "0.8.2", optional = true }
 
 
-sea-orm = { version = "0.12.2", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
+sea-orm = { version = "0.12.14", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
 migration = { path = "migration", optional = true}
 entity = { path = "entity", optional = true}
 sea-query = { version = "0.30.7", optional = true }
