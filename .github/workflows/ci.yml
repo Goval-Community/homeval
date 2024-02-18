@@ -1,7 +1,7 @@
 {
     "on":
         {
-            "push": { "branches": ["pure-rust"] },
+            "push": { "branches": ["main"] },
             "pull_request": {},
             "merge_group": {},
         },
