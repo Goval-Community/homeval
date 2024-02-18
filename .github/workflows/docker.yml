@@ -1,0 +1,32 @@
+{
+    "on": { "push": { "branches": ["pure-rust"] } },
+    "name": "Docker",
+    "permissions": { "packages": "write" },
+    "jobs":
+        {
+            "docker-build":
+                {
+                    "name": "Build & Push Docker Container",
+                    "runs-on": "ubuntu-latest",
+                    "steps":
+                        [
+                            {
+                                "name": "Checkout",
+                                "uses": "actions/checkout@v4",
+                            },
+                            {
+                                "name": "Build Image",
+                                "run": "docker buildx build -t ghcr.io/goval-community/homeval:${{ github.sha }} .",
+                            },
+                            {
+                                "name": "Log In to Registry",
+                                "run": 'echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin',
+                            },
+                            {
+                                "name": "Push Image",
+                                "run": "docker push ghcr.io/goval-community/homeval:${{ github.sha }}",
+                            },
+                        ],
+                },
+        },
+}

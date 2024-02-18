@@ -1,7 +1,11 @@
 {
-    "on": { "push": { "branches": "main" }, "pull_request": {} },
+    "on":
+        {
+            "push": { "branches": ["pure-rust"] },
+            "pull_request": {},
+        },
     "name": "CI",
-    "permissions": { "security-events": "write", "packages": "write" },
+    "permissions": { "security-events": "write" },
     "jobs":
         {
             "enforce-clippy":
