@@ -48,7 +48,7 @@ textnonce = "1.0.0"
 
 
 chrono = { version = "0.4.34", default-features = false, features = ["std", "libc", "clock"], optional = true }
-chrono-tz =  { version = "0.8.2", optional = true }
+chrono-tz =  { version = "0.8.6", optional = true }
 
 
 sea-orm = { version = "0.12.14", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "postgres-array" ], optional = true }
