@@ -37,6 +37,7 @@ impl traits::Service for Output {
                     seconds: self.start_time.unwrap_or(0),
                     nanos: 0,
                 }),
+                ..Default::default()
             };
 
             new_frame.body = Some(goval::command::Body::OutputBlockStartEvent(event));
@@ -112,6 +113,7 @@ impl traits::Service for Output {
                         seconds: now,
                         nanos: 0,
                     }),
+                    ..Default::default()
                 };
 
                 new_frame.body = Some(goval::command::Body::OutputBlockStartEvent(event));

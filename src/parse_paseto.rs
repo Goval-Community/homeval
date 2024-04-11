@@ -150,7 +150,7 @@ pub async fn parse(token: &str) -> Result<ClientInfo> {
     }
 
     let _inner = general_purpose::STANDARD.decode(msg)?;
-    let inner = goval::ReplToken::decode(_inner.as_slice())?;
+    let inner = goval::token::ReplToken::decode(_inner.as_slice())?;
 
     match inner.presenced {
         Some(user) => Ok(ClientInfo {

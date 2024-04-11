@@ -3,13 +3,13 @@
     <br>
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/License-AGPL--3.0--only-9958f7">
     </a>
-    <img alt="Services implemented: 15" src ="https://img.shields.io/badge/services%20implemented-14-9958f7">
+    <img alt="Services implemented: 12" src ="https://img.shields.io/badge/services%20implemented-12-9958f7">
     <hr><br>
     <p>Homeval is a custom server implementation of <a href="https://govaldocs.pages.dev">goval</a>, replits evaluation protocol.</p>
 </div>
 
-# ⚠️ Stability
-**⚠️ Homeval is still in early alpha and can be unstable so do not trust it with data you have not backed up. ⚠️**
+> [!CAUTION]  
+> **⚠️ Homeval is still in early alpha and can be unstable so do not trust it with data you have not backed up. ⚠️**
 
 # License
 Homeval is licensed under GNU AGPL-3.0-only  
@@ -18,40 +18,45 @@ Homeval is licensed under GNU AGPL-3.0-only
 Unfortunately due to replit's TOS, AGPL programs cannot be run in public repls. Though, private repls are fine, as long as you still fulfill the terms of the license.  
 This is due to <a href="https://docs.replit.com/legal-and-security-info/licensing-info#public-repls-and-teams">all public repls being licensed under MIT</a>, and GPL code cannot be included in a MIT licensed project.
 
-# Running homeval
+# Building homeval
 
-## Installation
 1. Git clone the repository
 2. Install required dependencies
-    * If on macOS or linux: [Bun](https://bun.sh/) and [Git](https://git-scm.com/downloads)
-    * If on windows: [Node.js](https://nodejs.org/en/download), [Yarn v1](https://classic.yarnpkg.com/lang/en/docs/install/#windows-stable) and [Git for Windows](https://gitforwindows.org/)
-    * The [Protobuf Compiler](https://github.com/protocolbuffers/protobuf/releases)
-        * If using a debian linux based distro just run: `sudo apt install protobuf-compiler`
-    * [Rustup](https://rustup.rs/)
-    * And finally, [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
+   * [Git](https://git-scm.com/downloads) ( [Git for Windows](https://gitforwindows.org/) on windows)
+   * The [Protobuf Compiler](https://github.com/protocolbuffers/protobuf/releases)
+      * If using a debian linux based distro just run: `sudo apt install protobuf-compiler`
+   * [Rustup](https://rustup.rs/)
+
+# Running homeval
+
+## Required tools
+
+- [Git](https://git-scm.com/downloads) ( [Git for Windows](https://gitforwindows.org/) on windows)
+- [Ripgrep](https://github.com/BurntSushi/ripgrep#installation).
+
 
 ## Setup
 
 ### Database
-Setup a [PostgreSQL](https://www.postgresql.org/) database and set the env var `$HOMEVAL_DB` to it's connection url.
+Set up a [PostgreSQL](https://www.postgresql.org/) database and set the env var `$HOMEVAL_DB` to its connection url.
 
 If the database isn't setup repldb won't work, and file history won't persist through server restarts.
 
 ### Proper Authentication
 
-> ⚠️ If you use someone elses key server it could let them authenticate as any user on your homeval instance
+> [!WARNING]
+> ⚠If you use someone else's key server it could let them authenticate as any user on your homeval instance
 
 Run [repl-key-server](https://github.com/Goval-Community/repl-key-server) on a repl and set the env var `$HOMEVAL_PASETO_KEY_URL` to `<your repl url>/keys`.  
 
 ### Replspace api
-> ⚠️ Likely won't work on windows
+> [!IMPORTANT]
+> This will not work on windows.
 
 To make use of this feature make sure that all files in `extras/` are placed in a directory contained in your `$PATH` on the machine running homeval.
 
 ## ⚠️ Notice for windows users
 On windows `cargo run` as well as invoking the built binary must happen inside the [Git Bash](https://gitforwindows.org/) shell.
-
-Console and shell will not work, this will be fixed later. You should submit a bug report for other broken features.
 
 ## Building
 
@@ -83,7 +88,7 @@ Make a new file in `services/` name it with the format `<service name>.js` then 
 | --- | --- | --- | --- | --- |
 | Linux[^linux]  | ✅ | ✅ | ✅ | ✅[^linux-tests] |
 | macOS[^macos]  | ✅ | ✅ | ✅ | ❎ | 
-| Windows | ✅ | ✅ | ❎[^windows] | ❎ |
+| Windows | ✅ | ✅ | ✅ | ❎ |
 
 
 [^testing]: This marks if every release is officially tested for this target.
@@ -94,10 +99,8 @@ Make a new file in `services/` name it with the format `<service name>.js` then 
 
 [^linux-tests]: Currently, the only tested distribution is arch linux. Though all distros with an up to date GLIC *should* work.
 
-[^windows]: Shell and Console support are currently unavailable on windows.
-
 # TODO:
 
-- [ ] Have windows builds feature complete
 - [ ] Debugger support
-- [ ] Audio channel support
+- [ ] Pid2 Support
+- [ ] Unit Tests
