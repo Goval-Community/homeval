@@ -1,4 +1,4 @@
-// @replit/protocol 0.3.31
+// @replit/protocol 0.3.55
 syntax = "proto3";
 
 package goval;
@@ -13,6 +13,7 @@ message Command {
   int32 session = 2;
   string ref = 1000;
   map<string, string> traceInfo = 1001;
+  bool forceTrace = 1002;
   oneof body {
     OpenChannel openChan = 3;
     OpenChannelRes openChanRes = 4;
@@ -24,7 +25,6 @@ message Command {
     Toast toast = 11;
     ProtocolError protocolError = 45;
     Redirect redirect = 12;
-    AlwaysOn alwaysOn = 13;
     RunMain runMain = 16;
     Clear clear = 17;
     string eval = 20;
@@ -39,6 +39,7 @@ message Command {
     OutputBlockEndEvent outputBlockEndEvent = 444;
     sint32 exitCodeEvent = 445;
     bool splitStderrRequest = 446;
+    ShellMetadata shellMetadata = 447;
     SaneTerm saneTerm = 26;
     ResizeTerm resizeTerm = 27;
     State state = 28;
@@ -51,6 +52,7 @@ message Command {
     File tryRemove = 36;
     File mkdir = 39;
     File stat = 368;
+    File resetNixFilesystem = 449;
     StatResult statRes = 369;
     TransferStart transferStart = 320;
     TransferChunk transferChunk = 321;
@@ -119,6 +121,7 @@ message Command {
     PackageInfo packageInfo = 282;
     PackageInfoResp packageInfoResp = 283;
     PackageAdd packageAdd = 284;
+    PackageAddResponse packageAddResponse = 448;
     PackageRemove packageRemove = 285;
     PackageInstall packageInstall = 286;
     PackageInstallResponse packageInstallResponse = 290;
@@ -181,6 +184,8 @@ message Command {
     NixChannelLatestStableResponse nixChannelLatestStableResponse = 419;
     NixPackageSearchRequest nixPackageSearchRequest = 420;
     NixPackageSearchResponse nixPackageSearchResponse = 421;
+    NixPackageInfoRequest nixPackageInfoRequest = 450;
+    NixPackageInfoResponse nixPackageInfoResponse = 451;
     UserEvent userEvent = 423;
     ReplspaceApiOpenFile replspaceApiOpenFile = 424;
     ReplspaceApiCloseFile replspaceApiCloseFile = 425;
@@ -199,6 +204,13 @@ message Command {
     ReplspaceApiOpenMultipleFiles replspaceApiOpenMultipleFiles = 438;
     NixModulesGetRegistryRequest nixModulesGetRegistryRequest = 439;
     NixModulesGetRegistryResponse nixModulesGetRegistryResponse = 440;
+    ReplspaceApiShellTracker replspaceApiShellTracker = 442;
+    NixModuleConfigGetRequest nixModuleConfigGetRequest = 460;
+    NixModuleConfigGetResponse nixModuleConfigGetResponse = 461;
+    NixModuleConfigSetRequest nixModuleConfigSetRequest = 462;
+    NixModuleConfigSetResponse nixModuleConfigSetResponse = 463;
+    ReplspaceApiSSHTokenGetRequest replspaceApiSSHTokenGetRequest = 464;
+    ReplspaceApiSSHTokenGetResponse replspaceApiSSHTokenGetResponse = 465;
   }
 }
 
@@ -231,9 +243,18 @@ message NixChannelLatestStableRequest {}
 
 message NixChannelLatestStableResponse { string channel = 1; }
 
-message NixPackageSearchRequest { string query = 1; }
+message NixPackageSearchRequest {
+  string query = 1;
+  oneof _filterBuilt { bool filterBuilt = 2; }
+}
 
 message NixPackageSearchResponse { repeated NixPackage packages = 1; }
+
+message NixPackageInfoRequest { string name = 1; }
+
+message NixPackageInfoResponse {
+  oneof _package { NixPackage package = 1; }
+}
 
 message StartLSP {
   string language = 1;
@@ -339,8 +360,9 @@ message FileEvent {
 
 message Flush {
   enum Consistency {
-    PermanentStorage = 0;
+    DiskAndHistory = 0;
     Disk = 1;
+    History = 2;
   }
 
   Flush.Consistency consistency = 1;
@@ -556,8 +578,6 @@ message ProtocolError { string text = 1; }
 
 message Redirect { string url = 1; }
 
-message AlwaysOn { bool enable = 1; }
-
 message RunMain {
   enum RunMode {
     RUN = 0;
@@ -569,6 +589,8 @@ message RunMain {
   string filePath = 3;
   string runnerId = 4;
   bool fromHosting = 5;
+  string runID = 6;
+  int32 clientSession = 7;
 }
 
 message OpenChannel {
@@ -634,7 +656,9 @@ message PortOpen {
   uint32 externalPort = 4;
   string comm = 5;
   repeated string cmdline = 6;
+  string cgroup = 8;
   uint32 pid = 7;
+  repeated uint32 pidChain = 9;
 }
 
 message PortClose {
@@ -755,7 +779,15 @@ message ReplspaceApiGitHubToken {
   string token = 2;
 }
 
-message ReplspaceApiOpenMultipleFiles { repeated string files = 1; }
+message ReplspaceApiOpenMultipleFiles {
+  repeated string files = 1;
+  repeated string urls = 2;
+}
+
+message ReplspaceApiShellTracker {
+  string cmd = 1;
+  string pwd = 2;
+}
 
 message Focused {}
 
@@ -783,6 +815,7 @@ message Exec {
   Exec.Lifecycle lifecycle = 6;
   bool splitStderr = 4;
   bool splitLogs = 5;
+  bool waitForEnv = 7;
 }
 
 message Package {
@@ -811,7 +844,12 @@ message PackageInfo { Package pkg = 1; }
 
 message PackageInfoResp { Package pkg = 1; }
 
-message PackageAdd { repeated Package pkgs = 1; }
+message PackageAdd {
+  repeated Package pkgs = 1;
+  bool useNewResponse = 2;
+}
+
+message PackageAddResponse { bool installedSystemDependencies = 1; }
 
 message PackageRemove { repeated Package pkgs = 1; }
 
@@ -827,6 +865,7 @@ message PackageInstallResponse {
   int64 upmAddDurationMs = 3;
   int64 upmLockDurationMs = 4;
   int64 totalDurationMs = 5;
+  bool installedSystemDependencies = 6;
 }
 
 message PackageListSpecfile {}
@@ -998,6 +1037,9 @@ message DotReplit {
   repeated string modules = 23;
   ExtensionConfig extension = 24;
   RulesConfig rules = 25;
+  SuggestionsConfig suggestions = 26;
+  ObjectStorageConfig objectStorage = 27;
+  AutoSaveConfig autoSave = 28;
 }
 
 message DotReplitEnvVar {
@@ -1008,6 +1050,7 @@ message DotReplitEnvVar {
 message DotReplitPort {
   uint32 localPort = 1;
   uint32 externalPort = 2;
+  bool exposeLocalhost = 3;
 }
 
 message DotReplitHint {
@@ -1022,6 +1065,21 @@ message DeploymentConfig {
     GCE = 0;
     CLOUDRUN = 1;
     STATIC = 2;
+    VM = 3;
+    AUTOSCALE = 4;
+    SCHEDULED = 5;
+    EXTENSION = 6;
+  }
+
+  message RewriteRule {
+    string from = 1;
+    string to = 2;
+  }
+
+  message Header {
+    string path = 1;
+    string name = 2;
+    string value = 3;
   }
 
   Exec run = 1;
@@ -1029,6 +1087,8 @@ message DeploymentConfig {
   bool ignorePorts = 3;
   DeploymentConfig.Target target = 4;
   string publicDir = 5;
+  repeated DeploymentConfig.RewriteRule rewrites = 6;
+  repeated DeploymentConfig.Header responseHeaders = 7;
 }
 
 message ExtensionConfig {
@@ -1038,6 +1098,8 @@ message ExtensionConfig {
   string outputDirectory = 4;
   string staticDirectory = 5;
 }
+
+message SuggestionsConfig { repeated string extensions = 1; }
 
 message NixConfig { string channel = 1; }
 
@@ -1161,7 +1223,12 @@ message NixModule {
   repeated FormatterOption formatters = 13;
 }
 
-message NixModulesChanged { repeated NixModule modules = 1; }
+message NixModulesChanged {
+  repeated NixModule modules = 1;
+  repeated NixModuleConfigValue moduleConfigValues = 2;
+  string buildOutput = 3;
+  repeated NixModuleConfigModuleEntry modulesV2 = 4;
+}
 
 message NixModulesBuildRequest {}
 
@@ -1171,6 +1238,10 @@ message NixModulesGetRegistryResponse {
   repeated NixModulesRegistryEntry modules = 1;
   map<string, NixModulesUpgradeMapEntry> autoUpgrade = 2;
   map<string, NixModulesUpgradeMapEntry> recommendUpgrade = 3;
+  repeated LanguageServerOption languageServers = 4;
+  repeated FormatterOption formatters = 5;
+  repeated PackagerOption packagers = 6;
+  repeated NixModulesV2RegistryEntry modulesV2 = 7;
 }
 
 message NixModulesRegistryEntry {
@@ -1182,12 +1253,99 @@ message NixModulesRegistryEntry {
   repeated string tags = 6;
   string commit = 7;
   string path = 8;
+  string displayVersion = 9;
 }
 
 message NixModulesUpgradeMapEntry {
   string to = 1;
   string changelog = 2;
 }
+
+message NixModulesV2RegistryEntry {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated NixModuleOption options = 4;
+}
+
+message NixModuleOption {
+  string name = 1;
+  string description = 2;
+  oneof type {
+    NixModuleBooleanType booleanType = 3;
+    NixModuleStringType stringType = 4;
+    NixModuleChoiceStringType choiceStringType = 5;
+    NixModuleStringListType stringListType = 6;
+    NixModuleIntegerType integerType = 7;
+  }
+}
+
+message NixModuleBooleanType { bool default = 1; }
+
+message NixModuleStringType { string default = 1; }
+
+message NixModuleIntegerType { int32 default = 1; }
+
+message NixModuleChoiceStringType {
+  string default = 1;
+  repeated string choices = 2;
+}
+
+message NixModuleStringListType { repeated string default = 1; }
+
+message NixModuleConfigGetRequest {}
+
+message NixModuleConfigGetResponse {
+  repeated NixModuleConfigValue values = 1;
+  repeated NixModuleConfigModuleEntry modules = 2;
+}
+
+message NixModuleConfigSetRequest {
+  repeated NixModuleConfigValue values = 1;
+  repeated NixModuleConfigModuleEntry modules = 2;
+}
+
+message NixModuleConfigSetResponse {
+  enum Status {
+    Ok = 0;
+    Error = 1;
+  }
+
+  NixModuleConfigSetResponse.Status status = 1;
+  string error = 2;
+}
+
+message NixModuleConfigModuleEntry {
+  string id = 1;
+  repeated NixModuleConfigValue values = 2;
+}
+
+message NixModuleConfigValue {
+  string moduleId = 1;
+  string optionName = 2;
+  oneof value {
+    string stringValue = 3;
+    int32 integerValue = 4;
+    bool booleanValue = 5;
+    StringList stringListValue = 7;
+  }
+}
+
+message ReplspaceApiSSHTokenGetRequest {
+  string nonce = 1;
+  string replid = 2;
+}
+
+message ReplspaceApiSSHTokenGetResponse {
+  string nonce = 1;
+  string token = 2;
+}
+
+message StringList { repeated string stringList = 1; }
+
+message ObjectStorageConfig { string defaultBucketID = 1; }
+
+message AutoSaveConfig { bool disabled = 1; }
 
 message ToolchainGetRequest {}
 
@@ -1230,6 +1388,8 @@ message LanguageServerOption {
   string language = 3;
   FileTypeAttrs fileTypeAttrs = 4;
   LanguageServerConfig config = 5;
+  string moduleId = 6;
+  string displayVersion = 7;
 }
 
 message FileTypeAttrs {
@@ -1246,6 +1406,8 @@ message PackagerOption {
   bool enabledForHosting = 5;
   bool packageSearch = 6;
   bool guessImports = 7;
+  string moduleId = 8;
+  string displayVersion = 9;
 }
 
 message FormatterOption {
@@ -1253,6 +1415,8 @@ message FormatterOption {
   string name = 2;
   Exec startCommand = 3;
   FileTypeAttrs fileTypeAttrs = 4;
+  string moduleId = 5;
+  string displayVersion = 6;
 }
 
 message ReplDomainDoubleDash {
@@ -1277,6 +1441,14 @@ message ReplDomainId {
   string suffix = 2;
 }
 
+message ReplDomainReplitDev {
+  string id = 1;
+  string version = 2;
+  string signature = 3;
+  string clusterName = 4;
+  string suffix = 5;
+}
+
 message ReplDomain {
   oneof kind {
     string custom = 1;
@@ -1284,6 +1456,7 @@ message ReplDomain {
     ReplDomainDoubleDash doubleDash = 3;
     ReplDomainDots dots = 4;
     ReplDomainSingleDomain singleDomain = 5;
+    ReplDomainReplitDev replitDev = 6;
   }
 }
 
@@ -1295,12 +1468,15 @@ message OutputBlockStartEvent {
 
   OutputBlockStartEvent.ExecutionMode executionMode = 1;
   google.protobuf.Timestamp measureStartTime = 2;
+  string cgroup = 3;
 }
 
 message OutputBlockEndEvent {
   sint32 exitCode = 1;
   google.protobuf.Timestamp measureEndTime = 2;
 }
+
+message ShellMetadata { string cgroup = 1; }
 
 message RulesConfig { FormatterRules formatter = 1; }
 
@@ -1315,48 +1491,6 @@ message FormatterConfig { string id = 1; }
 message FormatterConfigWithPattern {
   string id = 1;
   string pattern = 2;
-}
-
-message ReplToken {
-  message ClassroomMetadata {
-    string id = 1;
-    string language = 2;
-  }
-
-  message ReplID {
-    string id = 1;
-    string sourceRepl = 2;
-  }
-
-  enum WireFormat {
-    PROTOBUF = 0;
-    JSON = 1;
-    PID2 = 2;
-  }
-
-  message Presenced {
-    uint32 bearerID = 1;
-    string bearerName = 2;
-  }
-
-  google.protobuf.Timestamp iat = 1;
-  google.protobuf.Timestamp exp = 2;
-  string salt = 3;
-  string cluster = 4;
-  repl.Persistence persistence = 6;
-  repl.ResourceLimits resourceLimits = 10;
-  repl.ResourceLimits interactiveResourceLimits = 17;
-  ReplToken.WireFormat format = 12;
-  ReplToken.Presenced presenced = 13;
-  repeated string flags = 14;
-  repl.Permissions permissions = 15;
-  repeated features.Feature features = 16;
-  repl.BuildInfo buildInfo = 18;
-  oneof metadata {
-    repl.Repl repl = 7;
-    ReplToken.ReplID id = 8;
-    ReplToken.ClassroomMetadata classroom = 9;
-  }
 }
 
 message TLSCertificate {
@@ -1446,7 +1580,7 @@ message GovalToken {
   google.protobuf.Timestamp exp = 2;
   string replid = 3;
   oneof Token {
-    ReplToken replToken = 4;
+    token.ReplToken replToken = 4;
     GovalReplIdentity replIdentity = 5;
   }
 }
@@ -1462,6 +1596,7 @@ message GovalReplIdentity {
   repl.BuildInfo buildInfo = 8;
   bool isTeam = 9;
   repeated string roles = 10;
+  repl.Org org = 14;
   oneof runtime {
     ReplRuntimeInteractive interactive = 11;
     ReplRuntimeHosting hosting = 13;
@@ -1481,6 +1616,51 @@ message ReplRuntimeHosting {
 
 message ReplRuntimeDeployment {}
 
+message token {
+  message ReplToken {
+    message ClassroomMetadata {
+      string id = 1;
+      string language = 2;
+    }
+
+    message ReplID {
+      string id = 1;
+      string sourceRepl = 2;
+    }
+
+    enum WireFormat {
+      PROTOBUF = 0;
+      JSON = 1;
+      PID2 = 2;
+    }
+
+    message Presenced {
+      uint32 bearerID = 1;
+      string bearerName = 2;
+    }
+
+    google.protobuf.Timestamp iat = 1;
+    google.protobuf.Timestamp exp = 2;
+    string salt = 3;
+    string cluster = 4;
+    repl.Persistence persistence = 6;
+    repl.ResourceLimits resourceLimits = 10;
+    repl.ResourceLimits interactiveResourceLimits = 17;
+    token.ReplToken.WireFormat format = 12;
+    token.ReplToken.Presenced presenced = 13;
+    repeated string flags = 14;
+    repeated features.Feature features = 16;
+    repl.BuildInfo buildInfo = 18;
+    repl.Pid2Binary pid2Info = 19;
+    bool paid = 20;
+    oneof metadata {
+      repl.Repl repl = 7;
+      token.ReplToken.ReplID id = 8;
+      token.ReplToken.ClassroomMetadata classroom = 9;
+    }
+  }
+}
+
 message lore {
   message LoreCommand {
     oneof command {
@@ -1496,6 +1676,7 @@ message lore {
   message ClusterTransfer {
     string replId = 1;
     string user = 2;
+    lore.ReplLocation replLocation = 6;
     string transferId = 4;
     oneof location {
       string newClusterId = 3;
@@ -1545,6 +1726,176 @@ message lore {
     string replId = 1;
     repeated string flags = 2;
   }
+
+  message Buckets {
+    string files = 1;
+    string snapshots = 2;
+    string metadata = 3;
+    string diskBlocks = 4;
+  }
+
+  message Repl {
+    string id = 1;
+    string user = 2;
+    string slug = 3;
+  }
+
+  message Cluster {
+    string name = 1;
+    string conmanUrl = 2;
+    string gurl = 3;
+    string proxy = 4;
+  }
+
+  message CreateReplRequest {
+    message Repl {
+      string id = 1;
+      string user = 2;
+      string slug = 3;
+    }
+
+    message File {
+      string name = 1;
+      bytes contents = 2;
+    }
+
+    message SourceFiles { repeated lore.CreateReplRequest.File files = 1; }
+
+    message Buckets {
+      string files = 1;
+      string snapshots = 2;
+    }
+
+    message SourceRepl {
+      string id = 1;
+      bool requireSnapshot = 2;
+      lore.CreateReplRequest.Buckets buckets = 3;
+    }
+
+    lore.CreateReplRequest.Repl repl = 1;
+    lore.ReplLocation replLocation = 7;
+    string overrideFilesBucket = 5;
+    oneof location {
+      string cluster = 2;
+      string continent = 6;
+    }
+    oneof source {
+      lore.CreateReplRequest.SourceRepl sourceRepl = 3;
+      lore.CreateReplRequest.SourceFiles sourceFiles = 4;
+    }
+  }
+
+  message CreateReplResponse {}
+
+  message GetReplRequest { string replId = 1; }
+
+  message GetReplResponse {
+    lore.Repl repl = 1;
+    lore.Cluster cluster = 2;
+    lore.Buckets buckets = 3;
+    string dotdevHostname = 4;
+  }
+
+  message ReplLocation {
+    bool regionalGoval = 3;
+    oneof location {
+      string cluster = 1;
+      string continent = 2;
+    }
+  }
+
+  message GetReplConnectionInfoRequest {
+    string replId = 1;
+    string slug = 2;
+    string user = 3;
+    bool persistent = 4;
+    lore.ReplLocation replLocation = 9;
+    string sourceReplId = 7;
+    oneof defaultLocation {
+      string defaultCluster = 5;
+      string defaultContinent = 8;
+    }
+  }
+
+  message GetReplConnectionInfoResponse {
+    lore.Repl repl = 1;
+    lore.Cluster cluster = 2;
+    lore.Buckets buckets = 3;
+    string dotdevHostname = 4;
+  }
+
+  message GetTransferStatusRequest { string transferId = 1; }
+
+  message GetTransferStatusResponse {
+    string transferId = 1;
+    bool complete = 2;
+  }
+
+  message TransferReplsRequest {
+    string newCluster = 1;
+    repeated string replIds = 2;
+    lore.ReplLocation newLocation = 3;
+  }
+
+  message TransferReplsResponse { string transferId = 1; }
+
+  message TransferReplFromOfflineClusterRequest {
+    string newCluster = 1;
+    string replId = 2;
+  }
+
+  message TransferReplFromOfflineClusterResponse {}
+
+  message TransferUserRequest {
+    string user = 1;
+    string newCluster = 2;
+    repeated string excludedReplIds = 3;
+  }
+
+  message TransferUserResponse { string transferId = 1; }
+
+  message Continent {
+    string code = 1;
+    string name = 2;
+  }
+
+  message TakedownReplRequest { string replId = 1; }
+
+  message TakedownReplResponse {}
+
+  message SoftTakedownReplRequest { string replId = 1; }
+
+  message SoftTakedownReplResponse {}
+
+  message RestoreReplRequest { string replId = 1; }
+
+  message RestoreReplResponse {}
+
+  message BulkRemoveRequest { repeated string replIds = 1; }
+
+  message BulkRemoveResponse {}
+
+  message GetClustersRequest {}
+
+  message GetClustersResponse { repeated lore.Cluster clusters = 1; }
+
+  message PushDomainRequest {
+    string replId = 1;
+    string domain = 2;
+    string authToken = 3;
+  }
+
+  message PushDomainResponse {}
+
+  message UnlinkDomainRequest {
+    string replId = 1;
+    string domain = 2;
+    string authToken = 3;
+  }
+
+  message UnlinkDomainResponse {}
+
+  message Lore {}
 }
 
 message features {
@@ -1577,6 +1928,7 @@ message repl {
     string bucket = 3;
     string slug = 4;
     string user = 5;
+    repl.Org org = 14;
     string sourceRepl = 6;
     string database = 7;
     repl.Buckets buckets = 8;
@@ -1584,6 +1936,17 @@ message repl {
     bool isTeam = 10;
     repeated string roles = 11;
     string logFields = 13;
+  }
+
+  message Org {
+    enum OrgType {
+      TYPE_UNSPECIFIED = 0;
+      PERSONAL = 1;
+      TEAM = 2;
+    }
+
+    string id = 1;
+    repl.Org.OrgType type = 2;
   }
 
   enum Environment {
@@ -1612,10 +1975,7 @@ message repl {
     int64 scratchDisk = 9;
     repl.ResourceLimits.Cachability cache = 6;
     bool restrictNetwork = 7;
-    bool preventWakeup = 8;
   }
-
-  message Permissions { bool toggleAlwaysOn = 1; }
 
   enum Persistence {
     PERSISTENT = 0;
@@ -1630,7 +1990,6 @@ message repl {
     repl.ResourceLimits interactiveResourceLimits = 17;
     repl.Persistence persistence = 6;
     repeated string flags = 14;
-    repl.Permissions permissions = 15;
     repeated features.Feature features = 16;
     repl.BuildInfo buildInfo = 18;
   }
@@ -1641,6 +2000,8 @@ message repl {
     string buildId = 3;
     string machineTier = 4;
   }
+
+  message Pid2Binary { string version = 1; }
 }
 
 message PrivateReplsPowerup { bool enabled = 1; }

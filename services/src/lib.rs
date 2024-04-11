@@ -1,6 +1,7 @@
 mod chat;
 mod dotreplit;
 mod exec;
+mod fsevents;
 mod gcsfiles;
 mod git;
 mod ot;
@@ -57,8 +58,10 @@ impl Channel {
             "git" => Box::new(git::Git::new()),
             "exec" => Box::new(exec::Exec::new()),
             "dotreplit" => Box::new(dotreplit::DotReplit {}),
-            "null" => Box::new(stub::Stub {}), // This channel never does anything
-            "open" => Box::new(stub::Stub {}), // Stub until infra is set up to handle this
+            "fsevents" => Box::new(fsevents::FSEvents::new(sender).await?),
+            "audio" => Box::new(stub::Stub {}), // Will never be supported
+            "null" => Box::new(stub::Stub {}),  // This channel never does anything
+            "open" => Box::new(stub::Stub {}),  // Stub until infra is set up to handle this
             _ => return Err(format_err!("Unknown service: {}", service)),
         };
 
@@ -159,10 +162,11 @@ pub static IMPLEMENTED_SERVICES: &[&str] = &[
     "snapshot",
     "null",
     "git",
-    "open",
+    "audio",
     "output",
     "shell",
     "toolchain",
     "dotreplit",
     "exec",
+    "fsevents",
 ];
