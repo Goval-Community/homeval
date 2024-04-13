@@ -1,8 +1,8 @@
 pub struct Presence {
     users: Vec<goval::User>,
-    files: HashMap<i32, goval::FileOpened>,
+    files: HashMap<Session, goval::FileOpened>,
 }
-use crate::{ClientInfo, IPCMessage, SendSessions};
+use crate::{ClientInfo, IPCMessage, SendSessions, Session};
 use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
@@ -28,7 +28,7 @@ impl traits::Service for Presence {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        session: i32,
+        session: Session,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -39,25 +39,28 @@ impl traits::Service for Presence {
             goval::command::Body::FollowUser(follow) => {
                 let follow_notif = goval::Command {
                     body: Some(goval::command::Body::FollowUser(goval::FollowUser {
-                        session,
+                        session: session.into(),
                     })),
                     ..Default::default()
                 };
 
-                info.send(follow_notif, SendSessions::Only(follow.session))
+                info.send(follow_notif, SendSessions::Only(Session(follow.session)))
                     .await?;
                 Ok(None)
             }
             goval::command::Body::UnfollowUser(unfollow) => {
                 let unfollow_notif = goval::Command {
                     body: Some(goval::command::Body::UnfollowUser(goval::UnfollowUser {
-                        session,
+                        session: session.into(),
                     })),
                     ..Default::default()
                 };
 
-                info.send(unfollow_notif, SendSessions::Only(unfollow.session))
-                    .await?;
+                info.send(
+                    unfollow_notif,
+                    SendSessions::Only(Session(unfollow.session)),
+                )
+                .await?;
                 Ok(None)
             }
             goval::command::Body::OpenFile(file) => {
@@ -76,7 +79,7 @@ impl traits::Service for Presence {
                 let _inner = goval::FileOpened {
                     user_id: user.id,
                     file: file.file,
-                    session,
+                    session: session.into(),
                     timestamp,
                 };
 
@@ -98,7 +101,7 @@ impl traits::Service for Presence {
         &mut self,
         info: &super::types::ChannelInfo,
         client: ClientInfo,
-        session: i32,
+        session: Session,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         let mut roster = goval::Command::default();
@@ -115,7 +118,7 @@ impl traits::Service for Presence {
         roster.body = Some(goval::command::Body::Roster(_inner));
 
         let user = goval::User {
-            session,
+            session: session.into(),
             id: client.id,
             name: client.username,
             ..Default::default()
@@ -134,14 +137,14 @@ impl traits::Service for Presence {
         Ok(Some(roster))
     }
 
-    async fn detach(&mut self, info: &super::types::ChannelInfo, session: i32) -> Result<()> {
+    async fn detach(&mut self, info: &super::types::ChannelInfo, session: Session) -> Result<()> {
         self.files.remove(&session);
         let mut part = goval::Command::default();
         let mut flag = false;
 
         let users = self.users.clone();
         for (idx, user) in users.iter().enumerate() {
-            if user.session == session {
+            if user.session == session.0 {
                 flag = true;
                 part.body = Some(goval::command::Body::Part(user.clone()));
                 self.users.swap_remove(idx);

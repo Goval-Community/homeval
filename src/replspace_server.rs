@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use homeval_services::Session;
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::mpsc::channel;
@@ -53,10 +54,10 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
         debug!(channel = query.channel, "Got git askpass");
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
-        session = *last_session.get(&query.channel).unwrap_or(&0);
+        session = *last_session.get(&query.channel).unwrap_or(&Session::zero());
     } else {
         debug!("Got git askpass without channel id");
-        session = 0;
+        session = Session::zero();
     }
 
     let nonce = TextNonce::new().into_string();
@@ -137,14 +138,14 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
             debug!(channel, "Got git open file");
 
             let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
-            session = *last_session.get(&channel).unwrap_or(&0);
+            session = *last_session.get(&channel).unwrap_or(&Session::zero());
         } else {
             debug!("Got git open file with channel id set to 0 (unknown)");
-            session = 0;
+            session = Session::zero();
         }
     } else {
         debug!("Got git open file without channel id");
-        session = 0;
+        session = Session::zero();
     }
 
     let nonce = TextNonce::new().into_string();

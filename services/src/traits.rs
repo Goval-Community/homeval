@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 
-use crate::{ClientInfo, FSEvent, IPCMessage, ReplspaceMessage};
+use crate::{ClientInfo, FSEvent, IPCMessage, ReplspaceMessage, Session};
 
 #[async_trait]
 pub(crate) trait Service {
@@ -18,7 +18,7 @@ pub(crate) trait Service {
         &mut self,
         _info: &super::types::ChannelInfo,
         _message: goval::Command,
-        _session: i32,
+        _session: Session,
     ) -> Result<Option<goval::Command>> {
         Ok(None)
     }
@@ -35,7 +35,7 @@ pub(crate) trait Service {
         &mut self,
         _info: &super::types::ChannelInfo,
         _msg: ReplspaceMessage,
-        _session: i32,
+        _session: Session,
         _respond: Option<Sender<ReplspaceMessage>>,
     ) -> Result<()> {
         Ok(())
@@ -49,13 +49,13 @@ pub(crate) trait Service {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        _session: i32,
+        _session: Session,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         Ok(None)
     }
 
-    async fn detach(&mut self, _info: &super::types::ChannelInfo, _session: i32) -> Result<()> {
+    async fn detach(&mut self, _info: &super::types::ChannelInfo, _session: Session) -> Result<()> {
         Ok(())
     }
 }

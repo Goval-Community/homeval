@@ -6,23 +6,24 @@ use tokio::sync::RwLock;
 use tracing::error;
 
 use crate::config::dotreplit::DotReplit;
+use crate::Session;
 
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
 
 #[derive(Clone, Copy, Debug)]
 pub enum SendSessions {
-    Only(i32),
-    EveryoneExcept(i32),
+    Only(Session),
+    EveryoneExcept(Session),
     Everyone,
 }
 
 pub struct ChannelInfo {
     pub id: i32,
-    pub clients: HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
+    pub clients: HashMap<Session, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
     pub service: String,
     pub name: Option<String>,
-    pub sessions: HashMap<i32, ClientInfo>,
+    pub sessions: HashMap<Session, ClientInfo>,
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     pub dotreplit: Arc<RwLock<DotReplit>>,
     pub child_env_vars: Arc<RwLock<HashMap<String, String>>>,
@@ -30,7 +31,7 @@ pub struct ChannelInfo {
 
 impl ChannelInfo {
     pub async fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
-        let clients: Vec<i32>;
+        let clients: Vec<Session>;
         message.channel = self.id;
         match sessions {
             SendSessions::Everyone => {
@@ -43,7 +44,7 @@ impl ChannelInfo {
                 clients = _clients;
             }
             SendSessions::EveryoneExcept(excluded) => {
-                message.session = -excluded;
+                message.session = (-excluded).into();
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
                     if client != &excluded {
@@ -54,7 +55,7 @@ impl ChannelInfo {
                 clients = _clients;
             }
             SendSessions::Only(session) => {
-                message.session = session;
+                message.session = session.into();
                 clients = vec![session]
             }
         }
