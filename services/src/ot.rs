@@ -44,10 +44,6 @@ impl OT {
 
 #[async_trait]
 impl traits::Service for OT {
-    async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
-        Ok(())
-    }
-
     async fn message(
         &mut self,
         info: &super::types::ChannelInfo,
@@ -73,7 +69,7 @@ impl traits::Service for OT {
                     return Ok(Some(error));
                 }
 
-                self.path = path.clone();
+                self.path.clone_from(&path);
                 let byte_contents = fs::read(path.clone()).await?;
                 let crc32 = crc32fast::hash(byte_contents.as_slice());
 

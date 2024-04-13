@@ -15,19 +15,31 @@ use anyhow::Result;
 use goval::{Command, OpenChannel};
 use homeval_services::{ClientInfo, ServiceMetadata};
 use prost::Message;
-use std::{net::SocketAddr, sync::LazyLock};
-use tokio::sync::{mpsc::UnboundedSender, Mutex};
+use std::{collections::HashMap, net::SocketAddr, sync::LazyLock};
+use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    CHANNEL_MESSAGES, CHANNEL_METADATA, CHANNEL_SESSIONS, LAST_SESSION_USING_CHANNEL, MAX_SESSION,
-    PROCCESS_CHANNEL_TO_ID, SESSION_CHANNELS, SESSION_CLIENT_INFO, SESSION_MAP,
+    parse_paseto::parse, ChannelMessage, IPCMessage, CHANNEL_MESSAGES, CHILD_PROCS_ENV_BASE,
+    DOTREPLIT_CONFIG, LAST_SESSION_USING_CHANNEL,
 };
 
-use crate::{parse_paseto::parse, ChannelMessage, IPCMessage};
+static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+
+static SESSION_CHANNELS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<i32, ClientInfo>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, ServiceMetadata>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<i32>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_MAP: LazyLock<RwLock<HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Clone)]
 struct AppState {
@@ -173,23 +185,6 @@ async fn handle_message(
             _ => {}
         }
     } else {
-        // Directly deal with Command::Input, should be faster
-        if let goval::command::Body::Input(input) = cmd_body {
-            if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
-                let mut to_continue = false;
-                if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(pty_id) {
-                    queue.push(input);
-                    to_continue = true;
-                } else {
-                    error!(pty_id, "Couldn't find pty to write to");
-                }
-
-                if to_continue {
-                    return;
-                }
-            }
-        }
-
         let msg_lock = CHANNEL_MESSAGES.read().await;
 
         let queue = msg_lock.get(&cmd.channel).unwrap().clone();
@@ -281,7 +276,8 @@ async fn open_channel(
                     channel_id,
                     service,
                     _channel_name,
-                    crate::DOTREPLIT_CONFIG.clone(),
+                    DOTREPLIT_CONFIG.clone(),
+                    CHILD_PROCS_ENV_BASE.clone(),
                     writer,
                 )
                 .await
@@ -299,7 +295,7 @@ async fn open_channel(
             };
 
             protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
-            protocol_error.r#ref = message.command.r#ref.clone();
+            protocol_error.r#ref.clone_from(&message.command.r#ref);
             protocol_error.channel = 0;
 
             session_map
@@ -320,7 +316,7 @@ async fn open_channel(
         };
 
         open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
-        open_chan_res.r#ref = message.command.r#ref.clone();
+        open_chan_res.r#ref.clone_from(&message.command.r#ref);
         open_chan_res.channel = 0;
 
         session_map
@@ -412,7 +408,6 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
                     CHANNEL_METADATA.write().await.remove(&channel);
                     CHANNEL_SESSIONS.write().await.remove(&channel);
                     CHANNEL_MESSAGES.write().await.remove(&channel);
-                    PROCCESS_CHANNEL_TO_ID.write().await.remove(&channel);
                     LAST_SESSION_USING_CHANNEL.write().await.remove(&channel);
                 });
             } else {

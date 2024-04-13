@@ -9,6 +9,7 @@ pub(crate) trait Service {
     async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
         Ok(())
     }
+
     async fn shutdown(self: Box<Self>, _info: &super::types::ChannelInfo) -> Result<()> {
         Ok(())
     }

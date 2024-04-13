@@ -26,10 +26,6 @@ impl FSEvents {
 
 #[async_trait::async_trait]
 impl traits::Service for FSEvents {
-    async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
-        Ok(())
-    }
-
     async fn message(
         &mut self,
         _info: &super::types::ChannelInfo,

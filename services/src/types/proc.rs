@@ -1,17 +1,16 @@
 use std::{
     collections::{HashMap, VecDeque},
     pin::Pin,
-    process::{ExitStatus, Stdio},
+    process::Stdio,
     sync::{atomic::AtomicBool, Arc},
     task::{Context, Poll},
 };
 
-use crate::{ChannelMessage, IPCMessage, SendSessions};
+use crate::{ChannelMessage, SendSessions};
 use anyhow::Result;
 use tokio::{
-    io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+    io::{AsyncWrite, AsyncWriteExt},
     process::ChildStdin,
-    sync::RwLock,
 };
 use tracing::{error, trace};
 
@@ -80,9 +79,9 @@ impl AsyncWrite for CmdWriter {
 }
 
 pub struct Proc {
-    channel: i32,
+    _channel: i32,
     cancelled: Arc<AtomicBool>,
-    contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
+    _contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     stdin: ChildStdin,
 }
 
@@ -173,8 +172,8 @@ impl Proc {
         });
 
         Ok(Proc {
-            channel,
-            contact,
+            _channel: channel,
+            _contact: contact,
             cancelled,
             stdin,
         })

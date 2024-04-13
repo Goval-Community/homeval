@@ -4,8 +4,6 @@ pub struct Exec {
     current_ref: String,
 }
 
-use std::collections::HashMap;
-
 use crate::Proc;
 
 use super::traits;

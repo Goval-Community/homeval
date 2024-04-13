@@ -34,6 +34,7 @@ impl Channel {
         service: String,
         name: Option<String>,
         dotreplit: Arc<RwLock<DotReplit>>,
+        child_env_vars: Arc<RwLock<HashMap<String, String>>>,
         sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
     ) -> Result<Channel> {
         let info = ChannelInfo {
@@ -44,6 +45,7 @@ impl Channel {
             sessions: HashMap::new(),
             sender: sender.clone(),
             dotreplit,
+            child_env_vars,
         };
 
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
@@ -72,6 +74,10 @@ impl Channel {
     }
 
     pub async fn start(mut self, mut read: tokio::sync::mpsc::UnboundedReceiver<ChannelMessage>) {
+        if let Err(err) = self._inner.open(&self.info).await {
+            error!(%err, "Error encountered in Service::open");
+        }
+
         while let Some(message) = read.recv().await {
             let result = match message {
                 ChannelMessage::Attach(session, client, sender) => {
@@ -100,11 +106,8 @@ impl Channel {
                 }
             };
 
-            match result {
-                Ok(_) => {}
-                Err(err) => {
-                    error!(%err, "Error encountered in service")
-                }
+            if let Err(err) = result {
+                error!(%err, "Error encountered in service");
             }
         }
     }

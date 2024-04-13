@@ -24,10 +24,6 @@ impl Presence {
 
 #[async_trait]
 impl traits::Service for Presence {
-    async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
-        Ok(())
-    }
-
     async fn message(
         &mut self,
         info: &super::types::ChannelInfo,
@@ -115,7 +111,7 @@ impl traits::Service for Presence {
         }
 
         _inner.files = files;
-        _inner.user = self.users.clone();
+        _inner.user.clone_from(&self.users);
         roster.body = Some(goval::command::Body::Roster(_inner));
 
         let user = goval::User {

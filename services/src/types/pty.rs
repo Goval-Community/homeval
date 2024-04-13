@@ -106,10 +106,7 @@ impl Pty {
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
     ) -> Result<Pty> {
-        let env = match _env {
-            Some(env) => env,
-            None => HashMap::new(),
-        };
+        let env = _env.unwrap_or_default();
 
         let pty_system = portable_pty::native_pty_system();
 
@@ -173,21 +170,23 @@ impl Pty {
         });
 
         let child_lock_reaper = child_lock.clone();
-        tokio::task::spawn(async move {
-            match tokio::task::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_millis(50));
 
-                loop {
-                    interval.tick().await;
-                    let mut child_ = child_lock_reaper.lock().await;
-                    if let Some(exit_code) = child_.try_wait()? {
-                        return Ok::<i32, anyhow::Error>(exit_code.exit_code() as i32);
-                    }
-                    drop(child_);
+        let task_res = tokio::task::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(50));
+
+            loop {
+                interval.tick().await;
+                let mut child_ = child_lock_reaper.lock().await;
+                if let Some(exit_code) = child_.try_wait()? {
+                    return Ok::<i32, anyhow::Error>(exit_code.exit_code() as i32);
                 }
-            })
-            .await
-            {
+                drop(child_);
+            }
+        })
+        .await;
+
+        tokio::task::spawn(async move {
+            match task_res {
                 Ok(res) => {
                     match res {
                         Ok(exit_code) => {

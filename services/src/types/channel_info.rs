@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
-use goval;
 use tokio::sync::RwLock;
 use tracing::error;
 
@@ -26,6 +25,7 @@ pub struct ChannelInfo {
     pub sessions: HashMap<i32, ClientInfo>,
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     pub dotreplit: Arc<RwLock<DotReplit>>,
+    pub child_env_vars: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl ChannelInfo {

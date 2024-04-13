@@ -138,6 +138,7 @@ impl traits::Service for GCSFiles {
                 let mut file = fs::OpenOptions::new()
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(_file.path)
                     .await?;
                 file.set_len(0).await?;

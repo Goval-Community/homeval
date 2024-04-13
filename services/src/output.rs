@@ -87,7 +87,7 @@ impl traits::Service for Output {
                 ];
                 if let Some(run) = &info.dotreplit.read().await.run {
                     if let Some(args) = &run.args {
-                        cmd = args.clone()
+                        cmd.clone_from(args);
                     }
                 }
 
