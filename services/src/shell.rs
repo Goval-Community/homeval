@@ -78,6 +78,7 @@ impl Shell {
     async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
         let mut env = HashMap::new();
         env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
+
         Pty::start(
             vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,

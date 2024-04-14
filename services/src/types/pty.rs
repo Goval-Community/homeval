@@ -8,7 +8,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::{ChannelMessage, SessionID};
+use crate::{ChannelID, ChannelMessage, SessionID};
 
 use super::IPCMessage;
 
@@ -22,7 +22,7 @@ use tokio::sync::{Mutex, RwLock};
 //     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 struct PtyWriter {
-    channel: i32,
+    channel: ChannelID,
     sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     cancelled: Arc<AtomicBool>,
     scrollback: Arc<RwLock<String>>,
@@ -43,7 +43,7 @@ impl Write for PtyWriter {
         };
 
         cmd.body = Some(goval::command::Body::Output(output.clone()));
-        cmd.channel = self.channel;
+        cmd.channel = self.channel.into();
 
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(std::io::Error::new(ErrorKind::Other, "cancelled"));
@@ -89,7 +89,7 @@ impl Write for PtyWriter {
 }
 
 pub struct Pty {
-    channel: i32,
+    channel: ChannelID,
     pub sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     writer: Box<dyn Write + Send>,
     cancelled: Arc<AtomicBool>,
@@ -101,7 +101,7 @@ pub struct Pty {
 impl Pty {
     pub async fn start(
         _args: Vec<String>,
-        channel: i32,
+        channel: ChannelID,
         sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
@@ -114,13 +114,7 @@ impl Pty {
         let pair = pty_system.openpty(PtySize {
             rows: 24,
             cols: 80,
-            // Not all systems support pixel_width, pixel_height,
-            // but it is good practice to set it to something
-            // that matches the size of the selected font.  That
-            // is more complex than can be shown here in this
-            // brief example though!
-            pixel_width: 0,
-            pixel_height: 0,
+            ..Default::default()
         })?;
 
         let mut cmd = portable_pty::CommandBuilder::new(_args[0].clone());
@@ -172,19 +166,19 @@ impl Pty {
         let child_lock_reaper = child_lock.clone();
 
         tokio::task::spawn(async move {
-        let task_res = tokio::task::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(50));
+            let task_res = tokio::task::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_millis(50));
 
-            loop {
-                interval.tick().await;
-                let mut child_ = child_lock_reaper.lock().await;
-                if let Some(exit_code) = child_.try_wait()? {
-                    return Ok::<i32, anyhow::Error>(exit_code.exit_code() as i32);
+                loop {
+                    interval.tick().await;
+                    let mut child_ = child_lock_reaper.lock().await;
+                    if let Some(exit_code) = child_.try_wait()? {
+                        return Ok::<i32, anyhow::Error>(exit_code.exit_code() as i32);
+                    }
+                    drop(child_);
                 }
-                drop(child_);
-            }
-        })
-        .await;
+            })
+            .await;
 
             match task_res {
                 Ok(res) => {
@@ -281,7 +275,7 @@ impl Pty {
                 self.scrollback.read().await.clone(),
             )),
             session: session.into(),
-            channel: self.channel,
+            channel: self.channel.into(),
             ..Default::default()
         };
 

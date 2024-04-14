@@ -13,7 +13,7 @@ use chrono::Datelike;
 
 use anyhow::Result;
 use goval::{Command, OpenChannel};
-use homeval_services::{ClientInfo, ServiceMetadata, SessionID};
+use homeval_services::{ChannelID, ClientInfo, ServiceMetadata, SessionID};
 use prost::Message;
 use std::{collections::HashMap, net::SocketAddr, sync::LazyLock};
 use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
@@ -29,14 +29,14 @@ use crate::{
 
 static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
-static SESSION_CHANNELS: LazyLock<RwLock<HashMap<SessionID, Vec<i32>>>> =
+static SESSION_CHANNELS: LazyLock<RwLock<HashMap<SessionID, Vec<ChannelID>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<SessionID, ClientInfo>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, ServiceMetadata>>> =
+static CHANNEL_METADATA: LazyLock<RwLock<HashMap<ChannelID, ServiceMetadata>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<SessionID>>>> =
+static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<ChannelID, Vec<SessionID>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static SESSION_MAP: LazyLock<RwLock<HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -175,7 +175,7 @@ async fn handle_message(
             goval::command::Body::CloseChan(close_chan) => {
                 // TODO: follow close_chan.action
                 tokio::spawn(async move {
-                    match detach_channel(close_chan.id, message.session, true).await {
+                    match detach_channel(ChannelID(close_chan.id), message.session, true).await {
                         Ok(_) => {}
                         Err(err) => {
                             error!(%err, session = %message.session, channel = close_chan.id,
@@ -188,8 +188,9 @@ async fn handle_message(
         }
     } else {
         let msg_lock = CHANNEL_MESSAGES.read().await;
+        let channel_id = ChannelID(cmd.channel);
 
-        let queue = msg_lock.get(&cmd.channel).unwrap().clone();
+        let queue = msg_lock.get(&channel_id).unwrap().clone();
 
         drop(msg_lock);
 
@@ -199,7 +200,7 @@ async fn handle_message(
 
         let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
 
-        hashmap_lock.insert(cmd.channel, message.session);
+        hashmap_lock.insert(channel_id, message.session);
 
         drop(hashmap_lock);
     }
@@ -218,7 +219,7 @@ async fn open_channel(
     let searcher: &str = &open_chan.service;
     if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
         let mut found = false;
-        let mut channel_id_held = 0;
+        let mut channel_id_held: ChannelID = ChannelID(0);
 
         let attach = open_chan.action() == goval::open_channel::Action::AttachOrCreate
             || open_chan.action() == goval::open_channel::Action::Attach
@@ -245,7 +246,7 @@ async fn open_channel(
             let service = open_chan.service.clone();
             let mut max_channel = max_channel.lock().await;
             *max_channel += 1;
-            let channel_id = *max_channel;
+            let channel_id = ChannelID(*max_channel);
             channel_id_held = channel_id;
             drop(max_channel);
 
@@ -261,7 +262,7 @@ async fn open_channel(
                 name: _channel_name.clone(),
             };
 
-            trace!(channel = channel_id, "Awaiting queue write");
+            trace!(channel = %channel_id, "Awaiting queue write");
 
             let (writer, reader) = mpsc::unbounded_channel();
 
@@ -273,7 +274,7 @@ async fn open_channel(
             let mut metadata = CHANNEL_METADATA.write().await;
             metadata.insert(channel_id_held, service_data.clone());
             drop(metadata);
-            trace!(channel = channel_id_held, "Added channel to queue list");
+            trace!(channel = %channel_id_held, "Added channel to queue list");
 
             tokio::spawn(async move {
                 let channel = homeval_services::Channel::new(
@@ -315,7 +316,7 @@ async fn open_channel(
         let mut open_chan_res = goval::Command::default();
         let _open_res = goval::OpenChannelRes {
             state: goval::open_channel_res::State::Created.into(),
-            id: channel_id_held,
+            id: channel_id_held.into(),
             ..Default::default()
         };
 
@@ -380,14 +381,14 @@ async fn open_channel(
     Ok(())
 }
 
-async fn detach_channel(channel: i32, session: SessionID, forced: bool) -> Result<()> {
-    trace!(%session, channel, forced, "Client is closing a channel");
+async fn detach_channel(channel: ChannelID, session: SessionID, forced: bool) -> Result<()> {
+    trace!(%session, %channel, forced, "Client is closing a channel");
 
     SESSION_CHANNELS
         .write()
         .await
         .entry(session)
-        .and_modify(|channels| channels.retain(|chan: &i32| *chan != channel));
+        .and_modify(|channels| channels.retain(|chan| *chan != channel));
 
     let msg_lock = CHANNEL_MESSAGES.read().await;
 
@@ -405,7 +406,7 @@ async fn detach_channel(channel: i32, session: SessionID, forced: bool) -> Resul
         Some(arr) => {
             arr.retain(|sess| *sess != session);
             if arr.is_empty() {
-                trace!(channel, "Shutting down channel");
+                trace!(%channel, "Shutting down channel");
                 queue.send(ChannelMessage::Shutdown)?;
 
                 tokio::spawn(async move {
@@ -419,7 +420,7 @@ async fn detach_channel(channel: i32, session: SessionID, forced: bool) -> Resul
             }
         }
         None => {
-            warn!(channel, "Missing CHANNEL_SESSIONS");
+            warn!(%channel, "Missing CHANNEL_SESSIONS");
         }
     }
 
@@ -526,7 +527,7 @@ async fn accept_connection(
                                 match detach_channel(channel, session, true).await {
                                     Ok(_) => {}
                                     Err(err) => {
-                                        error!(%err, %session, channel, "Error occured while detaching from channel")
+                                        error!(%err, %session, %channel, "Error occured while detaching from channel")
                                     }
                                 }
                             });

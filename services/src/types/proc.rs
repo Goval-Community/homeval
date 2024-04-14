@@ -6,7 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{ChannelMessage, SendSessions};
+use crate::{ChannelID, ChannelMessage, SendSessions};
 use anyhow::Result;
 use tokio::{
     io::{AsyncWrite, AsyncWriteExt},
@@ -15,7 +15,7 @@ use tokio::{
 use tracing::{error, trace};
 
 struct CmdWriter {
-    channel: i32,
+    channel: ChannelID,
     contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     cancelled: Arc<AtomicBool>,
     error: bool,
@@ -52,7 +52,7 @@ impl AsyncWrite for CmdWriter {
             cmd.body = Some(goval::command::Body::Output(output));
         }
 
-        cmd.channel = self.channel;
+        cmd.channel = self.channel.into();
         if self
             .contact
             .send(ChannelMessage::ExternalMessage(cmd, SendSessions::Everyone))
@@ -79,7 +79,7 @@ impl AsyncWrite for CmdWriter {
 }
 
 pub struct Proc {
-    _channel: i32,
+    _channel: ChannelID,
     cancelled: Arc<AtomicBool>,
     _contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     stdin: ChildStdin,
@@ -88,7 +88,7 @@ pub struct Proc {
 impl Proc {
     pub async fn new(
         _args: Vec<String>,
-        channel: i32,
+        channel: ChannelID,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
     ) -> Result<Self> {

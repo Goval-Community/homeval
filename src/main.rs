@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use std::time::Instant;
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use homeval_services::SessionID;
+use homeval_services::{ChannelID, SessionID};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -35,10 +35,10 @@ pub static DOTREPLIT_CONFIG: LazyLock<Arc<RwLock<DotReplit>>> = LazyLock::new(||
 });
 
 static CHANNEL_MESSAGES: LazyLock<
-    RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<ChannelMessage>>>,
+    RwLock<HashMap<ChannelID, tokio::sync::mpsc::UnboundedSender<ChannelMessage>>>,
 > = LazyLock::new(|| RwLock::new(HashMap::new()));
 // Hashmap for channel id -> last session that sent it a message
-static LAST_SESSION_USING_CHANNEL: LazyLock<RwLock<HashMap<i32, SessionID>>> =
+static LAST_SESSION_USING_CHANNEL: LazyLock<RwLock<HashMap<ChannelID, SessionID>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // static REPLSPACE_CALLBACKS: LazyLock<

@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use homeval_services::SessionID;
+use homeval_services::{ChannelID, SessionID};
 use serde::{Deserialize, Serialize};
 use textnonce::TextNonce;
 use tokio::sync::mpsc::channel;
@@ -55,7 +55,7 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
         session = *last_session
-            .get(&query.channel)
+            .get(&ChannelID(query.channel))
             .unwrap_or(&SessionID::zero());
     } else {
         debug!("Got git askpass without channel id");
@@ -140,7 +140,9 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
             debug!(channel, "Got git open file");
 
             let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
-            session = *last_session.get(&channel).unwrap_or(&SessionID::zero());
+            session = *last_session
+                .get(&ChannelID(channel))
+                .unwrap_or(&SessionID::zero());
         } else {
             debug!("Got git open file with channel id set to 0 (unknown)");
             session = SessionID::zero();

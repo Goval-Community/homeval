@@ -30,7 +30,7 @@ pub struct Channel {
 // Public functions
 impl Channel {
     pub async fn new(
-        id: i32,
+        id: ChannelID,
         service: String,
         name: Option<String>,
         dotreplit: Arc<RwLock<DotReplit>>,

@@ -24,3 +24,6 @@ pub use proc::Proc;
 
 pub mod session_id;
 pub use session_id::SessionID;
+
+pub mod channel_id;
+pub use channel_id::ChannelID;
