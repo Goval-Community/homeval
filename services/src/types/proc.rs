@@ -1,22 +1,21 @@
 use std::{
     collections::{HashMap, VecDeque},
     pin::Pin,
-    process::{ExitStatus, Stdio},
+    process::Stdio,
     sync::{atomic::AtomicBool, Arc},
     task::{Context, Poll},
 };
 
-use crate::{ChannelMessage, IPCMessage, SendSessions};
+use crate::{ChannelID, ChannelMessage, SendSessions};
 use anyhow::Result;
 use tokio::{
-    io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+    io::{AsyncWrite, AsyncWriteExt},
     process::ChildStdin,
-    sync::RwLock,
 };
 use tracing::{error, trace};
 
 struct CmdWriter {
-    channel: i32,
+    channel: ChannelID,
     contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     cancelled: Arc<AtomicBool>,
     error: bool,
@@ -53,7 +52,7 @@ impl AsyncWrite for CmdWriter {
             cmd.body = Some(goval::command::Body::Output(output));
         }
 
-        cmd.channel = self.channel;
+        cmd.channel = self.channel.into();
         if self
             .contact
             .send(ChannelMessage::ExternalMessage(cmd, SendSessions::Everyone))
@@ -80,16 +79,16 @@ impl AsyncWrite for CmdWriter {
 }
 
 pub struct Proc {
-    channel: i32,
+    _channel: ChannelID,
     cancelled: Arc<AtomicBool>,
-    contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
+    _contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     stdin: ChildStdin,
 }
 
 impl Proc {
     pub async fn new(
         _args: Vec<String>,
-        channel: i32,
+        channel: ChannelID,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
     ) -> Result<Self> {
@@ -173,8 +172,8 @@ impl Proc {
         });
 
         Ok(Proc {
-            channel,
-            contact,
+            _channel: channel,
+            _contact: contact,
             cancelled,
             stdin,
         })

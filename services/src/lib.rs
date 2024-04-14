@@ -30,10 +30,11 @@ pub struct Channel {
 // Public functions
 impl Channel {
     pub async fn new(
-        id: i32,
+        id: ChannelID,
         service: String,
         name: Option<String>,
         dotreplit: Arc<RwLock<DotReplit>>,
+        child_env_vars: Arc<RwLock<HashMap<String, String>>>,
         sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
     ) -> Result<Channel> {
         let info = ChannelInfo {
@@ -44,6 +45,7 @@ impl Channel {
             sessions: HashMap::new(),
             sender: sender.clone(),
             dotreplit,
+            child_env_vars,
         };
 
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
@@ -72,6 +74,10 @@ impl Channel {
     }
 
     pub async fn start(mut self, mut read: tokio::sync::mpsc::UnboundedReceiver<ChannelMessage>) {
+        if let Err(err) = self._inner.open(&self.info).await {
+            error!(%err, "Error encountered in Service::open");
+        }
+
         while let Some(message) = read.recv().await {
             let result = match message {
                 ChannelMessage::Attach(session, client, sender) => {
@@ -100,11 +106,8 @@ impl Channel {
                 }
             };
 
-            match result {
-                Ok(_) => {}
-                Err(err) => {
-                    error!(%err, "Error encountered in service")
-                }
+            if let Err(err) = result {
+                error!(%err, "Error encountered in service");
             }
         }
     }
@@ -112,7 +115,7 @@ impl Channel {
 
 // Private functions
 impl Channel {
-    async fn message(&mut self, message: goval::Command, session: i32) -> Result<()> {
+    async fn message(&mut self, message: goval::Command, session: SessionID) -> Result<()> {
         if let Some(mut msg) = self
             ._inner
             .message(&self.info, message.clone(), session)
@@ -127,7 +130,7 @@ impl Channel {
 
     async fn attach(
         &mut self,
-        session: i32,
+        session: SessionID,
         client: ClientInfo,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<()> {
@@ -146,7 +149,7 @@ impl Channel {
         Ok(())
     }
 
-    async fn detach(&mut self, session: i32) -> Result<()> {
+    async fn detach(&mut self, session: SessionID) -> Result<()> {
         self.info.sessions.retain(|sess, _| sess != &session);
         self.info.clients.retain(|sess, _| sess != &session);
         self._inner.detach(&self.info, session).await?;

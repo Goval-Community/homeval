@@ -13,21 +13,33 @@ use chrono::Datelike;
 
 use anyhow::Result;
 use goval::{Command, OpenChannel};
-use homeval_services::{ClientInfo, ServiceMetadata};
+use homeval_services::{ChannelID, ClientInfo, ServiceMetadata, SessionID};
 use prost::Message;
-use std::{net::SocketAddr, sync::LazyLock};
-use tokio::sync::{mpsc::UnboundedSender, Mutex};
+use std::{collections::HashMap, net::SocketAddr, sync::LazyLock};
+use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    CHANNEL_MESSAGES, CHANNEL_METADATA, CHANNEL_SESSIONS, LAST_SESSION_USING_CHANNEL, MAX_SESSION,
-    PROCCESS_CHANNEL_TO_ID, SESSION_CHANNELS, SESSION_CLIENT_INFO, SESSION_MAP,
+    parse_paseto::parse, ChannelMessage, IPCMessage, CHANNEL_MESSAGES, CHILD_PROCS_ENV_BASE,
+    DOTREPLIT_CONFIG, LAST_SESSION_USING_CHANNEL,
 };
 
-use crate::{parse_paseto::parse, ChannelMessage, IPCMessage};
+static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+
+static SESSION_CHANNELS: LazyLock<RwLock<HashMap<SessionID, Vec<ChannelID>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<SessionID, ClientInfo>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+static CHANNEL_METADATA: LazyLock<RwLock<HashMap<ChannelID, ServiceMetadata>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<ChannelID, Vec<SessionID>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+static SESSION_MAP: LazyLock<RwLock<HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Clone)]
 struct AppState {
@@ -78,7 +90,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
 
     debug!("Mutex acquired...");
     *max_session += 1;
-    let session_id = *max_session;
+    let session_id = SessionID(*max_session);
     drop(max_session);
 
     let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
@@ -117,7 +129,9 @@ async fn wsv2(
 async fn handle_message(
     message: IPCMessage,
     session_map: &LazyLock<
-        tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>,
+        tokio::sync::RwLock<
+            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
+        >,
     >,
     max_channel: &Mutex<i32>,
 ) {
@@ -161,10 +175,10 @@ async fn handle_message(
             goval::command::Body::CloseChan(close_chan) => {
                 // TODO: follow close_chan.action
                 tokio::spawn(async move {
-                    match detach_channel(close_chan.id, message.session, true).await {
+                    match detach_channel(ChannelID(close_chan.id), message.session, true).await {
                         Ok(_) => {}
                         Err(err) => {
-                            error!(%err, session = message.session, channel = close_chan.id,
+                            error!(%err, session = %message.session, channel = close_chan.id,
                             "Error occured while detaching from channel")
                         }
                     }
@@ -173,26 +187,10 @@ async fn handle_message(
             _ => {}
         }
     } else {
-        // Directly deal with Command::Input, should be faster
-        if let goval::command::Body::Input(input) = cmd_body {
-            if let Some(pty_id) = PROCCESS_CHANNEL_TO_ID.read().await.get(&cmd.channel) {
-                let mut to_continue = false;
-                if let Some(queue) = crate::PROCCESS_WRITE_MESSAGES.read().await.get(pty_id) {
-                    queue.push(input);
-                    to_continue = true;
-                } else {
-                    error!(pty_id, "Couldn't find pty to write to");
-                }
-
-                if to_continue {
-                    return;
-                }
-            }
-        }
-
         let msg_lock = CHANNEL_MESSAGES.read().await;
+        let channel_id = ChannelID(cmd.channel);
 
-        let queue = msg_lock.get(&cmd.channel).unwrap().clone();
+        let queue = msg_lock.get(&channel_id).unwrap().clone();
 
         drop(msg_lock);
 
@@ -202,7 +200,7 @@ async fn handle_message(
 
         let mut hashmap_lock = LAST_SESSION_USING_CHANNEL.write().await;
 
-        hashmap_lock.insert(cmd.channel, message.session);
+        hashmap_lock.insert(channel_id, message.session);
 
         drop(hashmap_lock);
     }
@@ -213,13 +211,15 @@ async fn open_channel(
     message: IPCMessage,
     max_channel: &Mutex<i32>,
     session_map: &LazyLock<
-        tokio::sync::RwLock<std::collections::HashMap<i32, mpsc::UnboundedSender<IPCMessage>>>,
+        tokio::sync::RwLock<
+            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
+        >,
     >,
 ) -> Result<()> {
     let searcher: &str = &open_chan.service;
     if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
         let mut found = false;
-        let mut channel_id_held = 0;
+        let mut channel_id_held: ChannelID = ChannelID(0);
 
         let attach = open_chan.action() == goval::open_channel::Action::AttachOrCreate
             || open_chan.action() == goval::open_channel::Action::Attach
@@ -246,7 +246,7 @@ async fn open_channel(
             let service = open_chan.service.clone();
             let mut max_channel = max_channel.lock().await;
             *max_channel += 1;
-            let channel_id = *max_channel;
+            let channel_id = ChannelID(*max_channel);
             channel_id_held = channel_id;
             drop(max_channel);
 
@@ -262,7 +262,7 @@ async fn open_channel(
                 name: _channel_name.clone(),
             };
 
-            trace!(channel = channel_id, "Awaiting queue write");
+            trace!(channel = %channel_id, "Awaiting queue write");
 
             let (writer, reader) = mpsc::unbounded_channel();
 
@@ -274,14 +274,15 @@ async fn open_channel(
             let mut metadata = CHANNEL_METADATA.write().await;
             metadata.insert(channel_id_held, service_data.clone());
             drop(metadata);
-            trace!(channel = channel_id_held, "Added channel to queue list");
+            trace!(channel = %channel_id_held, "Added channel to queue list");
 
             tokio::spawn(async move {
                 let channel = homeval_services::Channel::new(
                     channel_id,
                     service,
                     _channel_name,
-                    crate::DOTREPLIT_CONFIG.clone(),
+                    DOTREPLIT_CONFIG.clone(),
+                    CHILD_PROCS_ENV_BASE.clone(),
                     writer,
                 )
                 .await
@@ -299,7 +300,7 @@ async fn open_channel(
             };
 
             protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
-            protocol_error.r#ref = message.command.r#ref.clone();
+            protocol_error.r#ref.clone_from(&message.command.r#ref);
             protocol_error.channel = 0;
 
             session_map
@@ -315,12 +316,12 @@ async fn open_channel(
         let mut open_chan_res = goval::Command::default();
         let _open_res = goval::OpenChannelRes {
             state: goval::open_channel_res::State::Created.into(),
-            id: channel_id_held,
+            id: channel_id_held.into(),
             ..Default::default()
         };
 
         open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
-        open_chan_res.r#ref = message.command.r#ref.clone();
+        open_chan_res.r#ref.clone_from(&message.command.r#ref);
         open_chan_res.channel = 0;
 
         session_map
@@ -380,14 +381,14 @@ async fn open_channel(
     Ok(())
 }
 
-async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> {
-    trace!(session, channel, forced, "Client is closing a channel");
+async fn detach_channel(channel: ChannelID, session: SessionID, forced: bool) -> Result<()> {
+    trace!(%session, %channel, forced, "Client is closing a channel");
 
     SESSION_CHANNELS
         .write()
         .await
         .entry(session)
-        .and_modify(|channels| channels.retain(|chan: &i32| *chan != channel));
+        .and_modify(|channels| channels.retain(|chan| *chan != channel));
 
     let msg_lock = CHANNEL_MESSAGES.read().await;
 
@@ -405,14 +406,13 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
         Some(arr) => {
             arr.retain(|sess| *sess != session);
             if arr.is_empty() {
-                trace!(channel, "Shutting down channel");
+                trace!(%channel, "Shutting down channel");
                 queue.send(ChannelMessage::Shutdown)?;
 
                 tokio::spawn(async move {
                     CHANNEL_METADATA.write().await.remove(&channel);
                     CHANNEL_SESSIONS.write().await.remove(&channel);
                     CHANNEL_MESSAGES.write().await.remove(&channel);
-                    PROCCESS_CHANNEL_TO_ID.write().await.remove(&channel);
                     LAST_SESSION_USING_CHANNEL.write().await.remove(&channel);
                 });
             } else {
@@ -420,7 +420,7 @@ async fn detach_channel(channel: i32, session: i32, forced: bool) -> Result<()> 
             }
         }
         None => {
-            warn!(channel, "Missing CHANNEL_SESSIONS");
+            warn!(%channel, "Missing CHANNEL_SESSIONS");
         }
     }
 
@@ -442,7 +442,7 @@ async fn accept_connection(
     ws_stream: WebSocket,
     propagate: mpsc::UnboundedSender<IPCMessage>,
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
-    session: i32,
+    session: SessionID,
     client: ClientInfo,
     addr: SocketAddr,
 ) -> Result<()> {
@@ -500,55 +500,48 @@ async fn accept_connection(
     tokio::spawn(async move {
         while let Some(_msg) = read.next().await {
             match _msg {
-                Ok(msg) => {
-                    match msg {
-                        WsMessage::Binary(buf) => {
-                            let _message: anyhow::Result<IPCMessage> = buf.try_into();
-                            let message = match _message {
-                                Ok(mut msg) => {
-                                    msg.session = session;
-                                    msg
-                                }
-                                Err(err) => {
-                                    error!(%err, session, "Error decoding message from client");
-                                    continue;
-                                }
-                            };
-
-                            if let Err(err) = propagate.send(message) {
-                                error!(session = session, ?err, "An error occured when enqueing message to global message queue")
+                Ok(msg) => match msg {
+                    WsMessage::Binary(buf) => {
+                        let _message: anyhow::Result<IPCMessage> = buf.try_into();
+                        let message = match _message {
+                            Ok(mut msg) => {
+                                msg.session = session;
+                                msg
                             }
-                        }
-                        WsMessage::Close(_) => {
-                            warn!(session, "CLOSING SESSION");
-                            for _channel in
-                                SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
-                            {
-                                let channel = *_channel;
-                                tokio::spawn(async move {
-                                    match detach_channel(channel, session, true).await {
-                                        Ok(_) => {}
-                                        Err(err) => {
-                                            error!(%err, session, channel, "Error occured while detaching from channel")
-                                        }
-                                    }
-                                });
+                            Err(err) => {
+                                error!(%err, %session, "Error decoding message from client");
+                                continue;
                             }
+                        };
 
-                            SESSION_MAP.write().await.remove(&session);
-                            SESSION_CLIENT_INFO.write().await.remove(&session);
-                            SESSION_CHANNELS.write().await.remove(&session);
-                            warn!(session, "CLOSED SESSION");
+                        if let Err(err) = propagate.send(message) {
+                            error!(%session, ?err, "An error occured when enqueing message to global message queue")
                         }
-                        _ => {}
                     }
-                }
+                    WsMessage::Close(_) => {
+                        warn!(%session, "CLOSING SESSION");
+                        for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
+                        {
+                            let channel = *_channel;
+                            tokio::spawn(async move {
+                                match detach_channel(channel, session, true).await {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        error!(%err, %session, %channel, "Error occured while detaching from channel")
+                                    }
+                                }
+                            });
+                        }
+
+                        SESSION_MAP.write().await.remove(&session);
+                        SESSION_CLIENT_INFO.write().await.remove(&session);
+                        SESSION_CHANNELS.write().await.remove(&session);
+                        warn!(%session, "CLOSED SESSION");
+                    }
+                    _ => {}
+                },
                 Err(err) => {
-                    error!(
-                        session = session,
-                        ?err,
-                        "An error occured while reading messages"
-                    );
+                    error!(%session, ?err, "An error occured while reading messages");
                 }
             };
         }
@@ -559,7 +552,7 @@ async fn accept_connection(
             Ok(_) => {}
             Err(err) => {
                 error!(
-                    session = i.session,
+                    session = %i.session,
                     ?err,
                     "An error occured while sending a message"
                 )

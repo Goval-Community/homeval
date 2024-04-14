@@ -4,9 +4,7 @@ pub struct Exec {
     current_ref: String,
 }
 
-use std::collections::HashMap;
-
-use crate::Proc;
+use crate::{Proc, SessionID};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -18,7 +16,7 @@ impl traits::Service for Exec {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: i32,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),

@@ -9,7 +9,7 @@ use tracing::debug;
 
 use super::traits;
 use super::types::pty::Pty;
-use crate::{ClientInfo, IPCMessage};
+use crate::{ClientInfo, IPCMessage, SessionID};
 use anyhow::{format_err, Result};
 
 #[async_trait]
@@ -18,14 +18,18 @@ impl traits::Service for Shell {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        session: i32,
+        session: SessionID,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         self.pty.session_join(session, sender).await?;
         Ok(None)
     }
 
-    async fn detach(&mut self, _info: &super::types::ChannelInfo, session: i32) -> Result<()> {
+    async fn detach(
+        &mut self,
+        _info: &super::types::ChannelInfo,
+        session: SessionID,
+    ) -> Result<()> {
         self.pty.session_leave(session).await?;
         Ok(())
     }
@@ -34,7 +38,7 @@ impl traits::Service for Shell {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: i32,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -74,6 +78,7 @@ impl Shell {
     async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
         let mut env = HashMap::new();
         env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
+
         Pty::start(
             vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,

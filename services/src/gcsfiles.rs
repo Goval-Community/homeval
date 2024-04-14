@@ -1,5 +1,7 @@
 pub struct GCSFiles {}
 
+use crate::SessionID;
+
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
@@ -12,7 +14,7 @@ impl traits::Service for GCSFiles {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: i32,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -138,6 +140,7 @@ impl traits::Service for GCSFiles {
                 let mut file = fs::OpenOptions::new()
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(_file.path)
                     .await?;
                 file.set_len(0).await?;

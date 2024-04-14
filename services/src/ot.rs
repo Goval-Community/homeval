@@ -13,7 +13,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage};
+use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage, SessionID};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -44,15 +44,11 @@ impl OT {
 
 #[async_trait]
 impl traits::Service for OT {
-    async fn open(&mut self, _info: &super::types::ChannelInfo) -> Result<()> {
-        Ok(())
-    }
-
     async fn message(
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        session: i32,
+        session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -73,7 +69,7 @@ impl traits::Service for OT {
                     return Ok(Some(error));
                 }
 
-                self.path = path.clone();
+                self.path.clone_from(&path);
                 let byte_contents = fs::read(path.clone()).await?;
                 let crc32 = crc32fast::hash(byte_contents.as_slice());
 
@@ -388,7 +384,7 @@ impl traits::Service for OT {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        _session: i32,
+        _session: SessionID,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         if self.path.is_empty() {

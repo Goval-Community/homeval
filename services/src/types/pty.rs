@@ -8,7 +8,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::ChannelMessage;
+use crate::{ChannelID, ChannelMessage, SessionID};
 
 use super::IPCMessage;
 
@@ -22,8 +22,8 @@ use tokio::sync::{Mutex, RwLock};
 //     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 struct PtyWriter {
-    channel: i32,
-    sessions: Arc<RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+    channel: ChannelID,
+    sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     cancelled: Arc<AtomicBool>,
     scrollback: Arc<RwLock<String>>,
 }
@@ -43,7 +43,7 @@ impl Write for PtyWriter {
         };
 
         cmd.body = Some(goval::command::Body::Output(output.clone()));
-        cmd.channel = self.channel;
+        cmd.channel = self.channel.into();
 
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(std::io::Error::new(ErrorKind::Other, "cancelled"));
@@ -67,7 +67,7 @@ impl Write for PtyWriter {
 
         for (session, sender) in sessions.iter() {
             let mut to_send = cmd.clone();
-            to_send.session = *session;
+            to_send.session = (*session).into();
 
             match sender.send(IPCMessage {
                 command: to_send,
@@ -89,8 +89,8 @@ impl Write for PtyWriter {
 }
 
 pub struct Pty {
-    channel: i32,
-    pub sessions: Arc<RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+    channel: ChannelID,
+    pub sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     writer: Box<dyn Write + Send>,
     cancelled: Arc<AtomicBool>,
     child_lock: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
@@ -101,15 +101,12 @@ pub struct Pty {
 impl Pty {
     pub async fn start(
         _args: Vec<String>,
-        channel: i32,
-        sessions: Arc<RwLock<HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+        channel: ChannelID,
+        sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
     ) -> Result<Pty> {
-        let env = match _env {
-            Some(env) => env,
-            None => HashMap::new(),
-        };
+        let env = _env.unwrap_or_default();
 
         let pty_system = portable_pty::native_pty_system();
 
@@ -117,13 +114,7 @@ impl Pty {
         let pair = pty_system.openpty(PtySize {
             rows: 24,
             cols: 80,
-            // Not all systems support pixel_width, pixel_height,
-            // but it is good practice to set it to something
-            // that matches the size of the selected font.  That
-            // is more complex than can be shown here in this
-            // brief example though!
-            pixel_width: 0,
-            pixel_height: 0,
+            ..Default::default()
         })?;
 
         let mut cmd = portable_pty::CommandBuilder::new(_args[0].clone());
@@ -173,8 +164,9 @@ impl Pty {
         });
 
         let child_lock_reaper = child_lock.clone();
+
         tokio::task::spawn(async move {
-            match tokio::task::spawn(async move {
+            let task_res = tokio::task::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_millis(50));
 
                 loop {
@@ -186,8 +178,9 @@ impl Pty {
                     drop(child_);
                 }
             })
-            .await
-            {
+            .await;
+
+            match task_res {
                 Ok(res) => {
                     match res {
                         Ok(exit_code) => {
@@ -270,7 +263,7 @@ impl Pty {
 
     pub async fn session_join(
         &mut self,
-        session: i32,
+        session: SessionID,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<()> {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
@@ -281,8 +274,8 @@ impl Pty {
             body: Some(goval::command::Body::Output(
                 self.scrollback.read().await.clone(),
             )),
-            session,
-            channel: self.channel,
+            session: session.into(),
+            channel: self.channel.into(),
             ..Default::default()
         };
 
@@ -296,7 +289,7 @@ impl Pty {
         Ok(())
     }
 
-    pub async fn session_leave(&mut self, session: i32) -> Result<()> {
+    pub async fn session_leave(&mut self, session: SessionID) -> Result<()> {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(format_err!("Can't remove a session from a cancelled pty"));
         }

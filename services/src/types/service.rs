@@ -1,6 +1,8 @@
+use crate::ChannelID;
+
 #[derive(Clone, Debug)]
 pub struct ServiceMetadata {
     pub service: String,
     pub name: Option<String>,
-    pub id: i32,
+    pub id: ChannelID,
 }

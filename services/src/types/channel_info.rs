@@ -2,36 +2,37 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
-use goval;
 use tokio::sync::RwLock;
 use tracing::error;
 
 use crate::config::dotreplit::DotReplit;
+use crate::{ChannelID, SessionID};
 
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
 
 #[derive(Clone, Copy, Debug)]
 pub enum SendSessions {
-    Only(i32),
-    EveryoneExcept(i32),
+    Only(SessionID),
+    EveryoneExcept(SessionID),
     Everyone,
 }
 
 pub struct ChannelInfo {
-    pub id: i32,
-    pub clients: HashMap<i32, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
+    pub id: ChannelID,
+    pub clients: HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
     pub service: String,
     pub name: Option<String>,
-    pub sessions: HashMap<i32, ClientInfo>,
+    pub sessions: HashMap<SessionID, ClientInfo>,
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     pub dotreplit: Arc<RwLock<DotReplit>>,
+    pub child_env_vars: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl ChannelInfo {
     pub async fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
-        let clients: Vec<i32>;
-        message.channel = self.id;
+        let clients: Vec<SessionID>;
+        message.channel = self.id.into();
         match sessions {
             SendSessions::Everyone => {
                 message.session = 0;
@@ -43,7 +44,7 @@ impl ChannelInfo {
                 clients = _clients;
             }
             SendSessions::EveryoneExcept(excluded) => {
-                message.session = -excluded;
+                message.session = (-excluded).into();
                 let mut _clients = vec![];
                 for client in self.clients.keys() {
                     if client != &excluded {
@@ -54,7 +55,7 @@ impl ChannelInfo {
                 clients = _clients;
             }
             SendSessions::Only(session) => {
-                message.session = session;
+                message.session = session.into();
                 clients = vec![session]
             }
         }
