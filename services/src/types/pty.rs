@@ -171,6 +171,7 @@ impl Pty {
 
         let child_lock_reaper = child_lock.clone();
 
+        tokio::task::spawn(async move {
         let task_res = tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(50));
 
@@ -185,7 +186,6 @@ impl Pty {
         })
         .await;
 
-        tokio::task::spawn(async move {
             match task_res {
                 Ok(res) => {
                     match res {
