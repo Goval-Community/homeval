@@ -22,5 +22,5 @@ pub use config::dotreplit::DotReplit;
 pub mod proc;
 pub use proc::Proc;
 
-pub mod session;
-pub use session::Session;
+pub mod session_id;
+pub use session_id::SessionID;

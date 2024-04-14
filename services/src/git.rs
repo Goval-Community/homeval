@@ -3,7 +3,7 @@ pub struct Git {
 }
 use std::collections::HashMap;
 
-use crate::{ReplspaceMessage, Session};
+use crate::{ReplspaceMessage, SessionID};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -17,7 +17,7 @@ impl traits::Service for Git {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -61,10 +61,10 @@ impl traits::Service for Git {
         &mut self,
         info: &super::types::ChannelInfo,
         msg: ReplspaceMessage,
-        session: Session,
+        session: SessionID,
         respond: Option<Sender<ReplspaceMessage>>,
     ) -> Result<()> {
-        if session == Session::zero() {
+        if session == SessionID::zero() {
             warn!(
                 ?msg,
                 "Got replspace message from an unknown session, ignoring"

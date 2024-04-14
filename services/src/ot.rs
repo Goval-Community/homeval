@@ -13,7 +13,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage, Session};
+use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage, SessionID};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -48,7 +48,7 @@ impl traits::Service for OT {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        session: Session,
+        session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -384,7 +384,7 @@ impl traits::Service for OT {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        _session: Session,
+        _session: SessionID,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         if self.path.is_empty() {

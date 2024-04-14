@@ -1,8 +1,8 @@
 pub struct Presence {
     users: Vec<goval::User>,
-    files: HashMap<Session, goval::FileOpened>,
+    files: HashMap<SessionID, goval::FileOpened>,
 }
-use crate::{ClientInfo, IPCMessage, SendSessions, Session};
+use crate::{ClientInfo, IPCMessage, SendSessions, SessionID};
 use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
@@ -28,7 +28,7 @@ impl traits::Service for Presence {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        session: Session,
+        session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -44,7 +44,7 @@ impl traits::Service for Presence {
                     ..Default::default()
                 };
 
-                info.send(follow_notif, SendSessions::Only(Session(follow.session)))
+                info.send(follow_notif, SendSessions::Only(SessionID(follow.session)))
                     .await?;
                 Ok(None)
             }
@@ -58,7 +58,7 @@ impl traits::Service for Presence {
 
                 info.send(
                     unfollow_notif,
-                    SendSessions::Only(Session(unfollow.session)),
+                    SendSessions::Only(SessionID(unfollow.session)),
                 )
                 .await?;
                 Ok(None)
@@ -101,7 +101,7 @@ impl traits::Service for Presence {
         &mut self,
         info: &super::types::ChannelInfo,
         client: ClientInfo,
-        session: Session,
+        session: SessionID,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         let mut roster = goval::Command::default();
@@ -137,7 +137,7 @@ impl traits::Service for Presence {
         Ok(Some(roster))
     }
 
-    async fn detach(&mut self, info: &super::types::ChannelInfo, session: Session) -> Result<()> {
+    async fn detach(&mut self, info: &super::types::ChannelInfo, session: SessionID) -> Result<()> {
         self.files.remove(&session);
         let mut part = goval::Command::default();
         let mut flag = false;

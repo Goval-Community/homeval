@@ -1,5 +1,5 @@
 pub struct Toolchain {}
-use crate::Session;
+use crate::SessionID;
 
 use super::traits;
 use async_trait::async_trait;
@@ -13,7 +13,7 @@ impl traits::Service for Toolchain {
         &mut self,
         _info: &super::types::ChannelInfo, // TODO: use this to give real toolchain info
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),

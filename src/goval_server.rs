@@ -13,7 +13,7 @@ use chrono::Datelike;
 
 use anyhow::Result;
 use goval::{Command, OpenChannel};
-use homeval_services::{ClientInfo, ServiceMetadata, Session};
+use homeval_services::{ClientInfo, ServiceMetadata, SessionID};
 use prost::Message;
 use std::{collections::HashMap, net::SocketAddr, sync::LazyLock};
 use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
@@ -29,16 +29,16 @@ use crate::{
 
 static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
-static SESSION_CHANNELS: LazyLock<RwLock<HashMap<Session, Vec<i32>>>> =
+static SESSION_CHANNELS: LazyLock<RwLock<HashMap<SessionID, Vec<i32>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<Session, ClientInfo>>> =
+static SESSION_CLIENT_INFO: LazyLock<RwLock<HashMap<SessionID, ClientInfo>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 static CHANNEL_METADATA: LazyLock<RwLock<HashMap<i32, ServiceMetadata>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<Session>>>> =
+static CHANNEL_SESSIONS: LazyLock<RwLock<HashMap<i32, Vec<SessionID>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
-static SESSION_MAP: LazyLock<RwLock<HashMap<Session, mpsc::UnboundedSender<IPCMessage>>>> =
+static SESSION_MAP: LazyLock<RwLock<HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Clone)]
@@ -90,7 +90,7 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
 
     debug!("Mutex acquired...");
     *max_session += 1;
-    let session_id = Session(*max_session);
+    let session_id = SessionID(*max_session);
     drop(max_session);
 
     let (send_to_session, session_recv) = mpsc::unbounded_channel::<IPCMessage>();
@@ -129,7 +129,9 @@ async fn wsv2(
 async fn handle_message(
     message: IPCMessage,
     session_map: &LazyLock<
-        tokio::sync::RwLock<std::collections::HashMap<Session, mpsc::UnboundedSender<IPCMessage>>>,
+        tokio::sync::RwLock<
+            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
+        >,
     >,
     max_channel: &Mutex<i32>,
 ) {
@@ -208,7 +210,9 @@ async fn open_channel(
     message: IPCMessage,
     max_channel: &Mutex<i32>,
     session_map: &LazyLock<
-        tokio::sync::RwLock<std::collections::HashMap<Session, mpsc::UnboundedSender<IPCMessage>>>,
+        tokio::sync::RwLock<
+            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
+        >,
     >,
 ) -> Result<()> {
     let searcher: &str = &open_chan.service;
@@ -376,7 +380,7 @@ async fn open_channel(
     Ok(())
 }
 
-async fn detach_channel(channel: i32, session: Session, forced: bool) -> Result<()> {
+async fn detach_channel(channel: i32, session: SessionID, forced: bool) -> Result<()> {
     trace!(%session, channel, forced, "Client is closing a channel");
 
     SESSION_CHANNELS
@@ -437,7 +441,7 @@ async fn accept_connection(
     ws_stream: WebSocket,
     propagate: mpsc::UnboundedSender<IPCMessage>,
     mut sent: mpsc::UnboundedReceiver<IPCMessage>,
-    session: Session,
+    session: SessionID,
     client: ClientInfo,
     addr: SocketAddr,
 ) -> Result<()> {

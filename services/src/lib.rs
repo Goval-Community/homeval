@@ -115,7 +115,7 @@ impl Channel {
 
 // Private functions
 impl Channel {
-    async fn message(&mut self, message: goval::Command, session: Session) -> Result<()> {
+    async fn message(&mut self, message: goval::Command, session: SessionID) -> Result<()> {
         if let Some(mut msg) = self
             ._inner
             .message(&self.info, message.clone(), session)
@@ -130,7 +130,7 @@ impl Channel {
 
     async fn attach(
         &mut self,
-        session: Session,
+        session: SessionID,
         client: ClientInfo,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<()> {
@@ -149,7 +149,7 @@ impl Channel {
         Ok(())
     }
 
-    async fn detach(&mut self, session: Session) -> Result<()> {
+    async fn detach(&mut self, session: SessionID) -> Result<()> {
         self.info.sessions.retain(|sess, _| sess != &session);
         self.info.clients.retain(|sess, _| sess != &session);
         self._inner.detach(&self.info, session).await?;

@@ -16,7 +16,7 @@ use tracing::{debug, warn};
 
 use super::traits;
 use super::types::pty::Pty;
-use crate::{ClientInfo, IPCMessage, Session};
+use crate::{ClientInfo, IPCMessage, SessionID};
 use anyhow::{format_err, Result};
 
 #[async_trait]
@@ -25,7 +25,7 @@ impl traits::Service for Output {
         &mut self,
         info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        session: Session,
+        session: SessionID,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         if let Some(pty) = &mut self.pty {
@@ -58,7 +58,11 @@ impl traits::Service for Output {
         Ok(Some(status))
     }
 
-    async fn detach(&mut self, _info: &super::types::ChannelInfo, session: Session) -> Result<()> {
+    async fn detach(
+        &mut self,
+        _info: &super::types::ChannelInfo,
+        session: SessionID,
+    ) -> Result<()> {
         if let Some(pty) = &mut self.pty {
             pty.session_leave(session).await?;
         }
@@ -69,7 +73,7 @@ impl traits::Service for Output {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),

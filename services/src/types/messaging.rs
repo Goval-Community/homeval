@@ -3,7 +3,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::{SendSessions, Session};
+use crate::{SendSessions, SessionID};
 
 use super::client::ClientInfo;
 
@@ -22,14 +22,18 @@ pub enum ReplspaceMessage {
 pub enum ChannelMessage {
     IPC(IPCMessage),
     Attach(
-        Session,
+        SessionID,
         ClientInfo,
         tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ),
-    Detach(Session),
+    Detach(SessionID),
     ProcessDead(i32),
     FSEvent(super::FSEvent),
-    Replspace(Session, ReplspaceMessage, Option<Sender<ReplspaceMessage>>), // session, message
+    Replspace(
+        SessionID,
+        ReplspaceMessage,
+        Option<Sender<ReplspaceMessage>>,
+    ), // session, message
     Shutdown,
     ExternalMessage(goval::Command, SendSessions),
 }
@@ -37,7 +41,7 @@ pub enum ChannelMessage {
 #[derive(Debug, Clone)]
 pub struct IPCMessage {
     pub command: goval::Command,
-    pub session: Session,
+    pub session: SessionID,
 }
 
 impl IPCMessage {
@@ -59,7 +63,7 @@ impl TryFrom<Vec<u8>> for IPCMessage {
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         Ok(Self {
             command: goval::Command::decode(value.as_slice())?,
-            session: Session::zero(),
+            session: SessionID::zero(),
         })
     }
 }

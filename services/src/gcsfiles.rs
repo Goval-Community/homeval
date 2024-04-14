@@ -1,6 +1,6 @@
 pub struct GCSFiles {}
 
-use crate::Session;
+use crate::SessionID;
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -14,7 +14,7 @@ impl traits::Service for GCSFiles {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),

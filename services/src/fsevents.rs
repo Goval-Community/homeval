@@ -4,7 +4,7 @@ pub struct FSEvents {
 }
 
 use super::traits;
-use crate::{FSEvent, FSWatcher, Session};
+use crate::{FSEvent, FSWatcher, SessionID};
 use anyhow::{format_err, Result};
 use goval::{Command, File, FileEvent};
 use tracing::{error, trace, warn};
@@ -30,7 +30,7 @@ impl traits::Service for FSEvents {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),

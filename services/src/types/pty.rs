@@ -8,7 +8,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::{ChannelMessage, Session};
+use crate::{ChannelMessage, SessionID};
 
 use super::IPCMessage;
 
@@ -23,7 +23,7 @@ use tokio::sync::{Mutex, RwLock};
 
 struct PtyWriter {
     channel: i32,
-    sessions: Arc<RwLock<HashMap<Session, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+    sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     cancelled: Arc<AtomicBool>,
     scrollback: Arc<RwLock<String>>,
 }
@@ -90,7 +90,7 @@ impl Write for PtyWriter {
 
 pub struct Pty {
     channel: i32,
-    pub sessions: Arc<RwLock<HashMap<Session, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+    pub sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
     writer: Box<dyn Write + Send>,
     cancelled: Arc<AtomicBool>,
     child_lock: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
@@ -102,7 +102,7 @@ impl Pty {
     pub async fn start(
         _args: Vec<String>,
         channel: i32,
-        sessions: Arc<RwLock<HashMap<Session, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
+        sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
         _env: Option<HashMap<String, String>>,
     ) -> Result<Pty> {
@@ -269,7 +269,7 @@ impl Pty {
 
     pub async fn session_join(
         &mut self,
-        session: Session,
+        session: SessionID,
         sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<()> {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
@@ -295,7 +295,7 @@ impl Pty {
         Ok(())
     }
 
-    pub async fn session_leave(&mut self, session: Session) -> Result<()> {
+    pub async fn session_leave(&mut self, session: SessionID) -> Result<()> {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(format_err!("Can't remove a session from a cancelled pty"));
         }

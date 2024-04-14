@@ -2,7 +2,7 @@ pub struct Chat {
     history: Vec<goval::ChatMessage>,
 }
 
-use crate::{ClientInfo, IPCMessage, SendSessions, Session};
+use crate::{ClientInfo, IPCMessage, SendSessions, SessionID};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -21,7 +21,7 @@ impl traits::Service for Chat {
         &mut self,
         info: &super::types::ChannelInfo,
         message: goval::Command,
-        session: Session,
+        session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
@@ -51,7 +51,7 @@ impl traits::Service for Chat {
         &mut self,
         _info: &super::types::ChannelInfo,
         _client: ClientInfo,
-        _session: Session,
+        _session: SessionID,
         _sender: tokio::sync::mpsc::UnboundedSender<IPCMessage>,
     ) -> Result<Option<goval::Command>> {
         let mut scrollback = goval::Command::default();

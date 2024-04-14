@@ -6,24 +6,24 @@ use tokio::sync::RwLock;
 use tracing::error;
 
 use crate::config::dotreplit::DotReplit;
-use crate::Session;
+use crate::SessionID;
 
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
 
 #[derive(Clone, Copy, Debug)]
 pub enum SendSessions {
-    Only(Session),
-    EveryoneExcept(Session),
+    Only(SessionID),
+    EveryoneExcept(SessionID),
     Everyone,
 }
 
 pub struct ChannelInfo {
     pub id: i32,
-    pub clients: HashMap<Session, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
+    pub clients: HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>,
     pub service: String,
     pub name: Option<String>,
-    pub sessions: HashMap<Session, ClientInfo>,
+    pub sessions: HashMap<SessionID, ClientInfo>,
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     pub dotreplit: Arc<RwLock<DotReplit>>,
     pub child_env_vars: Arc<RwLock<HashMap<String, String>>>,
@@ -31,7 +31,7 @@ pub struct ChannelInfo {
 
 impl ChannelInfo {
     pub async fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
-        let clients: Vec<Session>;
+        let clients: Vec<SessionID>;
         message.channel = self.id;
         match sessions {
             SendSessions::Everyone => {

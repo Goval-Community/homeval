@@ -1,5 +1,5 @@
 pub struct DotReplit {}
-use crate::Session;
+use crate::SessionID;
 
 use super::traits;
 
@@ -12,7 +12,7 @@ impl traits::Service for DotReplit {
         &mut self,
         _info: &super::types::ChannelInfo,
         message: goval::Command,
-        _session: Session,
+        _session: SessionID,
     ) -> Result<Option<goval::Command>> {
         let body = match message.body.clone() {
             None => return Err(format_err!("Expected command body")),
