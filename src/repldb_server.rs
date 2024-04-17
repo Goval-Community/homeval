@@ -43,15 +43,15 @@ pub async fn start_server() -> Result<()> {
     Ok(())
 }
 
-async fn set_value(Form(data): Form<HashMap<String, String>>) -> StatusCode {
+async fn set_value(Form(mut data): Form<HashMap<String, String>>) -> StatusCode {
     let database = crate::DATABASE
         .get()
         .expect("DATABASE is known to be set or else repldb server is disabled");
 
-    for (key, value) in data.iter() {
+    for (key, value) in data.drain() {
         let active: repldb::ActiveModel = repldb::ActiveModel {
-            key: sea_orm::ActiveValue::Set(key.clone()),
-            value: sea_orm::ActiveValue::Set(value.clone()),
+            key: sea_orm::ActiveValue::Set(key),
+            value: sea_orm::ActiveValue::Set(value),
         };
 
         let result = repldb::Entity::insert(active)
