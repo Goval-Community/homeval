@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::{info, warn};
+use tracing::{debug, trace, warn};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -139,17 +139,22 @@ impl traits::Service for Presence {
 
     async fn detach(&mut self, info: &super::types::ChannelInfo, session: SessionID) -> Result<()> {
         self.files.remove(&session);
-        let mut part = goval::Command::default();
         let mut flag = false;
 
-        let users = self.users.clone();
-        for (idx, user) in users.iter().enumerate() {
-            if user.session == session.0 {
-                flag = true;
-                part.body = Some(goval::command::Body::Part(user.clone()));
-                self.users.swap_remove(idx);
-                break;
-            }
+        for user in self.users.extract_if(|user| user.session == session.0) {
+            let part = goval::Command {
+                body: Some(goval::command::Body::Part(user.clone())),
+                ..Default::default()
+            };
+
+            trace!(%session, "Sending depart notification");
+
+            info.send(part, SendSessions::EveryoneExcept(session))
+                .await?;
+
+            debug!(?user, "Sent depart notification");
+
+            flag = true;
         }
 
         if !flag {
@@ -159,9 +164,6 @@ impl traits::Service for Presence {
             ));
         }
 
-        info!(?part, "Presence#detach");
-        info.send(part, SendSessions::EveryoneExcept(session))
-            .await?;
         Ok(())
     }
 }

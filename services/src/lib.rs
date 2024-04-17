@@ -1,3 +1,5 @@
+#![feature(extract_if)]
+
 mod chat;
 mod dotreplit;
 mod exec;
