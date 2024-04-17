@@ -66,7 +66,7 @@ pub async fn start_server() -> Result<()> {
         let max_channel = Mutex::new(0);
 
         while let Some(message) = rx.recv().await {
-            handle_message(message, &SESSION_MAP, &max_channel).await;
+            handle_message(message, &max_channel).await;
         }
     });
 
@@ -126,15 +126,7 @@ async fn wsv2(
     ws.on_upgrade(move |socket| on_wsv2_upgrade(socket, token, state, addr))
 }
 
-async fn handle_message(
-    message: IPCMessage,
-    session_map: &LazyLock<
-        tokio::sync::RwLock<
-            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
-        >,
-    >,
-    max_channel: &Mutex<i32>,
-) {
+async fn handle_message(message: IPCMessage, max_channel: &Mutex<i32>) {
     let cmd: Command = message.clone().command;
 
     let cmd_body = match cmd.body {
@@ -155,7 +147,7 @@ async fn handle_message(
                     ..Default::default()
                 };
 
-                if let Some(sender) = session_map.read().await.get(&message.session) {
+                if let Some(sender) = SESSION_MAP.read().await.get(&message.session) {
                     match sender.send(message.replace_cmd(pong)) {
                         Ok(_) => {}
                         Err(err) => {
@@ -167,7 +159,7 @@ async fn handle_message(
                 }
             }
             goval::command::Body::OpenChan(open_chan) => {
-                if let Err(err) = open_channel(open_chan, message, max_channel, session_map).await {
+                if let Err(err) = open_channel(open_chan, message, max_channel).await {
                     error!(?err, "Error in open chan handler")
                 }
             }
@@ -210,11 +202,6 @@ async fn open_channel(
     open_chan: OpenChannel,
     message: IPCMessage,
     max_channel: &Mutex<i32>,
-    session_map: &LazyLock<
-        tokio::sync::RwLock<
-            std::collections::HashMap<SessionID, mpsc::UnboundedSender<IPCMessage>>,
-        >,
-    >,
 ) -> Result<()> {
     let searcher: &str = &open_chan.service;
     if homeval_services::IMPLEMENTED_SERVICES.contains(&searcher) {
@@ -303,7 +290,7 @@ async fn open_channel(
             protocol_error.r#ref.clone_from(&message.command.r#ref);
             protocol_error.channel = 0;
 
-            session_map
+            SESSION_MAP
                 .read()
                 .await
                 .get(&message.session)
@@ -324,7 +311,7 @@ async fn open_channel(
         open_chan_res.r#ref.clone_from(&message.command.r#ref);
         open_chan_res.channel = 0;
 
-        session_map
+        SESSION_MAP
             .read()
             .await
             .get(&message.session)
