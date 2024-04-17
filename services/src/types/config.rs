@@ -16,7 +16,7 @@ pub use serde::{Deserialize, Serialize};
 pub mod toolchain {
     use super::*;
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct ToolchainConfigs {
         pub entrypoint: Option<String>,
@@ -36,7 +36,7 @@ pub mod toolchain {
     }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct RunOption {
         pub id: Option<String>,
@@ -56,7 +56,7 @@ pub mod toolchain {
     }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct DebuggerOption {
         pub id: Option<String>,
@@ -76,7 +76,7 @@ pub mod toolchain {
     }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct LanguageServerOption {
         pub id: Option<String>,
@@ -94,7 +94,7 @@ pub mod toolchain {
     }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct FileTypeAttrs {
         pub extensions: Vec<String>,
@@ -114,7 +114,7 @@ pub mod toolchain {
     }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct PackagerOption {
         pub id: Option<String>,
@@ -137,7 +137,7 @@ pub mod dotreplit {
     map<string,DotReplitLanguage> languages = 9;
     repeated string hidden = 11;
     */
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct DotReplit {
         pub run: Option<Exec>,
@@ -147,36 +147,36 @@ pub mod dotreplit {
         pub hidden: Option<Vec<String>>,
     }
 
-    impl From<DotReplit> for goval::DotReplit {
-        fn from(val: DotReplit) -> Self {
+    impl From<&DotReplit> for goval::DotReplit {
+        fn from(val: &DotReplit) -> Self {
             let mut ret = goval::DotReplit::default();
 
-            if let Some(run) = val.run {
+            if let Some(run) = &val.run {
                 // let mut inner = goval::Exec::default();
                 // inner.args = vec!["sh".into(), "-c".into(), run];
                 ret.run = Some(run.into());
             }
 
-            if let Some(lang) = val.language {
-                ret.language = lang;
+            if let Some(lang) = &val.language {
+                ret.language.clone_from(lang);
             }
 
-            if let Some(entrypoint) = val.entrypoint {
-                ret.entrypoint = entrypoint;
+            if let Some(entrypoint) = &val.entrypoint {
+                ret.entrypoint.clone_from(entrypoint);
             }
 
-            if let Some(languages) = val.languages {
+            if let Some(languages) = &val.languages {
                 let mut inner = HashMap::new();
 
                 for (lang, data) in languages.iter() {
-                    inner.insert(lang.into(), data.clone().into());
+                    inner.insert(lang.into(), data.into());
                 }
 
                 ret.languages = inner
             }
 
-            if let Some(hidden) = val.hidden {
-                ret.hidden = hidden;
+            if let Some(hidden) = &val.hidden {
+                ret.hidden.clone_from(hidden);
             }
 
             ret
@@ -190,7 +190,7 @@ pub mod dotreplit {
         }
     */
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     pub struct DotReplitLanguage {
         pub pattern: Option<String>,
@@ -198,19 +198,19 @@ pub mod dotreplit {
         pub language_server: Option<LanguageServerConfig>,
     }
 
-    impl From<DotReplitLanguage> for goval::DotReplitLanguage {
-        fn from(val: DotReplitLanguage) -> Self {
+    impl From<&DotReplitLanguage> for goval::DotReplitLanguage {
+        fn from(val: &DotReplitLanguage) -> Self {
             let mut ret = goval::DotReplitLanguage::default();
 
-            if let Some(pattern) = val.pattern {
-                ret.pattern = pattern;
+            if let Some(pattern) = &val.pattern {
+                ret.pattern.clone_from(pattern);
             }
 
-            if let Some(syntax) = val.syntax {
-                ret.syntax = syntax;
+            if let Some(syntax) = &val.syntax {
+                ret.syntax.clone_from(syntax);
             }
 
-            if let Some(language_server) = val.language_server {
+            if let Some(language_server) = &val.language_server {
                 ret.language_server = Some(language_server.into());
             }
 
@@ -227,7 +227,7 @@ message LanguageServerConfig {
 }
 */
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LanguageServerConfig {
     #[serde(rename = "start")]
@@ -236,23 +236,24 @@ pub struct LanguageServerConfig {
     pub initialization_options_json: Option<String>,
 }
 
-impl From<LanguageServerConfig> for goval::LanguageServerConfig {
-    fn from(val: LanguageServerConfig) -> Self {
+impl From<&LanguageServerConfig> for goval::LanguageServerConfig {
+    fn from(val: &LanguageServerConfig) -> Self {
         let mut ret = goval::LanguageServerConfig::default();
 
-        if let Some(start_command) = val.start_command {
+        if let Some(start_command) = &val.start_command {
             // let mut inner = goval::Exec::default();
             // inner.args = vec!["sh".into(), "-c".into(), start_command];
             // ret.start_command = Some(inner);
             ret.start_command = Some(start_command.into());
         }
 
-        if let Some(configuration_json) = val.configuration_json {
-            ret.configuration_json = configuration_json;
+        if let Some(configuration_json) = &val.configuration_json {
+            ret.configuration_json.clone_from(configuration_json);
         }
 
-        if let Some(initialization_options_json) = val.initialization_options_json {
-            ret.initialization_options_json = initialization_options_json;
+        if let Some(initialization_options_json) = &val.initialization_options_json {
+            ret.initialization_options_json
+                .clone_from(initialization_options_json);
         };
 
         ret
@@ -275,14 +276,14 @@ message Exec {
 }
 */
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ExecLifecycle {
     NonBlocking,
     Stdin,
     Blocking,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Exec {
     pub args: Option<Vec<String>>,
@@ -293,16 +294,16 @@ pub struct Exec {
     pub split_logs: Option<bool>,
 }
 
-impl From<Exec> for goval::Exec {
-    fn from(val: Exec) -> Self {
+impl From<&Exec> for goval::Exec {
+    fn from(val: &Exec) -> Self {
         let mut ret = goval::Exec::default();
 
-        if let Some(args) = val.args {
-            ret.args = args;
+        if let Some(args) = &val.args {
+            ret.args.clone_from(args);
         }
 
-        if let Some(env) = val.env {
-            ret.env = env;
+        if let Some(env) = &val.env {
+            ret.env.clone_from(env);
         }
 
         if let Some(blocking) = val.blocking {
@@ -317,7 +318,7 @@ impl From<Exec> for goval::Exec {
             ret.split_logs = split_logs;
         }
 
-        if let Some(lifecycle) = val.lifecycle {
+        if let Some(lifecycle) = &val.lifecycle {
             ret.lifecycle = match lifecycle {
                 ExecLifecycle::NonBlocking => goval::exec::Lifecycle::NonBlocking,
                 ExecLifecycle::Blocking => goval::exec::Lifecycle::Blocking,
