@@ -15,7 +15,7 @@ goval = { package = "protobuf", path = "../protobuf"}
 notify-debouncer-full = { version = "0.3.1", default-features = false }
 portable-pty = "0.8.1"
 prost = "0.12.4"
-prost-types = "0.12.3"
+prost-types = "0.12.4"
 ropey = "1.6.0"
 serde = "1.0.197"
 serde_json = "1.0.115"
