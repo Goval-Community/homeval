@@ -1,4 +1,5 @@
 #![feature(lazy_cell)]
+#![warn(clippy::pedantic)]
 
 use std::sync::LazyLock;
 use std::time::Instant;
@@ -30,7 +31,7 @@ static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
 
 pub static DOTREPLIT_CONFIG: LazyLock<Arc<RwLock<DotReplit>>> = LazyLock::new(|| {
     Arc::new(RwLock::const_new(
-        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap(),
+        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or_default()).unwrap(),
     ))
 });
 

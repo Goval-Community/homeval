@@ -66,7 +66,7 @@ pub async fn start_server() -> Result<()> {
         let max_channel = Mutex::new(0);
 
         while let Some(message) = rx.recv().await {
-            handle_message(message, &max_channel).await;
+            Box::pin(handle_message(message, &max_channel)).await;
         }
     });
 
@@ -110,9 +110,9 @@ async fn on_wsv2_upgrade(socket: WebSocket, token: String, state: AppState, addr
     )
     .await
     {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(err) => {
-            error!(?err, "accept_connection errored")
+            error!(?err, "accept_connection errored");
         }
     };
 }
@@ -149,18 +149,18 @@ async fn handle_message(message: IPCMessage, max_channel: &Mutex<i32>) {
 
                 if let Some(sender) = SESSION_MAP.read().await.get(&message.session) {
                     match sender.send(message.replace_cmd(pong)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             error!(?err, "Error occured while sending Pong");
                         }
                     }
                 } else {
-                    error!("Missing session queue when sending Pong")
+                    error!("Missing session queue when sending Pong");
                 }
             }
             goval::command::Body::OpenChan(open_chan) => {
                 if let Err(err) = open_channel(open_chan, message, max_channel).await {
-                    error!(?err, "Error in open chan handler")
+                    error!(?err, "Error in open chan handler");
                 }
             }
 
@@ -168,10 +168,10 @@ async fn handle_message(message: IPCMessage, max_channel: &Mutex<i32>) {
                 // TODO: follow close_chan.action
                 tokio::spawn(async move {
                     match detach_channel(ChannelID(close_chan.id), message.session, true).await {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             error!(%err, session = %message.session, channel = close_chan.id,
-                            "Error occured while detaching from channel")
+                            "Error occured while detaching from channel");
                         }
                     }
                 });
@@ -198,6 +198,7 @@ async fn handle_message(message: IPCMessage, max_channel: &Mutex<i32>) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn open_channel(
     open_chan: OpenChannel,
     message: IPCMessage,
@@ -218,7 +219,7 @@ async fn open_channel(
             let metadata = CHANNEL_METADATA.read().await;
             for (id, channel) in metadata.iter() {
                 if channel.name.is_some()
-                    && channel.name.clone().unwrap_or("".to_string()) == open_chan.name
+                    && channel.name.clone().unwrap_or_default() == open_chan.name
                     && channel.service.clone() == open_chan.service
                 {
                     found = true;
@@ -237,16 +238,16 @@ async fn open_channel(
             channel_id_held = channel_id;
             drop(max_channel);
 
-            let _channel_name = if !open_chan.name.is_empty() {
-                Some(open_chan.name)
-            } else {
+            let channel_name = if open_chan.name.is_empty() {
                 None
+            } else {
+                Some(open_chan.name)
             };
 
             let service_data = ServiceMetadata {
                 service: service.clone(),
                 id: channel_id,
-                name: _channel_name.clone(),
+                name: channel_name.clone(),
             };
 
             trace!(channel = %channel_id, "Awaiting queue write");
@@ -267,14 +268,14 @@ async fn open_channel(
                 let channel = homeval_services::Channel::new(
                     channel_id,
                     service,
-                    _channel_name,
+                    channel_name,
                     DOTREPLIT_CONFIG.clone(),
                     CHILD_PROCS_ENV_BASE.clone(),
                     writer,
                 )
                 .await
                 .expect("TODO: Deal with this");
-                channel.start(reader).await;
+                Box::pin(channel.start(reader)).await;
             });
             found = true;
         }
@@ -282,11 +283,11 @@ async fn open_channel(
         if !found {
             error!("Couldnt make channel");
             let mut protocol_error = goval::Command::default();
-            let _inner = goval::ProtocolError {
+            let inner = goval::ProtocolError {
                 text: "Could not create / attach channel".to_string(),
             };
 
-            protocol_error.body = Some(goval::command::Body::ProtocolError(_inner));
+            protocol_error.body = Some(goval::command::Body::ProtocolError(inner));
             protocol_error.r#ref.clone_from(&message.command.r#ref);
             protocol_error.channel = 0;
 
@@ -301,13 +302,13 @@ async fn open_channel(
         }
 
         let mut open_chan_res = goval::Command::default();
-        let _open_res = goval::OpenChannelRes {
+        let open_res = goval::OpenChannelRes {
             state: goval::open_channel_res::State::Created.into(),
             id: channel_id_held.into(),
             ..Default::default()
         };
 
-        open_chan_res.body = Some(goval::command::Body::OpenChanRes(_open_res));
+        open_chan_res.body = Some(goval::command::Body::OpenChanRes(open_res));
         open_chan_res.r#ref.clone_from(&message.command.r#ref);
         open_chan_res.channel = 0;
 
@@ -363,7 +364,7 @@ async fn open_channel(
         warn!(
             service = open_chan.service,
             "Missing service requested by openChan"
-        )
+        );
     }
     Ok(())
 }
@@ -485,12 +486,12 @@ async fn accept_connection(
 
     SESSION_CHANNELS.write().await.insert(session, vec![]);
     tokio::spawn(async move {
-        while let Some(_msg) = read.next().await {
-            match _msg {
+        while let Some(msg_res) = read.next().await {
+            match msg_res {
                 Ok(msg) => match msg {
                     WsMessage::Binary(buf) => {
-                        let _message: anyhow::Result<IPCMessage> = buf.try_into();
-                        let message = match _message {
+                        let ipc_message: anyhow::Result<IPCMessage> = buf.try_into();
+                        let message = match ipc_message {
                             Ok(mut msg) => {
                                 msg.session = session;
                                 msg
@@ -502,19 +503,18 @@ async fn accept_connection(
                         };
 
                         if let Err(err) = propagate.send(message) {
-                            error!(%session, ?err, "An error occured when enqueing message to global message queue")
+                            error!(%session, ?err, "An error occured when enqueing message to global message queue");
                         }
                     }
                     WsMessage::Close(_) => {
                         warn!(%session, "CLOSING SESSION");
-                        for _channel in SESSION_CHANNELS.read().await.get(&session).unwrap().iter()
-                        {
-                            let channel = *_channel;
+                        for channel in SESSION_CHANNELS.read().await.get(&session).unwrap() {
+                            let channel = *channel;
                             tokio::spawn(async move {
                                 match detach_channel(channel, session, true).await {
-                                    Ok(_) => {}
+                                    Ok(()) => {}
                                     Err(err) => {
-                                        error!(%err, %session, %channel, "Error occured while detaching from channel")
+                                        error!(%err, %session, %channel, "Error occured while detaching from channel");
                                     }
                                 }
                             });
@@ -536,13 +536,13 @@ async fn accept_connection(
 
     while let Some(i) = sent.recv().await {
         match write.send(WsMessage::Binary(i.to_bytes())).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(err) => {
                 error!(
                     session = %i.session,
                     ?err,
                     "An error occured while sending a message"
-                )
+                );
             }
         }
     }

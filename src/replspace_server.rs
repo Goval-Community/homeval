@@ -48,9 +48,9 @@ struct GithubTokenReq {
     channel: i32,
 }
 
-async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Json<GithubTokenRes>) {
+async fn get_gh_token(query: Option<Query<GithubTokenReq>>) -> (StatusCode, Json<GithubTokenRes>) {
     let session;
-    if let Some(query) = _query {
+    if let Some(query) = query {
         debug!(channel = query.channel, "Got git askpass");
 
         let last_session = crate::LAST_SESSION_USING_CHANNEL.read().await;
@@ -78,35 +78,29 @@ async fn get_gh_token(_query: Option<Query<GithubTokenReq>>) -> (StatusCode, Jso
 
     let msg = rx.recv().await;
     rx.close();
-    let res = match msg {
-        Some(token) => token,
-        None => {
-            error!("rx#recv() returned None in gh get token");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(GithubTokenRes {
-                    status: ReplspaceStatus::Err,
-                    token: None,
-                }),
-            );
-        }
+    let Some(res) = msg else {
+        error!("rx#recv() returned None in gh get token");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(GithubTokenRes {
+                status: ReplspaceStatus::Err,
+                token: None,
+            }),
+        );
     };
 
-    let token = match res {
-        ReplspaceMessage::GithubTokenRes(token) => token,
-        _ => {
-            error!(
-                result = ?res,
-                "Got unexpected result in replspace api github token fetcher"
-            );
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(GithubTokenRes {
-                    status: ReplspaceStatus::Err,
-                    token: None,
-                }),
-            );
-        }
+    let ReplspaceMessage::GithubTokenRes(token) = res else {
+        error!(
+            result = ?res,
+            "Got unexpected result in replspace api github token fetcher"
+        );
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(GithubTokenRes {
+                status: ReplspaceStatus::Err,
+                token: None,
+            }),
+        );
     };
 
     (
@@ -154,13 +148,13 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
 
     let nonce = TextNonce::new().into_string();
     let tx;
-    let _rx;
+    let rx_option;
     if query.wait_for_close {
         let res = channel(1);
         tx = Some(res.0);
-        _rx = Some(res.1);
+        rx_option = Some(res.1);
     } else {
-        _rx = None;
+        rx_option = None;
         tx = None;
     }
 
@@ -179,50 +173,47 @@ async fn open_file(Json(query): Json<OpenFileReq>) -> (StatusCode, Json<OpenFile
     drop(msg_lock);
 
     let mut rx;
-    if !query.wait_for_close {
+    if query.wait_for_close {
+        rx = rx_option.expect("rx must be defined for this code to run");
+    } else {
         return (
             StatusCode::OK,
             Json(OpenFileRes {
                 status: ReplspaceStatus::Ok,
             }),
         );
-    } else {
-        rx = _rx.expect("rx must be defined for this code to run");
     }
 
     let msg = rx.recv().await;
     rx.close();
-    let res = match msg {
-        Some(token) => token,
-        None => {
-            error!("rx#none() returned none in replspace api open file fetcher");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(OpenFileRes {
-                    status: ReplspaceStatus::Err,
-                }),
-            );
-        }
+
+    let Some(res) = msg else {
+        error!("rx#none() returned none in replspace api open file fetcher");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(OpenFileRes {
+                status: ReplspaceStatus::Err,
+            }),
+        );
     };
 
-    match res {
-        ReplspaceMessage::OpenFileRes => (
+    if let ReplspaceMessage::OpenFileRes = res {
+        (
             StatusCode::OK,
             Json(OpenFileRes {
                 status: ReplspaceStatus::Ok,
             }),
-        ),
-        _ => {
-            error!(
-                result = ?res,
-                "Got unexpected result in replspace api github token fetcher"
-            );
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(OpenFileRes {
-                    status: ReplspaceStatus::Err,
-                }),
-            )
-        }
+        )
+    } else {
+        error!(
+            result = ?res,
+            "Got unexpected result in replspace api github token fetcher"
+        );
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(OpenFileRes {
+                status: ReplspaceStatus::Err,
+            }),
+        )
     }
 }

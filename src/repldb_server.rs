@@ -84,12 +84,12 @@ async fn get_value(Path(key): Path<String>) -> (StatusCode, String) {
 
     match result {
         Ok(value) => match value {
-            None => (StatusCode::NOT_FOUND, "".to_string()),
+            None => (StatusCode::NOT_FOUND, String::new()),
             Some(data) => (StatusCode::OK, data.value),
         },
         Err(err) => {
             error!(?err, "Encountered error reading key from database");
-            (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
+            (StatusCode::INTERNAL_SERVER_ERROR, String::new())
         }
     }
 }
@@ -122,9 +122,8 @@ struct ListKeys {
 }
 
 async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
-    let prefix = match __prefix.prefix {
-        Some(prefix) => prefix,
-        None => return (StatusCode::OK, "".to_string()),
+    let Some(prefix) = __prefix.prefix else {
+        return (StatusCode::OK, String::new());
     };
 
     let database = crate::DATABASE
@@ -138,20 +137,20 @@ async fn list_keys(Query(__prefix): Query<ListKeys>) -> (StatusCode, String) {
 
     match result {
         Ok(value) => {
-            let mut keys = "".to_string();
+            let mut keys = String::new();
 
             for (index, info) in value.iter().enumerate() {
                 if index != 0 {
-                    keys += "\n"
+                    keys += "\n";
                 }
-                keys += &info.key
+                keys += &info.key;
             }
 
             (StatusCode::OK, keys)
         }
         Err(err) => {
             error!(?err, "Encountered error listing keys in database");
-            (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
+            (StatusCode::INTERNAL_SERVER_ERROR, String::new())
         }
     }
 }
