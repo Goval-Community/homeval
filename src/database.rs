@@ -35,7 +35,9 @@ pub async fn setup() -> Result<()> {
     migration::Migrator::up(&db, None).await?;
 
     debug!("Setting database once cell");
-    DATABASE.set(db).unwrap();
+    DATABASE
+        .set(db)
+        .expect("This function is the only possible call to DATABASE.set and is only called once");
 
     debug!("Done with database setup");
 

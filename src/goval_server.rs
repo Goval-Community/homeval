@@ -1,3 +1,6 @@
+// TODO: Fix all these warnings and remove this allow
+#![allow(clippy::unwrap_used)]
+
 use axum::{
     extract::{
         ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
@@ -182,7 +185,13 @@ async fn handle_message(message: IPCMessage, max_channel: &Mutex<i32>) {
         let msg_lock = CHANNEL_MESSAGES.read().await;
         let channel_id = ChannelID(cmd.channel);
 
-        let queue = msg_lock.get(&channel_id).unwrap().clone();
+        let Some(queue) = msg_lock.get(&channel_id).cloned() else {
+            error!(
+                "Session {} sent message to unknown channel {channel_id}",
+                message.session
+            );
+            return;
+        };
 
         drop(msg_lock);
 

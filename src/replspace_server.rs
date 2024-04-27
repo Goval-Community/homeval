@@ -21,12 +21,8 @@ pub async fn start_server() -> Result<()> {
         .route("/files/open", post(open_file))
         .route("/github/token", get(get_gh_token));
 
-    let listener = tokio::net::TcpListener::bind(&"127.0.0.1:8283".parse::<SocketAddr>()?)
-        .await
-        .unwrap();
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(&"127.0.0.1:8283".parse::<SocketAddr>()?).await?;
+    axum::serve(listener, app.into_make_service()).await?;
     Ok(())
 }
 

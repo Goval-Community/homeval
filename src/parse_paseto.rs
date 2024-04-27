@@ -101,7 +101,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
         pubkey = pasetors::keys::AsymmetricPublicKey::from(
             general_purpose::STANDARD.decode(key)?.as_slice(),
         )
-        .unwrap();
+        .expect("Invalid signing key");
     } else {
         return Err(Error::new(
             std::io::ErrorKind::InvalidData,

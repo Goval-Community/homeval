@@ -139,7 +139,7 @@ pub mod dotreplit {
     map<string,DotReplitLanguage> languages = 9;
     repeated string hidden = 11;
     */
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Default)]
     #[serde(rename_all = "camelCase")]
     pub struct DotReplit {
         pub run: Option<Exec>,
