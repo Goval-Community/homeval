@@ -1,5 +1,10 @@
 #![feature(extract_if)]
-#![warn(clippy::pedantic, clippy::unwrap_used)]
+#![warn(
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::redundant_clone,
+    clippy::missing_const_for_fn
+)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,

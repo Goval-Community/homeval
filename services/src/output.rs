@@ -191,7 +191,7 @@ impl traits::Service for Output {
 }
 
 impl Output {
-    pub fn new() -> Output {
+    pub const fn new() -> Output {
         Output {
             pty: None,
             start_time: None,

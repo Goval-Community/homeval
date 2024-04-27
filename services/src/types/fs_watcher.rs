@@ -116,7 +116,7 @@ fn notify_event_to_final(event: &Event) -> Result<Option<FSEvent>> {
         EventKind::Create(_) => Ok(Some(FSEvent::Create(file_name))),
         EventKind::Modify(_kind @ ModifyKind::Name(notify::event::RenameMode::Both)) => {
             let Some(resultant) = event.paths[1]
-                .strip_prefix(base.clone())?
+                .strip_prefix(base)?
                 .to_str()
                 .map(String::from)
             else {

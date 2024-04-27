@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use tracing::warn;
 
 impl Chat {
-    pub fn new() -> Chat {
+    pub const fn new() -> Chat {
         Chat { history: vec![] }
     }
 }

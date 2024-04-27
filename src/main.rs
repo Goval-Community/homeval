@@ -1,5 +1,9 @@
 #![feature(lazy_cell)]
-#![warn(clippy::pedantic)]
+#![warn(
+    clippy::pedantic,
+    clippy::redundant_clone,
+    clippy::missing_const_for_fn
+)]
 
 use std::sync::LazyLock;
 use std::time::Instant;
