@@ -1,7 +1,7 @@
 pub struct OT {
     crc32: u32,
     version: u32,
-    contents: ropey::Rope,
+    contents: Rope,
     path: String,
     cursors: HashMap<String, goval::OtCursor>,
     history: Vec<goval::OtPacket>,
@@ -18,6 +18,7 @@ use crate::{client::ClientInfo, fs_watcher::FSWatcher, FSEvent, IPCMessage, Sess
 use super::traits;
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
+use ropey::Rope;
 use similar::TextDiff;
 use tokio::fs;
 use tracing::{debug, error, trace, warn};
@@ -31,8 +32,8 @@ impl OT {
         let chan = OT {
             crc32: 0,
             version: 1,
-            contents: "".into(),
-            path: "".to_string(),
+            contents: Rope::new(),
+            path: String::new(),
             cursors: HashMap::new(),
             history: vec![],
             watcher,
@@ -57,12 +58,16 @@ impl traits::Service for OT {
 
         if self.path.is_empty() {
             if let goval::command::Body::OtLinkFile(link_file) = body.clone() {
-                let path = link_file.file.unwrap().path;
+                let Some(goval::File { path, .. }) = link_file.file else {
+                    return Err(format_err!(
+                        "Session `{session}` sent OT::OtLinkFile without an attached file"
+                    ));
+                };
+
                 if (fs::metadata(path.clone()).await).is_err() {
                     let error = goval::Command {
                         body: Some(goval::command::Body::Error(format!(
-                            "{}: no such file or directory",
-                            path
+                            "{path}: no such file or directory"
                         ))),
                         ..Default::default()
                     };
@@ -80,10 +85,7 @@ impl traits::Service for OT {
                 self.contents = file_contents.clone().into();
 
                 let timestamp = Some(prost_types::Timestamp {
-                    seconds: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64,
+                    seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
                     nanos: 0,
                 });
 
@@ -98,7 +100,7 @@ impl traits::Service for OT {
                     crc32,
                     committed: timestamp,
                     author: goval::ot_packet::Author::User.into(),
-                    user_id: 23352071,
+                    user_id: 23_352_071,
                     nonce: 0,
                 };
 
@@ -118,7 +120,7 @@ impl traits::Service for OT {
                 };
                 link_response.body = Some(goval::command::Body::OtLinkFileResponse(_inner));
 
-                self.watcher.watch(vec![path]).await?;
+                self.watcher.watch(vec![path])?;
 
                 // let mut reader = self.watcher.get_event_reader().await;
                 // let sending_map = self._sending_map.clone();
@@ -155,19 +157,25 @@ impl traits::Service for OT {
                 // });
 
                 return Ok(Some(link_response));
-            } else {
-                return Err(format_err!("Command sent before otLinkFile"));
             }
+
+            return Err(format_err!("Command sent before otLinkFile"));
         }
 
         match body {
             goval::command::Body::Ot(ot) => {
                 let mut cursor: usize = 0;
 
-                for op in ot.op.clone() {
-                    match op.op_component.unwrap() {
+                for op in &ot.op {
+                    let Some(component) = &op.op_component else {
+                        return Err(format_err!(
+                            "Session `{session}` sent an ot packet without components"
+                        ));
+                    };
+
+                    match component {
                         goval::ot_op_component::OpComponent::Skip(_skip) => {
-                            let skip: usize = _skip.try_into()?;
+                            let skip: usize = (*_skip).try_into()?;
                             if skip + cursor > self.contents.len_chars() {
                                 let err = goval::Command {
                                     body: Some(goval::command::Body::Error(
@@ -178,10 +186,10 @@ impl traits::Service for OT {
                                 return Ok(Some(err));
                             }
 
-                            cursor += skip
+                            cursor += skip;
                         }
                         goval::ot_op_component::OpComponent::Delete(_delete) => {
-                            let delete: usize = _delete.try_into()?;
+                            let delete: usize = (*_delete).try_into()?;
                             if delete + cursor > self.contents.len_chars() {
                                 let err = goval::Command {
                                     body: Some(goval::command::Body::Error(
@@ -192,10 +200,10 @@ impl traits::Service for OT {
                                 return Ok(Some(err));
                             }
 
-                            self.contents.remove(cursor..(cursor + delete))
+                            self.contents.remove(cursor..(cursor + delete));
                         }
                         goval::ot_op_component::OpComponent::Insert(insert) => {
-                            self.contents.insert(cursor, &insert)
+                            self.contents.insert(cursor, insert);
                         }
                     }
                 }
@@ -206,21 +214,18 @@ impl traits::Service for OT {
 
                 let user_id;
                 if ot.author == goval::ot_packet::Author::Ghostwriter as i32 {
-                    user_id = 22261053 // https://replit.com/@ghostwriterai
+                    user_id = 22_261_053; // https://replit.com/@ghostwriterai
                 } else if let Some(user) = info.sessions.get(&session) {
-                    user_id = user.id
+                    user_id = user.id;
                 } else {
-                    user_id = 23054564 // https://replit.com/@homeval-user
+                    user_id = 23_054_564; // https://replit.com/@homeval-user
                 }
 
                 let crc32 = crc32fast::hash(to_write.as_bytes());
                 self.crc32 = crc32;
 
                 let committed = Some(prost_types::Timestamp {
-                    seconds: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64,
+                    seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
                     nanos: 0,
                 });
 
@@ -242,7 +247,7 @@ impl traits::Service for OT {
                     ..Default::default()
                 };
 
-                info.send(ot_notif, crate::SendSessions::Everyone).await?;
+                info.send(ot_notif, crate::SendSessions::Everyone)?;
 
                 fs::write(&self.path, to_write).await?;
 
@@ -261,8 +266,7 @@ impl traits::Service for OT {
                     ..Default::default()
                 };
 
-                info.send(cursor_notif, crate::SendSessions::EveryoneExcept(session))
-                    .await?;
+                info.send(cursor_notif, crate::SendSessions::EveryoneExcept(session))?;
                 Ok(None)
             }
             goval::command::Body::OtDeleteCursor(cursor) => {
@@ -276,8 +280,7 @@ impl traits::Service for OT {
                 info.send(
                     cursor_delete_notif,
                     crate::SendSessions::EveryoneExcept(session),
-                )
-                .await?;
+                )?;
 
                 Ok(None)
             }
@@ -287,7 +290,7 @@ impl traits::Service for OT {
                 let to = request.version_to as usize;
                 for (index, item) in self.history.iter().enumerate() {
                     if index >= from && index <= to {
-                        packets.push(item.clone())
+                        packets.push(item.clone());
                     }
                 }
 
@@ -334,16 +337,13 @@ impl traits::Service for OT {
                     let new_contents =
                         String::from_utf8(new_contents).expect("TODO: Deal with this");
 
-                    let ops = diff(self.contents.to_string(), new_contents.clone());
+                    let ops = diff(&self.contents.to_string(), &new_contents);
 
                     self.contents = new_contents.into();
                     self.crc32 = new_crc32;
 
                     let committed = Some(prost_types::Timestamp {
-                        seconds: SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs() as i64,
+                        seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
                         nanos: 0,
                     });
 
@@ -365,7 +365,7 @@ impl traits::Service for OT {
                         ..Default::default()
                     };
 
-                    info.send(ot_notif, crate::SendSessions::Everyone).await?;
+                    info.send(ot_notif, crate::SendSessions::Everyone)?;
                 }
                 Ok(())
             }
@@ -404,7 +404,7 @@ impl traits::Service for OT {
         let mut cursors = vec![];
 
         for cursor in self.cursors.values() {
-            cursors.push(cursor.clone())
+            cursors.push(cursor.clone());
         }
 
         let _inner = goval::OtStatus {
@@ -420,15 +420,15 @@ impl traits::Service for OT {
     }
 
     async fn shutdown(self: Box<OT>, _info: &super::types::ChannelInfo) -> Result<()> {
-        self.watcher.shutdown().await;
+        self.watcher.shutdown();
         Ok(())
     }
 }
 
-fn diff(old_text: String, new_text: String) -> Vec<goval::OtOpComponent> {
-    let mut _differ = TextDiff::configure();
-    let differ = _differ.timeout(Duration::from_secs(1));
-    let diff = differ.diff_chars(&old_text, &new_text);
+fn diff(old_text: &str, new_text: &str) -> Vec<goval::OtOpComponent> {
+    let mut differ_config: similar::TextDiffConfig = TextDiff::configure();
+    let differ = differ_config.timeout(Duration::from_secs(1));
+    let diff = differ.diff_chars(old_text, new_text);
 
     let mut parts: Vec<goval::OtOpComponent> = vec![];
     let mut last_op: Option<goval::ot_op_component::OpComponent> = None;
@@ -439,7 +439,7 @@ fn diff(old_text: String, new_text: String) -> Vec<goval::OtOpComponent> {
                 if let Some(goval::ot_op_component::OpComponent::Skip(amount)) = last_op.clone() {
                     last_op = Some(goval::ot_op_component::OpComponent::Skip(
                         amount + part.value().len() as u32,
-                    ))
+                    ));
                 } else {
                     new_op = Some(goval::ot_op_component::OpComponent::Skip(
                         part.value().len() as u32,
@@ -450,7 +450,7 @@ fn diff(old_text: String, new_text: String) -> Vec<goval::OtOpComponent> {
                 if let Some(goval::ot_op_component::OpComponent::Delete(amount)) = last_op.clone() {
                     last_op = Some(goval::ot_op_component::OpComponent::Delete(
                         amount + part.value().len() as u32,
-                    ))
+                    ));
                 } else {
                     new_op = Some(goval::ot_op_component::OpComponent::Delete(
                         part.value().len() as u32,
@@ -461,7 +461,7 @@ fn diff(old_text: String, new_text: String) -> Vec<goval::OtOpComponent> {
                 if let Some(goval::ot_op_component::OpComponent::Insert(same)) = last_op.clone() {
                     last_op = Some(goval::ot_op_component::OpComponent::Insert(
                         same + part.value(),
-                    ))
+                    ));
                 } else {
                     new_op = Some(goval::ot_op_component::OpComponent::Insert(
                         part.value().to_string(),

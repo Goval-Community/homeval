@@ -53,9 +53,9 @@ async fn init_keys() -> Result<std::collections::HashMap<String, String>> {
         Client::builder(TokioExecutor::new())
             .build::<HttpsConnector<HttpConnector>, Collected<prost::bytes::Bytes>>(https);
 
-    let mut _body = client.get(hyper::Uri::try_from(key_get)?).await?;
+    let mut body = client.get(hyper::Uri::try_from(key_get)?).await?;
 
-    let body = _body.body_mut().collect().await?.to_bytes();
+    let body = body.body_mut().collect().await?.to_bytes();
 
     Ok(serde_json::from_slice(&body)?)
 }
@@ -74,8 +74,8 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
         }
     };
 
-    let _authority = general_purpose::STANDARD.decode(token.untrusted_footer())?;
-    let authority = goval::GovalSigningAuthority::decode(_authority.as_slice())?;
+    let authority = general_purpose::STANDARD.decode(token.untrusted_footer())?;
+    let authority = goval::GovalSigningAuthority::decode(authority.as_slice())?;
 
     let key_id;
 
@@ -101,7 +101,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
         pubkey = pasetors::keys::AsymmetricPublicKey::from(
             general_purpose::STANDARD.decode(key)?.as_slice(),
         )
-        .unwrap();
+        .expect("Invalid signing key");
     } else {
         return Err(Error::new(
             std::io::ErrorKind::InvalidData,
@@ -115,7 +115,7 @@ async fn parse_verify(input: &str) -> Result<(Vec<u8>, bool)> {
         Err(err) => {
             return Err(Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Paseto invalid: `{:#?}`", err),
+                format!("Paseto invalid: `{err:#?}`"),
             )
             .into());
         }
@@ -149,8 +149,7 @@ pub async fn parse(token: &str) -> Result<ClientInfo> {
         }
     }
 
-    let _inner = general_purpose::STANDARD.decode(msg)?;
-    let inner = goval::token::ReplToken::decode(_inner.as_slice())?;
+    let inner = goval::token::ReplToken::decode(general_purpose::STANDARD.decode(msg)?.as_slice())?;
 
     match inner.presenced {
         Some(user) => Ok(ClientInfo {

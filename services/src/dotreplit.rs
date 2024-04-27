@@ -22,7 +22,7 @@ impl traits::Service for DotReplit {
         match body {
             goval::command::Body::DotReplitGetRequest(_) => {
                 let mut dotreplit = goval::Command::default();
-                let inner: goval::DotReplit = _info.dotreplit.read().await.clone().into();
+                let inner: goval::DotReplit = (&*_info.dotreplit.read().await).into();
 
                 dotreplit.body = Some(goval::command::Body::DotReplitGetResponse(
                     goval::DotReplitGetResponse {

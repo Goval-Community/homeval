@@ -45,7 +45,7 @@ pub struct IPCMessage {
 }
 
 impl IPCMessage {
-    pub fn replace_cmd(&self, cmd: goval::Command) -> IPCMessage {
+    pub const fn replace_cmd(&self, cmd: goval::Command) -> IPCMessage {
         IPCMessage {
             command: cmd,
             session: self.session,

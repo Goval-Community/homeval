@@ -3,7 +3,7 @@ use migration::MigratorTrait;
 use sea_orm::{ConnectOptions, Database};
 use std::time::Duration;
 use tokio::sync::OnceCell;
-use tracing::{debug, warn};
+use tracing::{debug, log::LevelFilter, warn};
 
 pub static DATABASE: OnceCell<sea_orm::DatabaseConnection> = OnceCell::const_new();
 
@@ -22,7 +22,7 @@ pub async fn setup() -> Result<()> {
 
     let connect_options = ConnectOptions::new(db_url)
         .acquire_timeout(Duration::from_secs(5))
-        .sqlx_logging_level(log::LevelFilter::Trace)
+        .sqlx_logging_level(LevelFilter::Trace)
         .to_owned();
 
     debug!("Connecting to database");
@@ -35,7 +35,9 @@ pub async fn setup() -> Result<()> {
     migration::Migrator::up(&db, None).await?;
 
     debug!("Setting database once cell");
-    DATABASE.set(db).unwrap();
+    DATABASE
+        .set(db)
+        .expect("This function is the only possible call to DATABASE.set and is only called once");
 
     debug!("Done with database setup");
 

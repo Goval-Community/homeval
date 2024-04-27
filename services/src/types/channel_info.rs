@@ -30,33 +30,33 @@ pub struct ChannelInfo {
 }
 
 impl ChannelInfo {
-    pub async fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
+    pub fn send(&self, mut message: goval::Command, sessions: SendSessions) -> Result<()> {
         let clients: Vec<SessionID>;
         message.channel = self.id.into();
         match sessions {
             SendSessions::Everyone => {
                 message.session = 0;
-                let mut _clients = vec![];
+                let mut all_clients = vec![];
                 for client in self.clients.keys() {
-                    _clients.push(*client)
+                    all_clients.push(*client);
                 }
 
-                clients = _clients;
+                clients = all_clients;
             }
             SendSessions::EveryoneExcept(excluded) => {
                 message.session = (-excluded).into();
-                let mut _clients = vec![];
+                let mut most_client = vec![];
                 for client in self.clients.keys() {
                     if client != &excluded {
-                        _clients.push(*client)
+                        most_client.push(*client);
                     }
                 }
 
-                clients = _clients;
+                clients = most_client;
             }
             SendSessions::Only(session) => {
                 message.session = session.into();
-                clients = vec![session]
+                clients = vec![session];
             }
         }
 
@@ -67,7 +67,7 @@ impl ChannelInfo {
                     session: client,
                 })?;
             } else {
-                error!("Missing session outbound message queue in op_send_msg")
+                error!("Missing session outbound message queue in op_send_msg");
             }
         }
         Ok(())

@@ -6,7 +6,7 @@ use notify_debouncer_full::{
 use serde::Serialize;
 use tracing::error;
 
-use anyhow::Result;
+use anyhow::{format_err, Result};
 
 use std::{path::Path, time::Duration};
 
@@ -54,7 +54,9 @@ impl FSWatcher {
                 None,
                 move |result: DebounceEventResult| match result {
                     Ok(events) => events.iter().for_each(|event| {
-                        if let Some(final_event) = notify_event_to_final(event).unwrap() {
+                        if let Some(final_event) =
+                            notify_event_to_final(event).expect("TODO: handle this")
+                        {
                             debounce_writer
                                 .send(ChannelMessage::FSEvent(final_event))
                                 .expect("TODO: handle this");
@@ -78,7 +80,7 @@ impl FSWatcher {
         Ok(FSWatcher { debouncer, writer })
     }
 
-    pub async fn watch(&mut self, files: Vec<String>) -> Result<()> {
+    pub fn watch(&mut self, files: Vec<String>) -> Result<()> {
         for file in files {
             let path = Path::new(&file);
             self.debouncer
@@ -86,42 +88,50 @@ impl FSWatcher {
                 .watch(path, notify::RecursiveMode::NonRecursive)?;
             self.debouncer
                 .cache()
-                .add_root(path, notify::RecursiveMode::NonRecursive)
+                .add_root(path, notify::RecursiveMode::NonRecursive);
         }
 
         Ok(())
     }
 
-    pub async fn shutdown(self) {
+    pub fn shutdown(self) {
         self.debouncer.stop_nonblocking();
-        drop(self.writer)
+        drop(self.writer);
     }
 }
 
 fn notify_event_to_final(event: &Event) -> Result<Option<FSEvent>> {
     let base = std::env::current_dir()?;
-    let file_name = event.paths[0]
+    let Some(file_name) = event.paths[0]
         .strip_prefix(base.clone())?
         .to_str()
-        .unwrap()
-        .to_string();
+        .map(String::from)
+    else {
+        return Err(format_err!(
+            "Got invalid utf-8 when trying to find FSEvent file name :eyes:"
+        ));
+    };
+
     match event.kind {
         EventKind::Create(_) => Ok(Some(FSEvent::Create(file_name))),
         EventKind::Modify(_kind @ ModifyKind::Name(notify::event::RenameMode::Both)) => {
-            Ok(Some(FSEvent::Rename(
-                file_name,
-                event.paths[1]
-                    .strip_prefix(base)?
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-            )))
+            let Some(resultant) = event.paths[1]
+                .strip_prefix(base)?
+                .to_str()
+                .map(String::from)
+            else {
+                return Err(format_err!(
+                    "Got invalid utf-8 when trying to find FSEvent resultant file name :eyes:"
+                ));
+            };
+
+            Ok(Some(FSEvent::Rename(file_name, resultant)))
         }
         EventKind::Modify(_kind @ ModifyKind::Name(notify::event::RenameMode::From)) => {
-            Ok(Some(FSEvent::Remove(file_name.to_string())))
+            Ok(Some(FSEvent::Remove(file_name)))
         }
         EventKind::Modify(_kind @ ModifyKind::Name(notify::event::RenameMode::To)) => {
-            Ok(Some(FSEvent::Create(file_name.to_string())))
+            Ok(Some(FSEvent::Create(file_name)))
         }
         EventKind::Modify(_) => Ok(Some(FSEvent::Modify(file_name))),
         EventKind::Remove(_) => Ok(Some(FSEvent::Remove(file_name))),

@@ -12,7 +12,7 @@ impl Default for ClientInfo {
             is_secure: false,
 
             username: "homeval-user".to_owned(),
-            id: 23054564,
+            id: 23_054_564,
         }
     }
 }

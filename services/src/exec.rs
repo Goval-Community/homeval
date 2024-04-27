@@ -32,8 +32,7 @@ impl traits::Service for Exec {
                             ..Default::default()
                         },
                         crate::SendSessions::Everyone,
-                    )
-                    .await?;
+                    )?;
                     return Ok(None);
                 }
 
@@ -45,19 +44,17 @@ impl traits::Service for Exec {
                         ..Default::default()
                     },
                     crate::SendSessions::Everyone,
-                )
-                .await?;
+                )?;
                 self.running = true;
                 self.current_ref = message.r#ref;
-                Proc::new(exec.args, info.id, info.sender.clone(), Some(exec.env)).await?;
+                Proc::new(exec.args, info.id, info.sender.clone(), Some(&exec.env))?;
                 info.send(
                     goval::Command {
                         body: Some(goval::command::Body::State(goval::State::Running.into())),
                         ..Default::default()
                     },
                     crate::SendSessions::Everyone,
-                )
-                .await?;
+                )?;
             }
         }
 
@@ -78,8 +75,7 @@ impl traits::Service for Exec {
                     ..Default::default()
                 },
                 crate::SendSessions::Everyone,
-            )
-            .await?;
+            )?;
         } else {
             info.send(
                 goval::Command {
@@ -90,8 +86,7 @@ impl traits::Service for Exec {
                     ..Default::default()
                 },
                 crate::SendSessions::Everyone,
-            )
-            .await?;
+            )?;
         }
 
         self.current_ref = String::new();
@@ -102,13 +97,12 @@ impl traits::Service for Exec {
                 ..Default::default()
             },
             crate::SendSessions::Everyone,
-        )
-        .await?;
+        )?;
 
         if !self.queue.is_empty() {
             self.running = true;
             let item = self.queue.swap_remove(0);
-            Proc::new(item.0.args, info.id, info.sender.clone(), Some(item.0.env)).await?;
+            Proc::new(item.0.args, info.id, info.sender.clone(), Some(&item.0.env))?;
             self.current_ref = item.1;
             info.send(
                 goval::Command {
@@ -116,8 +110,7 @@ impl traits::Service for Exec {
                     ..Default::default()
                 },
                 crate::SendSessions::Everyone,
-            )
-            .await?;
+            )?;
         }
 
         Ok(())

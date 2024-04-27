@@ -82,8 +82,7 @@ impl traits::Service for Git {
                     )),
                     ..Default::default()
                 };
-                info.send(token_req, crate::SendSessions::Only(session))
-                    .await?;
+                info.send(token_req, crate::SendSessions::Only(session))?;
 
                 self.replspace.insert(nonce, respond);
             }
@@ -98,8 +97,7 @@ impl traits::Service for Git {
                     )),
                     ..Default::default()
                 };
-                info.send(token_req, crate::SendSessions::Only(session))
-                    .await?;
+                info.send(token_req, crate::SendSessions::Only(session))?;
 
                 self.replspace.insert(nonce, respond);
             }

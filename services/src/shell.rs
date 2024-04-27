@@ -47,10 +47,10 @@ impl traits::Service for Shell {
 
         match body {
             goval::command::Body::Input(msg) => {
-                self.pty.write(msg)?;
+                self.pty.write(&msg)?;
             }
             goval::command::Body::ResizeTerm(size) => {
-                self.pty.resize(size.rows as u16, size.cols as u16)?
+                self.pty.resize(size.rows as u16, size.cols as u16)?;
             }
             _ => {
                 debug!(?message, "New message");
@@ -64,7 +64,7 @@ impl traits::Service for Shell {
         info: &super::types::ChannelInfo,
         _exit_code: i32,
     ) -> Result<()> {
-        self.pty = Shell::start_pty(info).await?;
+        self.pty = Shell::start_pty(info)?;
         Ok(())
     }
 }
@@ -75,7 +75,7 @@ static DEFAULT_SHELL: &str = "sh";
 static DEFAULT_SHELL: &str = "pwsh";
 
 impl Shell {
-    async fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
+    fn start_pty(info: &super::types::ChannelInfo) -> Result<Pty> {
         let mut env = HashMap::new();
         env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
 
@@ -83,14 +83,14 @@ impl Shell {
             vec![std::env::var("SHELL").unwrap_or(DEFAULT_SHELL.to_string())],
             info.id,
             Arc::new(RwLock::new(info.clients.clone())),
-            info.sender.clone(),
+            &info.sender,
             Some(env),
         )
-        .await
     }
-    pub async fn new(info: &super::types::ChannelInfo) -> Result<Shell> {
+
+    pub fn new(info: &super::types::ChannelInfo) -> Result<Shell> {
         Ok(Shell {
-            pty: Shell::start_pty(info).await?,
+            pty: Shell::start_pty(info)?,
         })
     }
 }

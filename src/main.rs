@@ -1,8 +1,15 @@
 #![feature(lazy_cell)]
+#![warn(
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::redundant_clone,
+    clippy::missing_const_for_fn
+)]
 
+use anyhow::Result;
 use std::sync::LazyLock;
 use std::time::Instant;
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use homeval_services::{ChannelID, SessionID};
 use tokio::sync::RwLock;
@@ -30,7 +37,7 @@ static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
 
 pub static DOTREPLIT_CONFIG: LazyLock<Arc<RwLock<DotReplit>>> = LazyLock::new(|| {
     Arc::new(RwLock::const_new(
-        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or("".to_string())).unwrap(),
+        toml::from_str(&std::fs::read_to_string(".replit").unwrap_or_default()).unwrap_or_default(),
     ))
 });
 
@@ -56,7 +63,7 @@ pub use database::DATABASE;
 mod goval_server;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     debug!("Initializing lazy statics");
     LazyLock::force(&START_TIME);
@@ -69,7 +76,7 @@ async fn main() -> Result<(), Error> {
     // console_subscriber::init();
 
     #[cfg(feature = "database")]
-    database::setup().await.unwrap();
+    database::setup().await?;
 
     info!("Starting homeval!");
 
@@ -79,7 +86,7 @@ async fn main() -> Result<(), Error> {
     #[cfg(feature = "repldb")]
     tokio::spawn(repldb_server::start_server());
 
-    goval_server::start_server().await.unwrap();
+    goval_server::start_server().await?;
 
     Ok(())
 }

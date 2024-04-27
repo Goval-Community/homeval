@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use tracing::warn;
 
 impl Chat {
-    pub fn new() -> Chat {
+    pub const fn new() -> Chat {
         Chat { history: vec![] }
     }
 }
@@ -30,14 +30,12 @@ impl traits::Service for Chat {
 
         match body {
             goval::command::Body::ChatMessage(msg) => {
-                info.send(message, SendSessions::EveryoneExcept(session))
-                    .await?;
+                info.send(message, SendSessions::EveryoneExcept(session))?;
                 self.history.push(msg);
                 Ok(None)
             }
             goval::command::Body::ChatTyping(_) => {
-                info.send(message, SendSessions::EveryoneExcept(session))
-                    .await?;
+                info.send(message, SendSessions::EveryoneExcept(session))?;
                 Ok(None)
             }
             _ => {

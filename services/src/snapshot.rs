@@ -14,7 +14,7 @@ impl traits::Service for Snapshot {
         message: goval::Command,
         _session: SessionID,
     ) -> Result<Option<goval::Command>> {
-        let body = match message.body.clone() {
+        let body = match message.body {
             None => return Err(format_err!("Expected command body")),
             Some(body) => body,
         };

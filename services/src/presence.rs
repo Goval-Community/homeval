@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::{info, warn};
+use tracing::{debug, trace, warn};
 
 use super::traits;
 use anyhow::{format_err, Result};
@@ -44,8 +44,7 @@ impl traits::Service for Presence {
                     ..Default::default()
                 };
 
-                info.send(follow_notif, SendSessions::Only(SessionID(follow.session)))
-                    .await?;
+                info.send(follow_notif, SendSessions::Only(SessionID(follow.session)))?;
                 Ok(None)
             }
             goval::command::Body::UnfollowUser(unfollow) => {
@@ -59,20 +58,20 @@ impl traits::Service for Presence {
                 info.send(
                     unfollow_notif,
                     SendSessions::Only(SessionID(unfollow.session)),
-                )
-                .await?;
+                )?;
                 Ok(None)
             }
             goval::command::Body::OpenFile(file) => {
-                let user = info.sessions.get(&session).unwrap();
+                let Some(user) = info.sessions.get(&session) else {
+                    return Err(format_err!(
+                        "Session `{session}` who is not joined tried to send Presence::OpenFile"
+                    ));
+                };
 
                 let mut file_notif = goval::Command::default();
 
                 let timestamp = Some(prost_types::Timestamp {
-                    seconds: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64,
+                    seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
                     nanos: 0,
                 });
 
@@ -85,8 +84,7 @@ impl traits::Service for Presence {
 
                 file_notif.body = Some(goval::command::Body::FileOpened(_inner));
 
-                info.send(file_notif, SendSessions::EveryoneExcept(session))
-                    .await?;
+                info.send(file_notif, SendSessions::EveryoneExcept(session))?;
 
                 Ok(None)
             }
@@ -110,7 +108,7 @@ impl traits::Service for Presence {
         let mut files = vec![];
 
         for file in self.files.values() {
-            files.push(file.clone())
+            files.push(file.clone());
         }
 
         _inner.files = files;
@@ -129,8 +127,7 @@ impl traits::Service for Presence {
             ..Default::default()
         };
 
-        info.send(join, SendSessions::EveryoneExcept(session))
-            .await?;
+        info.send(join, SendSessions::EveryoneExcept(session))?;
 
         self.users.push(user);
 
@@ -139,17 +136,21 @@ impl traits::Service for Presence {
 
     async fn detach(&mut self, info: &super::types::ChannelInfo, session: SessionID) -> Result<()> {
         self.files.remove(&session);
-        let mut part = goval::Command::default();
         let mut flag = false;
 
-        let users = self.users.clone();
-        for (idx, user) in users.iter().enumerate() {
-            if user.session == session.0 {
-                flag = true;
-                part.body = Some(goval::command::Body::Part(user.clone()));
-                self.users.swap_remove(idx);
-                break;
-            }
+        for user in self.users.extract_if(|user| user.session == session.0) {
+            let part = goval::Command {
+                body: Some(goval::command::Body::Part(user.clone())),
+                ..Default::default()
+            };
+
+            trace!(%session, "Sending depart notification");
+
+            info.send(part, SendSessions::EveryoneExcept(session))?;
+
+            debug!(?user, "Sent depart notification");
+
+            flag = true;
         }
 
         if !flag {
@@ -159,9 +160,6 @@ impl traits::Service for Presence {
             ));
         }
 
-        info!(?part, "Presence#detach");
-        info.send(part, SendSessions::EveryoneExcept(session))
-            .await?;
         Ok(())
     }
 }
