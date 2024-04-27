@@ -1,3 +1,5 @@
+#![allow(clippy::wildcard_imports)]
+
 /*
 message ToolchainConfigs {
     string entrypoint = 1;
@@ -168,11 +170,11 @@ pub mod dotreplit {
             if let Some(languages) = &val.languages {
                 let mut inner = HashMap::new();
 
-                for (lang, data) in languages.iter() {
+                for (lang, data) in languages {
                     inner.insert(lang.into(), data.into());
                 }
 
-                ret.languages = inner
+                ret.languages = inner;
             }
 
             if let Some(hidden) = &val.hidden {

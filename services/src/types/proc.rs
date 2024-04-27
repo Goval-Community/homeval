@@ -86,19 +86,19 @@ pub struct Proc {
 }
 
 impl Proc {
-    pub async fn new(
-        _args: Vec<String>,
+    pub fn new(
+        args: Vec<String>,
         channel: ChannelID,
         contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
-        _env: Option<HashMap<String, String>>,
+        _env: Option<&HashMap<String, String>>,
     ) -> Result<Self> {
         let cancelled = Arc::new(AtomicBool::new(false));
 
-        let mut cmd = tokio::process::Command::new(&_args[0]);
-        let args = &mut VecDeque::from(_args.to_vec());
-        trace!("{:#?}", args);
-        VecDeque::pop_front(args);
-        for arg in args {
+        let mut cmd = tokio::process::Command::new(&args[0]);
+        let real_args = &mut VecDeque::from(args);
+        trace!("{:#?}", real_args);
+        VecDeque::pop_front(real_args);
+        for arg in real_args {
             cmd.arg(arg);
         }
         // debug!("{:#?}", std::env::current_dir()?);
@@ -167,7 +167,7 @@ impl Proc {
                 .send(ChannelMessage::ProcessDead(exit_status))
                 .is_err()
             {
-                error!("Proc recv'ing channel was dropped before process dead alert was sent")
+                error!("Proc recv'ing channel was dropped before process dead alert was sent");
             }
         });
 

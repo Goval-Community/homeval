@@ -46,10 +46,10 @@ impl traits::Service for GCSFiles {
                     }
                 }
 
-                let mut ret = goval::Command::default();
+                let mut ret_cmd = goval::Command::default();
                 let _inner = goval::Files { files: res };
-                ret.body = Some(goval::command::Body::Files(_inner));
-                Ok(Some(ret))
+                ret_cmd.body = Some(goval::command::Body::Files(_inner));
+                Ok(Some(ret_cmd))
             }
             goval::command::Body::Mkdir(dir) => {
                 fs::create_dir_all(dir.path).await?;
@@ -107,9 +107,9 @@ impl traits::Service for GCSFiles {
             goval::command::Body::Remove(file) => {
                 let stat = fs::metadata(&file.path).await?;
                 if stat.is_dir() {
-                    fs::remove_dir_all(&file.path).await?
+                    fs::remove_dir_all(&file.path).await?;
                 } else {
-                    fs::remove_file(&file.path).await?
+                    fs::remove_file(&file.path).await?;
                 }
 
                 let ret = goval::Command {

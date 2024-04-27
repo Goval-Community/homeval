@@ -37,23 +37,20 @@ impl traits::Service for FSEvents {
             Some(body) => body,
         };
 
-        match body {
-            goval::command::Body::SubscribeFile(subscribe) => {
-                let mut files = vec![];
-                for file in subscribe.files {
-                    files.push(file.path);
-                }
+        if let goval::command::Body::SubscribeFile(subscribe) = body {
+            let mut files = vec![];
+            for file in subscribe.files {
+                files.push(file.path);
+            }
 
-                self.watcher.watch(files).await?;
-                Ok(Some(goval::Command {
-                    body: Some(goval::command::Body::Ok(goval::Ok {})),
-                    ..Default::default()
-                }))
-            }
-            _ => {
-                warn!(cmd = ?message, "Unknown fs event command");
-                Ok(None)
-            }
+            self.watcher.watch(files)?;
+            Ok(Some(goval::Command {
+                body: Some(goval::command::Body::Ok(goval::Ok {})),
+                ..Default::default()
+            }))
+        } else {
+            warn!(cmd = ?message, "Unknown fs event command");
+            Ok(None)
         }
     }
 
@@ -114,13 +111,12 @@ impl traits::Service for FSEvents {
                 ..Default::default()
             },
             crate::SendSessions::Everyone,
-        )
-        .await?;
+        )?;
         Ok(())
     }
 
     async fn shutdown(self: Box<FSEvents>, _info: &super::types::ChannelInfo) -> Result<()> {
-        self.watcher.shutdown().await;
+        self.watcher.shutdown();
         Ok(())
     }
 }

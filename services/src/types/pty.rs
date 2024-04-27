@@ -73,7 +73,7 @@ impl Write for PtyWriter {
                 command: to_send,
                 session: *session,
             }) {
-                Ok(_) => {}
+                Ok(()) => {}
                 Err(err) => {
                     return Err(Error::new(ErrorKind::Other, err));
                 }
@@ -99,14 +99,14 @@ pub struct Pty {
 }
 
 impl Pty {
-    pub async fn start(
-        _args: Vec<String>,
+    pub fn start(
+        args: Vec<String>,
         channel: ChannelID,
         sessions: Arc<RwLock<HashMap<SessionID, tokio::sync::mpsc::UnboundedSender<IPCMessage>>>>,
-        contact: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
-        _env: Option<HashMap<String, String>>,
+        contact: &tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
+        env: Option<HashMap<String, String>>,
     ) -> Result<Pty> {
-        let env = _env.unwrap_or_default();
+        let env = env.unwrap_or_default();
 
         let pty_system = portable_pty::native_pty_system();
 
@@ -117,16 +117,16 @@ impl Pty {
             ..Default::default()
         })?;
 
-        let mut cmd = portable_pty::CommandBuilder::new(_args[0].clone());
-        let args = &mut VecDeque::from(_args.to_vec());
-        VecDeque::pop_front(args);
-        for arg in args {
+        let mut cmd = portable_pty::CommandBuilder::new(args[0].clone());
+        let real_args = &mut VecDeque::from(args);
+        VecDeque::pop_front(real_args);
+        for arg in real_args {
             cmd.arg(arg);
         }
         cmd.cwd(std::env::current_dir()?);
 
-        for (key, val) in env.into_iter() {
-            cmd.env(key, val)
+        for (key, val) in env {
+            cmd.env(key, val);
         }
 
         let child = pair.slave.spawn_command(cmd)?;
@@ -187,19 +187,19 @@ impl Pty {
                             // let queue = _read.get(&channel).unwrap().clone();
                             // drop(_read);
                             match contact_clone.send(ChannelMessage::ProcessDead(exit_code)) {
-                                Ok(_) => {}
+                                Ok(()) => {}
                                 Err(err) => {
-                                    error!(%err, "PTY child proc reaper errored when alerting channel")
+                                    error!(%err, "PTY child proc reaper errored when alerting channel");
                                 }
                             }
                         }
                         Err(err) => {
-                            error!(%err, "PTY child proc reaper errored")
+                            error!(%err, "PTY child proc reaper errored");
                         }
                     }
                 }
                 Err(err) => {
-                    error!(%err, "Join error on pty child proc reaper")
+                    error!(%err, "Join error on pty child proc reaper");
                 }
             }
         });
@@ -252,7 +252,7 @@ impl Pty {
         Ok(())
     }
 
-    pub fn write(&mut self, task: String) -> Result<()> {
+    pub fn write(&mut self, task: &str) -> Result<()> {
         if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(format_err!("Can't write to a cancelled pty"));
         }

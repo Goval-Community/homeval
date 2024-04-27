@@ -41,8 +41,7 @@ impl traits::Service for Output {
             };
 
             new_frame.body = Some(goval::command::Body::OutputBlockStartEvent(event));
-            info.send(new_frame, crate::SendSessions::Only(session))
-                .await?;
+            info.send(new_frame, crate::SendSessions::Only(session))?;
 
             pty.session_join(session, sender).await?;
         }
@@ -98,16 +97,13 @@ impl traits::Service for Output {
                 let mut env = HashMap::new();
                 env.insert("REPLIT_GIT_TOOLS_CHANNEL_FROM".into(), info.id.to_string());
 
-                self.pty = Some(
-                    Pty::start(
-                        cmd,
-                        info.id,
-                        Arc::new(RwLock::new(info.clients.clone())),
-                        info.sender.clone(),
-                        Some(env),
-                    )
-                    .await?,
-                );
+                self.pty = Some(Pty::start(
+                    cmd,
+                    info.id,
+                    Arc::new(RwLock::new(info.clients.clone())),
+                    &info.sender,
+                    Some(env),
+                )?);
 
                 let mut new_frame = goval::Command::default();
 
@@ -121,25 +117,25 @@ impl traits::Service for Output {
                 };
 
                 new_frame.body = Some(goval::command::Body::OutputBlockStartEvent(event));
-                info.send(new_frame, crate::SendSessions::Everyone).await?;
+                info.send(new_frame, crate::SendSessions::Everyone)?;
 
                 let status = goval::Command {
                     body: Some(goval::command::Body::State(goval::State::Running.into())),
                     ..Default::default()
                 };
 
-                info.send(status, crate::SendSessions::Everyone).await?;
+                info.send(status, crate::SendSessions::Everyone)?;
             }
             goval::command::Body::Clear(_) => {
                 if let Some(pty) = &mut self.pty {
                     pty.cancel().await?;
                 } else {
-                    warn!("Client tried to stop an already stopped pty")
+                    warn!("Client tried to stop an already stopped pty");
                 }
             }
             goval::command::Body::Input(msg) => {
                 if let Some(pty) = &mut self.pty {
-                    pty.write(msg)?;
+                    pty.write(&msg)?;
                 }
             }
             goval::command::Body::ResizeTerm(_) => {}
@@ -172,7 +168,7 @@ impl traits::Service for Output {
         };
 
         end_frame.body = Some(goval::command::Body::OutputBlockEndEvent(event));
-        info.send(end_frame, crate::SendSessions::Everyone).await?;
+        info.send(end_frame, crate::SendSessions::Everyone)?;
 
         if exit_code != 0 {
             let error = goval::Command {
@@ -182,20 +178,20 @@ impl traits::Service for Output {
                 ..Default::default()
             };
 
-            info.send(error, crate::SendSessions::Everyone).await?;
+            info.send(error, crate::SendSessions::Everyone)?;
         }
 
         let status = goval::Command {
             body: Some(goval::command::Body::State(goval::State::Stopped.into())),
             ..Default::default()
         };
-        info.send(status, crate::SendSessions::Everyone).await?;
+        info.send(status, crate::SendSessions::Everyone)?;
         Ok(())
     }
 }
 
 impl Output {
-    pub async fn new() -> Output {
+    pub fn new() -> Output {
         Output {
             pty: None,
             start_time: None,
