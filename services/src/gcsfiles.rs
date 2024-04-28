@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 impl traits::Service for GCSFiles {
     async fn message(
         &mut self,
-        _info: &super::types::ChannelInfo,
+        #[allow(unused)] info: &super::types::ChannelInfo,
         message: goval::Command,
         _session: SessionID,
     ) -> Result<Option<goval::Command>> {
@@ -64,19 +64,11 @@ impl traits::Service for GCSFiles {
                 let contents = match file.path.as_str() {
                     // TODO: Read this from in the db
                     ".env" => vec![],
+                    #[cfg(feature = "goval-ident")]
                     ".config/goval/info" => {
-                        let val = serde_json::json!({
-                            "server": "homeval",
-                            "version": env!("CARGO_PKG_VERSION").to_string(),
-                            "license": "AGPL",
-                            "authors": vec!["PotentialStyx <62217716+PotentialStyx@users.noreply.github.com>"],
-                            "repository": "https://github.com/goval-community/homeval",
-                            "description": "", // TODO: do dis
-                            "uptime": 0, // TODO: impl fo realz
-                            "services": super::IMPLEMENTED_SERVICES
-                        });
-
-                        val.to_string().as_bytes().to_vec()
+                        serde_json::to_string(&info.server_info.get_serializable())?
+                            .as_bytes()
+                            .to_vec()
                     }
                     _ => match fs::read(&file.path).await {
                         Err(err) => {

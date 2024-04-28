@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 use tracing::error;
 
 use crate::config::dotreplit::DotReplit;
-use crate::{ChannelID, SessionID};
+use crate::{ChannelID, ServerInfo, SessionID};
 
 use super::client::ClientInfo;
 use super::messaging::IPCMessage;
@@ -27,6 +27,8 @@ pub struct ChannelInfo {
     pub sender: tokio::sync::mpsc::UnboundedSender<super::ChannelMessage>,
     pub dotreplit: Arc<RwLock<DotReplit>>,
     pub child_env_vars: Arc<RwLock<HashMap<String, String>>>,
+
+    pub server_info: &'static ServerInfo<'static>,
 }
 
 impl ChannelInfo {

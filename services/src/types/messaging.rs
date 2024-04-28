@@ -1,14 +1,12 @@
 use anyhow::Result;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
 use crate::{SendSessions, SessionID};
 
 use super::client::ClientInfo;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub enum ReplspaceMessage {
     GithubTokenReq(String),                 // nonce
     OpenFileReq(String, bool, String),      // file, wait for close, nonce

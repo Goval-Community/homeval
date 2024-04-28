@@ -17,12 +17,13 @@ See https://govaldocs.pages.dev"""
 members = [".", "migration", "entity", "services", "protobuf"]
 
 [features]
-default = ["replspace", "database", "repldb", "verify_connections"]
+default = ["replspace", "database", "repldb", "verify_connections", "goval-ident"]
 repldb = ["database"]
 database = ["dep:sea-orm", "dep:sea-query", "dep:migration", "dep:entity"]
 replspace = []
 fun-stuff = ["dep:chrono", "dep:chrono-tz"]
 verify_connections = ["dep:hyper", "dep:hyper-tls", "dep:hyper-util", "dep:http-body-util"]
+goval-ident = ["homeval_services/goval-ident"]
 
 [dependencies]
 goval = { path = "protobuf", package = "protobuf" }
