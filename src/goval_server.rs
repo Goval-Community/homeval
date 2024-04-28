@@ -26,8 +26,8 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    parse_paseto::parse, ChannelMessage, IPCMessage, CHANNEL_MESSAGES, CHILD_PROCS_ENV_BASE,
-    DOTREPLIT_CONFIG, LAST_SESSION_USING_CHANNEL,
+    parse_paseto::parse, server_info::SERVER_INFO, ChannelMessage, IPCMessage, CHANNEL_MESSAGES,
+    CHILD_PROCS_ENV_BASE, DOTREPLIT_CONFIG, LAST_SESSION_USING_CHANNEL,
 };
 
 static MAX_SESSION: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
@@ -281,6 +281,7 @@ async fn open_channel(
                     DOTREPLIT_CONFIG.clone(),
                     CHILD_PROCS_ENV_BASE.clone(),
                     writer,
+                    &SERVER_INFO,
                 )
                 .await
                 .expect("TODO: Deal with this");

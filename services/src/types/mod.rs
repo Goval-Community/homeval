@@ -1,6 +1,9 @@
 pub mod channel_info;
 pub use channel_info::{ChannelInfo, SendSessions};
 
+pub mod server_info;
+pub use server_info::ServerInfo;
+
 pub mod messaging;
 pub use messaging::{ChannelMessage, IPCMessage, ReplspaceMessage};
 

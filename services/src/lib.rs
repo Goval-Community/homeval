@@ -1,4 +1,4 @@
-#![feature(extract_if)]
+#![feature(extract_if, lazy_cell)]
 #![warn(
     clippy::pedantic,
     clippy::unwrap_used,
@@ -36,6 +36,9 @@ mod toolchain;
 mod traits;
 mod types;
 
+#[cfg(feature = "goval-ident")]
+mod goval_ident;
+
 use anyhow::format_err;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -58,7 +61,12 @@ impl Channel {
         dotreplit: Arc<RwLock<DotReplit>>,
         child_env_vars: Arc<RwLock<HashMap<String, String>>>,
         sender: tokio::sync::mpsc::UnboundedSender<ChannelMessage>,
+
+        server_info: &'static ServerInfo<'static>,
     ) -> Result<Channel> {
+        #[cfg(feature = "goval-ident")]
+        let goval_ident = name.as_deref() == Some("goval-ident");
+
         let info = ChannelInfo {
             id,
             name,
@@ -68,10 +76,24 @@ impl Channel {
             sender: sender.clone(),
             dotreplit,
             child_env_vars,
+
+            server_info,
         };
 
         let channel: Box<dyn traits::Service + Send> = match service.as_str() {
-            "chat" => Box::new(chat::Chat::new()),
+            "chat" => {
+                #[cfg(feature = "goval-ident")]
+                {
+                    if goval_ident {
+                        Box::new(goval_ident::GovalIdent {})
+                    } else {
+                        Box::new(chat::Chat::new())
+                    }
+                }
+
+                #[cfg(not(feature = "goval-ident"))]
+                Box::new(chat::Chat::new())
+            }
             "gcsfiles" => Box::new(gcsfiles::GCSFiles {}),
             "presence" => Box::new(presence::Presence::new()),
             "ot" => Box::new(ot::OT::new(sender).await?),

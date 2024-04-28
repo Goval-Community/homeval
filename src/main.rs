@@ -7,11 +7,10 @@
 )]
 
 use anyhow::Result;
+use homeval_services::{ChannelID, SessionID};
 use std::sync::LazyLock;
 use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
-
-use homeval_services::{ChannelID, SessionID};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -30,6 +29,9 @@ mod replspace_server;
 
 #[cfg(feature = "repldb")]
 mod repldb_server;
+
+mod server_info;
+pub use server_info::SERVER_INFO;
 
 pub static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 static CPU_STATS: LazyLock<Arc<cpu_time::ProcessTime>> =
@@ -68,6 +70,7 @@ async fn main() -> Result<()> {
     debug!("Initializing lazy statics");
     LazyLock::force(&START_TIME);
     LazyLock::force(&CPU_STATS);
+    LazyLock::force(SERVER_INFO.authors);
 
     debug!("Lazy statics initialized successfully");
 

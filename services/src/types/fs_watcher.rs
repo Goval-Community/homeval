@@ -3,7 +3,6 @@ use notify_debouncer_full::{
     notify::{self, event::ModifyKind, Event, EventKind, RecommendedWatcher, Watcher},
     DebounceEventResult, Debouncer,
 };
-use serde::Serialize;
 use tracing::error;
 
 use anyhow::{format_err, Result};
@@ -20,8 +19,7 @@ use crate::ChannelMessage;
 // > = LazyLock::new(|| RwLock::new(HashMap::new()));
 // static MAX_WATCHER: LazyLock<Mutex<u32>> = LazyLock::new(|| Mutex::new(0));
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub enum FSEvent {
     Remove(String),
     Create(String),
