@@ -26,7 +26,7 @@ tracing = "0.1.40"
 tracing-futures = "0.2.5"
 
 # goval-ident features
-serde_json = { version = "1.0.116", optional = true }
+serde_json = { version = "1.0.117", optional = true }
 
 [lib]
 name = "services"
