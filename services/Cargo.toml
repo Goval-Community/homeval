@@ -8,7 +8,7 @@ edition = "2021"
 goval-ident = ["dep:serde_json"]
 
 [dependencies]
-anyhow = "1.0.81"
+anyhow = "1.0.83"
 async-trait = "0.1.80"
 crc32fast = { version = "1.4.0", features = ["nightly"] }
 deadqueue = { version = "0.2.4", default-features = false, features = ["unlimited"] }
