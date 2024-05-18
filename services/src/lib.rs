@@ -105,7 +105,7 @@ impl Channel {
             "exec" => Box::new(exec::Exec::new()),
             "dotreplit" => Box::new(dotreplit::DotReplit {}),
             "fsevents" => Box::new(fsevents::FSEvents::new(sender).await?),
-            "audio" | "null" => Box::new(stub::Stub {}), // Audio will never be supported and null does nothing
+            "null" => Box::new(stub::Stub {}), // Null does nothing
             _ => return Err(format_err!("Unknown service: {}", service)),
         };
 
@@ -205,7 +205,6 @@ pub static IMPLEMENTED_SERVICES: &[&str] = &[
     "snapshot",
     "null",
     "git",
-    "audio",
     "output",
     "shell",
     "toolchain",
